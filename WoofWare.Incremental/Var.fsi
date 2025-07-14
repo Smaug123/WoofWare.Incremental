@@ -13,3 +13,5 @@ type internal VarCrate =
 module internal Var =
     val latestValue : Var<'t> -> 't
     val incrState : Var<'a> -> State
+
+    val invariant<'a> : ('a -> unit) -> Var<'a> -> unit

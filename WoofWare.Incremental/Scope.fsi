@@ -9,3 +9,5 @@ module Scope =
     val isValid : Scope -> bool
     val isNecessary : Scope -> bool
     val addNode : Scope -> _ Node -> unit
+
+    val internal invariant : Scope -> unit

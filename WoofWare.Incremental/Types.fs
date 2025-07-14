@@ -136,7 +136,7 @@ and InternalObserverState =
 
 and InternalObserver<'a> =
     {
-        mutable State : State
+        mutable State : InternalObserverState
         Observing : Node<'a>
         mutable OnUpdateHandlers : 'a OnUpdateHandler list
         mutable PrevInAll : InternalObserverCrate option

@@ -41,7 +41,7 @@ module Scope =
           { new BindEval<_> with
               member _.Eval bind =
                   bind.Main
-                  |> Node.isNecessary
+                  |> NodeHelpers.isNecessary
           }
           |> bind.Apply
 
@@ -58,3 +58,15 @@ module Scope =
         }
         |> bind.Apply
         |> FakeUnit.toUnit
+
+    let invariant (s : Scope) =
+        match s with
+        | Scope.Top -> ()
+        | Scope.Bind bind ->
+            { new BindEval<_> with
+                member _.Eval bind =
+                    Bind.invariant ignore ignore bind
+                    |> FakeUnit.ofUnit
+            }
+            |> bind.Apply
+            |> FakeUnit.toUnit

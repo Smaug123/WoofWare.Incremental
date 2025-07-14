@@ -63,7 +63,7 @@ module internal UnorderedArrayFold =
         =
         let childAtIndex = t.Children.[childIndex]
 
-        match Node.typeEqualIfPhysSame child childAtIndex with
+        match NodeHelpers.typeEqualIfPhysSame child childAtIndex with
         | None -> failwith "UnorderedArrayFold.childChanged mismatch"
         | Some teq ->
             if t.NumChangesSinceLastFullCompute < t.FullComputeEveryNChanges - 1 then
@@ -77,33 +77,34 @@ module internal UnorderedArrayFold =
                 forceFullCompute t
 
     let invariant<'a, 'b> (invA : 'a -> unit) (invB : 'b -> unit) (f : UnorderedArrayFold<'a, 'b>) : unit =
-            Fields.iter
-      ~main:
-        (check (fun (main : _ Node.t) ->
-           match main.kind with
-           | Invalid -> ()
-           | Unordered_array_fold t' -> assert (same t t')
-           | _ -> assert false))
-      ~init:(check invariant_acc)
-      ~f:ignore
-      ~update:ignore
-      ~children:
-        (check (fun children ->
-           Array.iter children ~f:(fun (child : _ Node.t) ->
-             Uopt.invariant invariant_a child.value_opt;
-             if t.num_changes_since_last_full_compute < t.full_compute_every_n_changes
-             then assert (Uopt.is_some child.value_opt))))
-      ~fold_value:
-        (check (fun fold_value ->
-           Uopt.invariant invariant_acc fold_value;
-           [%test_result: bool]
-             (Uopt.is_some fold_value)
-             ~expect:
-               (t.num_changes_since_last_full_compute < t.full_compute_every_n_changes)))
-      ~num_changes_since_last_full_compute:
-        (check (fun num_changes_since_last_full_compute ->
-           assert (num_changes_since_last_full_compute >= 0);
-           assert (num_changes_since_last_full_compute <= t.full_compute_every_n_changes)))
-      ~full_compute_every_n_changes:
-        (check (fun full_compute_every_n_changes ->
-           assert (full_compute_every_n_changes > 0))))
+        match f.Main.Kind with
+        | Kind.Invalid -> ()
+        | Kind.UnorderedArrayFold t' ->
+            { new UnorderedArrayFoldEval<_, _> with
+                member _.Eval t' =
+                    if not (same f t') then
+                        failwith "invariant failed"
+                    FakeUnit.ofUnit ()
+            }
+            |> t'.Apply
+            |> FakeUnit.toUnit
+        | k -> failwith $"invariant failed: {k}"
+
+        invB f.Init
+
+        for child in f.Children do
+            child.ValueOpt |> ValueOption.iter invA
+            if f.NumChangesSinceLastFullCompute < f.FullComputeEveryNChanges then
+                if child.ValueOpt.IsNone then
+                    failwith "invariant failed"
+
+        f.FoldValue |> ValueOption.iter invB
+        if f.FoldValue.IsSome <> (f.NumChangesSinceLastFullCompute < f.FullComputeEveryNChanges) then
+            failwith "invariant failed"
+
+        do
+            if f.NumChangesSinceLastFullCompute < 0 then failwith "invariant failed"
+            if f.NumChangesSinceLastFullCompute > f.FullComputeEveryNChanges then failwith "invariant failed"
+
+        if f.FullComputeEveryNChanges <= 0 then
+            failwith "invariant failed"

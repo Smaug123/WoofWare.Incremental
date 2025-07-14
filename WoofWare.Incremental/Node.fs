@@ -6,41 +6,7 @@ open TypeEquality
 [<RequireQualifiedAccess>]
 module Node =
 
-    let isValue (n : 'a Node) : bool =
-        match n.Kind with
-        | Kind.Invalid -> false
-        | _ -> true
-
-    let isNecessary (n : 'a Node) : bool =
-        n.NumParents > 0
-        || n.Observers.IsSome
-        || (
-            match n.Kind with
-            | Kind.Freeze _ -> true
-            | _ -> false
-        )
-        || n.ForceNecessary
-
     let nodeIsInjective<'a, 'b> (t : Teq<'a Node, 'b Node>) : Teq<'a, 'b> = Teq.Cong.believeMe t
-
-    let typeEqualIfPhysSame<'a, 'b> (t1 : Node<'a>) (t2 : Node<'b>) : Teq<'a, 'b> option =
-        (* This is type-safe assuming no one can give the same incremental node two different
-           types.  This is true because the field [mutable old_value_opt : 'a option] prevents
-           both subtyping and parameteric polymorphism.  But this allows to break
-           abstractions, as in someone could write:
-
-           {[
-             type t
-             type u (* = t underneath *)
-             val create : unit -> t Incr.t * u Incr.t (* the two incrementals are phys_equal *)
-           ]}
-
-           and we would figure out that type t = u.  However, we could add a Type_equal.Id to
-           nodes and do the same, so it seems to be a more general issue. *)
-        if Object.ReferenceEquals (t1, t2) then
-            Teq.tryRefl<'a, 'b>
-        else
-            None
 
     let same (t1 : Node<'a>) (t2 : Node<'b>) = Object.ReferenceEquals (t1, t2)
     let packedSame (t1 : NodeCrate) (t2 : NodeCrate) =
@@ -170,7 +136,7 @@ module Node =
         iteriChildren t (fun _ child ->
             { new NodeEval<_> with
                 member _.Eval child =
-                    has <- has || not (isValid child)
+                    has <- has || not (NodeHelpers.isValid child)
                     FakeUnit.ofUnit ()
             }
             |> child.Apply
@@ -211,20 +177,20 @@ module Node =
           | Kind.BindLhsChange (cr, _) ->
               { new BindEval<_> with
                   member _.Eval cr =
-                      isValid cr.Lhs
+                      NodeHelpers.isValid cr.Lhs
                       |> not
               }
               |> cr.Apply
           | Kind.IfTestChange (cr, _) ->
               { new IfThenElseEval<_> with
                   member _.Eval cr =
-                      not (isValid cr.Test)
+                      not (NodeHelpers.isValid cr.Test)
               }
               |> cr.Apply
           | Kind.JoinLhsChange (cr, _) ->
               { new JoinEval<_> with
                   member _.Eval cr =
-                      not (isValid cr.Lhs)
+                      not (NodeHelpers.isValid cr.Lhs)
               }
               |> cr.Apply
           (* [Bind_main], [If_then_else], and [Join_main] are invalid if their *_change child is,
@@ -233,11 +199,11 @@ module Node =
           | Kind.BindMain cr ->
               { new BindMainEval<_, _> with
                   member _.Eval cr =
-                      not (isValid cr.LhsChange)
+                      not (NodeHelpers.isValid cr.LhsChange)
               }
               |> cr.Apply
-          | Kind.IfThenElse ite -> not (isValid ite.TestChange)
-          | Kind.JoinMain join -> not (isValid join.LhsChange)
+          | Kind.IfThenElse ite -> not (NodeHelpers.isValid ite.TestChange)
+          | Kind.JoinMain join -> not (NodeHelpers.isValid join.LhsChange)
           | Kind.Expert _ ->
             (* This is similar to what we do for bind above, except that any invalid child can be
                removed, so we can only tell if an expert node becomes invalid when all its
@@ -255,6 +221,56 @@ module Node =
         ac
 
     let iterObservers (t: Node<'a>) (f: InternalObserver<'a> -> unit) : unit = foldObservers t () (fun () -> f)
+
+    let unsafeValue (t: Node<'a>) : 'a = t.ValueOpt.Value
+
+    let valueThrowing (t: Node<'a>) : 'a =
+        match t.ValueOpt with
+        | ValueNone -> failwith "attempt to get value of an invalid node"
+        | ValueSome v -> v
+
+    let getCutoff (t: Node<'a>) : Cutoff<'a> = t.Cutoff
+    let setCutoff (t: Node<'a>) (cutoff: Cutoff<'a>) : unit = t.Cutoff <- cutoff
+
+    let isConst (t : Node<'a>) : bool =
+        match t.Kind with
+        | Kind.Const _ -> true
+        | _ -> false
+
+    let onUpdate (t: Node<'a>) (onUpdateHandler: OnUpdateHandler<'a>) : unit =
+        t.OnUpdateHandlers <- onUpdateHandler :: t.OnUpdateHandlers
+        t.NumOnUpdateHandlers <- t.NumOnUpdateHandlers + 1
+
+    let runOnUpdateHandlers t nodeUpdate now =
+        let mutable r = t.OnUpdateHandlers
+        while not r.IsEmpty do
+            match r with
+            | [] -> failwith "LOGIC ERROR"
+            | onUpdateHandler :: rest ->
+                r <- rest
+                OnUpdateHandler.run onUpdateHandler nodeUpdate now
+
+        let mutable r = t.Observers
+        while r.IsSome do
+            let observer = r.Value
+            r <- observer.NextInObserving
+            let mutable r = observer.OnUpdateHandlers
+            while not r.IsEmpty do
+                match r with
+                | [] -> failwith "LOGIC ERROR"
+                | onUpdateHandler :: rest ->
+                    r <- rest
+                    // We have to test [state] before each on-update handler, because an on-update
+                    // handler might disable its own observer, which should prevent other on-update
+                    // handlers in the same observer from running.
+                    match observer.State with
+                    | InternalObserverState.Created | InternalObserverState.Unlinked -> failwith "unexpected"
+                    | InternalObserverState.Disallowed -> ()
+                    | InternalObserverState.InUse -> OnUpdateHandler.run onUpdateHandler nodeUpdate now
+
+    let setKind (t: Node<'a>) (kind: Kind<'a>) : unit =
+        t.Kind <- kind
+        t.MyParentIndexInChildAtIndex <- Array.create (Kind.initialNumChildren kind) -1
 
     let invariant<'a> (invA : 'a -> unit) (t : Node<'a>) : unit =
         if needsToBeComputed t <> isInRecomputeHeap t then
@@ -292,7 +308,7 @@ module Node =
         NodeId.invariant t.Id
         StabilizationNum.invariant t.RecomputedAt
         do
-            if isValid t && not (isStale t) then
+            if NodeHelpers.isValid t && not (isStale t) then
                 if t.ValueOpt.IsNone then failwith "invariant failure"
             t.ValueOpt |> ValueOption.iter invA
 
@@ -310,61 +326,85 @@ module Node =
                 if t.ChangedAt > t.RecomputedAt then
                     failwith "invariant failure"
 
-      ~num_on_update_handlers:
-        (check
-           ([%test_result: int]
-              ~expect:
-                (List.length t.on_update_handlers
-                 + fold_observers t ~init:0 ~f:(fun n { on_update_handlers; _ } ->
-                   n + List.length on_update_handlers))))
-      ~num_parents:
-        (check (fun num_parents ->
-           assert (num_parents >= 0);
-           assert (num_parents <= 1 + Uniform_array.length t.parent1_and_beyond)))
-      ~parent1_and_beyond:
-        (check (fun parent1_and_beyond ->
-           for parent_index = 1 to Uniform_array.length parent1_and_beyond do
-             [%test_eq: bool]
-               (parent_index < t.num_parents)
-               (Uopt.is_some (Uniform_array.get parent1_and_beyond (parent_index - 1)))
-           done))
-      ~parent0:
-        (check (fun parent0 ->
-           [%test_eq: bool] (t.num_parents > 0) (Uopt.is_some parent0)))
-      ~created_in:(check Scope.invariant)
-      ~next_node_in_same_scope:
-        (check (fun next_node_in_same_scope ->
-           if Scope.is_top t.created_in || not (is_valid t)
-           then assert (Uopt.is_none next_node_in_same_scope)))
-      ~height:
-        (check (fun height ->
-           if is_necessary t then assert (height >= 0) else assert (height = -1)))
-      ~height_in_recompute_heap:
-        (check (fun height_in_recompute_heap ->
-           assert (height_in_recompute_heap >= -1);
-           assert (height_in_recompute_heap <= t.height)))
-      ~prev_in_recompute_heap:
-        (check (fun (prev_in_recompute_heap : Packed.t Uopt.t) ->
-           if not (is_in_recompute_heap t)
-           then assert (Uopt.is_none prev_in_recompute_heap);
-           if Uopt.is_some prev_in_recompute_heap
-           then (
-             let (T prev) = Uopt.value_exn prev_in_recompute_heap in
-             assert (packed_same (T t) (Uopt.value_exn prev.next_in_recompute_heap));
-             assert (t.height_in_recompute_heap = prev.height_in_recompute_heap))))
-      ~next_in_recompute_heap:
-        (check (fun (next_in_recompute_heap : Packed.t Uopt.t) ->
-           if not (is_in_recompute_heap t)
-           then assert (Uopt.is_none next_in_recompute_heap);
-           if Uopt.is_some next_in_recompute_heap
-           then (
-             let (T next) = Uopt.value_exn next_in_recompute_heap in
-             assert (packed_same (T t) (Uopt.value_exn next.prev_in_recompute_heap));
-             assert (t.height_in_recompute_heap = next.height_in_recompute_heap))))
-      ~height_in_adjust_heights_heap:
-        (check (fun height_in_adjust_heights_heap ->
-           if height_in_adjust_heights_heap >= 0
-           then assert (height_in_adjust_heights_heap < t.height)))
+        do
+            let expected =
+                List.length t.OnUpdateHandlers + foldObservers t 0 (fun n h -> n + List.length h.OnUpdateHandlers)
+            if expected <> t.NumOnUpdateHandlers then
+                failwith "invariant failure"
+
+        do
+            if t.NumParents < 0 then
+                failwith "invariant failure"
+            if t.NumParents > 1 + t.Parent1AndBeyond.Length then
+                failwith "invariant failure"
+
+        do
+            for parentIndex = 1 to t.Parent1AndBeyond.Length do
+                if (parentIndex < t.NumParents) <> t.Parent1AndBeyond.[parentIndex - 1].IsSome then
+                    failwith "invariant failure"
+
+        if (t.NumParents > 0) <> t.Parent0.IsSome then
+            failwith "invariant failure"
+
+        Scope.invariant t.CreatedIn
+
+        if Scope.isTop t.CreatedIn || not (NodeHelpers.isValid t) then
+            if t.NextNodeInSameScope.IsSome then
+                failwith "invariant failure"
+
+        do
+            if isNecessary t then
+                if t.Height < 0 then failwith "invariant failed"
+            else
+                if t.Height <> -1 then failwith "invariant failed"
+
+        do
+            if t.HeightInRecomputeHeap < -1 then
+                failwith "invariant failed"
+            if t.HeightInRecomputeHeap > t.Height then
+                failwith "invariant failed"
+
+        do
+            if not (isInRecomputeHeap t) then
+                if t.PrevInRecomputeHeap.IsSome then
+                    failwith "invariant failed"
+            match t.PrevInRecomputeHeap with
+            | ValueNone -> ()
+            | ValueSome prev ->
+                { new NodeEval<_> with
+                    member _.Eval prev =
+                        if not (packedSame t prev.NextInRecomputeHeap.Value) then
+                            failwith "invariant failure"
+                        if t.HeightInRecomputeHeap <> prev.HeightInRecomputeHeap then
+                            failwith "invariant failure"
+                        FakeUnit.ofUnit ()
+                }
+                |> prev.Apply
+                |> FakeUnit.toUnit
+
+        do
+            if not (isInRecomputeHeap t) then
+                if t.NextInRecomputeHeap.IsSome then
+                    failwith "invariant failed"
+            match t.NextInRecomputeHeap with
+            | ValueNone -> ()
+            | ValueSome next ->
+                { new NodeEval<_> with
+                    member _.Eval next =
+                        if not (packedSame t next.PrevInRecomputeHeap.Value) then
+                            failwith "invariant failure"
+                        if t.HeightInRecomputeHeap <> next.HeightInRecomputeHeap then
+                            failwith "invariant failure"
+                        FakeUnit.ofUnit ()
+                }
+                |> next.Apply
+                |> FakeUnit.toUnit
+
+        do
+            if t.HeightInAdjustHeightsHeap >= 0 then
+                if t.HeightInAdjustHeightsHeap >= t.Height then
+                    failwith "invariant failure"
+
       ~next_in_adjust_heights_heap:
         (check (fun (next_in_adjust_heights_heap : Packed.t Uopt.t) ->
            if not (is_in_adjust_heights_heap t)
@@ -382,9 +422,6 @@ module Node =
              match state with
              | In_use | Disallowed -> ()
              | Created | Unlinked -> assert false)))
-      ~is_in_handle_after_stabilization:ignore
-      ~on_update_handlers:ignore
-      ~user_info:ignore
       ~my_parent_index_in_child_at_index:
         (check (fun my_parent_index_in_child_at_index ->
            (match t.kind with
@@ -418,67 +455,6 @@ module Node =
                     ~index:my_child_index_in_parent_at_index.(parent_index))));
            if debug && not (is_necessary t)
            then Array.iter my_child_index_in_parent_at_index ~f:(fun x -> assert (x = -1))))
-      ~force_necessary:ignore
-      ~creation_backtrace:ignore)
-;;
-
-let unsafe_value t = Uopt.unsafe_value t.value_opt
-
-let value_exn t =
-  if Uopt.is_some t.value_opt
-  then Uopt.unsafe_value t.value_opt
-  else failwiths "attempt to get value of an invalid node" t [%sexp_of: _ t]
-;;
-
-let get_cutoff t = t.cutoff
-let set_cutoff t cutoff = t.cutoff <- cutoff
-
-let is_const t =
-  match t.kind with
-  | Const _ -> true
-  | _ -> false
-;;
-
-let on_update t on_update_handler =
-  t.on_update_handlers <- on_update_handler :: t.on_update_handlers;
-  t.num_on_update_handlers <- t.num_on_update_handlers + 1
-;;
-
-let run_on_update_handlers t node_update ~now =
-  let r = ref t.on_update_handlers in
-  while not (List.is_empty !r) do
-    match !r with
-    | [] -> assert false
-    | on_update_handler :: rest ->
-      r := rest;
-      On_update_handler.run on_update_handler node_update ~now
-  done;
-  let r = ref t.observers in
-  while Uopt.is_some !r do
-    let observer = Uopt.value_exn !r in
-    r := observer.next_in_observing;
-    let r = ref observer.on_update_handlers in
-    while not (List.is_empty !r) do
-      match !r with
-      | [] -> assert false
-      | on_update_handler :: rest ->
-        r := rest;
-        (* We have to test [state] before each on-update handler, because an on-update
-           handler might disable its own observer, which should prevent other on-update
-           handlers in the same observer from running. *)
-        (match observer.state with
-         | Created | Unlinked -> assert false
-         | Disallowed -> ()
-         | In_use -> On_update_handler.run on_update_handler node_update ~now)
-    done
-  done
-;;
-
-let set_kind t kind =
-  t.kind <- kind;
-  t.my_parent_index_in_child_at_index
-  <- Array.create ~len:(Kind.initial_num_children kind) (-1)
-;;
 
 let create state created_in kind =
   let t =
