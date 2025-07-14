@@ -39,3 +39,5 @@ module internal Expert =
     val beforeMainComputation : _ Expert -> BeforeMainComputationResult
     val observabilityChange : _ Expert -> isNowOservable:bool -> unit
     val runEdgeCallback : _ Expert -> childIndex:int -> unit
+
+    val invariant<'a> : ('a -> unit) -> Expert<'a> -> unit

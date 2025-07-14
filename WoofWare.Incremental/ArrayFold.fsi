@@ -6,3 +6,5 @@ namespace WoofWare.Incremental
 [<RequireQualifiedAccess>]
 module internal ArrayFold =
     val compute : ArrayFold<'a, 'b> -> 'b
+
+    val invariant : ('a -> unit) -> ('b -> unit) -> ArrayFold<'a, 'b> -> unit

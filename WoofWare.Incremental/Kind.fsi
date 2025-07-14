@@ -17,3 +17,5 @@ module internal Kind =
     val ifBranchChildIndex : int
     val joinRhsChildIndex : int
     val iteriChildren<'a> : Kind<'a> -> f:(int -> NodeCrate -> unit) -> unit
+
+    val invariant<'a> : Kind<'a> -> ('a -> unit) -> unit

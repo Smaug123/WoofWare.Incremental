@@ -54,7 +54,7 @@ and AtIntervals =
     {
         Main : Node<unit>
         Base : TimeNs
-        Interval : TimeSpan
+        Interval : TimeNs.Span
         Alarm : Alarm
         Clock : Clock
     }
@@ -142,7 +142,7 @@ and InternalObserver<'a> =
         mutable PrevInAll : InternalObserverCrate option
         mutable NextInAll : InternalObserverCrate option
         mutable PrevInObserving : InternalObserver<'a> option
-        mutable NextInObserving : InternalObserver<'a> option
+        mutable NextInObserving : InternalObserver<'a> voption
     }
 
 and InternalObserverEval<'ret> =
@@ -270,7 +270,7 @@ and Node<'a> =
             /// only one parent.
             mutable NumParents : int
             mutable Parent1AndBeyond : NodeCrate voption[]
-            mutable Parent0 : NodeCrate option
+            mutable Parent0 : NodeCrate voption
             /// [created_in] is initially the scope that the node is created in.  If a node is
             /// later "rescoped", then created_in will be adjusted to the new scope that the node
             /// is part of.

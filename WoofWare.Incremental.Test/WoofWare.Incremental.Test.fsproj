@@ -19,7 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\WoofWare.Incremental.fsproj" />
+      <ProjectReference Include="..\WoofWare.Incremental\WoofWare.Incremental.fsproj" />
     </ItemGroup>
 
 </Project>

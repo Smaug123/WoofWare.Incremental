@@ -70,184 +70,246 @@ module Node =
             | Some i -> Some (DotUserInfo.Info i)
         t.UserInfo <- desired
 
-let append_user_info_graphviz t ~label ~attrs =
-  let new_ = Dot_user_info.dot ~label ~attributes:attrs in
-  t.user_info
-  <- (match t.user_info with
-      | None -> Some new_
-      | Some other -> Some (Dot_user_info.append other new_))
-;;
+    let appendUserInfoGraphviz (t: Node<'a>) (label: string list) (attrs: Map<string,string>) : unit =
+        let new' = DotUserInfo.dot label attrs
+        let newUserInfo =
+            match t.UserInfo with
+            | None -> new'
+            | Some other ->  DotUserInfo.append other new'
+        t.UserInfo <- Some newUserInfo
 
-let edge_is_stale ~child ~parent =
-  Stabilization_num.compare child.changed_at parent.recomputed_at > 0
-;;
+    let edgeIsStale (child: Node<'a>) (parent: Node<'b>) : bool =
+        child.ChangedAt > parent.RecomputedAt
 
-let is_stale_with_respect_to_a_child t =
-  let is_stale = ref false in
-  iteri_children t ~f:(fun _ (T child) ->
-    if edge_is_stale ~child ~parent:t then is_stale := true);
-  !is_stale
-;;
+    let isStaleWithRespectToAChild (t: Node<'a>) : bool =
+        let mutable isStale = false
+        iteriChildren t (fun _ child ->
+            { new NodeEval<_> with
+                member _.Eval child =
+                    if edgeIsStale child t then isStale <- true
+                    FakeUnit.ofUnit ()
+            }
+            |> child.Apply
+            |> FakeUnit.toUnit
+        )
+        isStale
 
-let is_stale : type a. a t -> bool =
-  fun (t : a t) ->
-  match t.kind with
-  | Uninitialized -> assert false
-  (* A const node is stale only at initialization. *)
-  | Const _ -> Stabilization_num.is_none t.recomputed_at
-  (* Time-based nodes are considered stale when [t.recomputed_at] is none, which happens
-     at initialization and when the alarm mechanism makes a node stale (it sets the
-     [t.recomputed_at] to [Stabilization_num.none]). *)
-  | At _ -> Stabilization_num.is_none t.recomputed_at
-  | At_intervals _ -> Stabilization_num.is_none t.recomputed_at
-  | Snapshot _ -> Stabilization_num.is_none t.recomputed_at
-  (* We never consider an invalidated node to be stale -- when we invalidate a node, we
-     immediately propagate invalidity to its ancestors. *)
-  | Invalid -> false
-  (* A [Var] node is stale if it was set since it was recomputed. *)
-  | Var { set_at; _ } -> Stabilization_num.compare set_at t.recomputed_at > 0
-  (* Nodes that have children. *)
-  | Bind_lhs_change _ ->
-    Stabilization_num.is_none t.recomputed_at || is_stale_with_respect_to_a_child t
-  | If_test_change _ ->
-    Stabilization_num.is_none t.recomputed_at || is_stale_with_respect_to_a_child t
-  | Join_lhs_change _ ->
-    Stabilization_num.is_none t.recomputed_at || is_stale_with_respect_to_a_child t
-  | Array_fold _
-  | Bind_main _
-  | Freeze _
-  | If_then_else _
-  | Join_main _
-  | Map _
-  | Map2 _
-  | Step_function _
-  | Unordered_array_fold _ ->
-    Stabilization_num.is_none t.recomputed_at || is_stale_with_respect_to_a_child t
-  | Expert { force_stale; _ } ->
-    force_stale
-    || Stabilization_num.is_none t.recomputed_at
-    || is_stale_with_respect_to_a_child t
-;;
+    let isStale<'a> (t : Node<'a>) : bool =
+        match t.Kind with
+          | Kind.Uninitialized -> failwith "should not have called"
+          | Kind.Const _ ->
+              // A const node is stale only at initialization.
+              StabilizationNum.isNone t.RecomputedAt
+          | At _
+          | Kind.AtIntervals _
+          | Kind.Snapshot _ ->
+          // Time-based nodes are considered stale when [t.recomputed_at] is none, which happens
+          // at initialization and when the alarm mechanism makes a node stale (it sets the
+          // [t.recomputed_at] to [Stabilization_num.none]).
+               StabilizationNum.isNone t.RecomputedAt
+          | Kind.Invalid ->
+            // We never consider an invalidated node to be stale -- when we invalidate a node, we immediately
+            // propagate invalidity to its ancestors.
+              false
+          | Kind.Var node ->
+          // A [Var] node is stale if it was set since it was recomputed.
+              node.SetAt > t.RecomputedAt
+          (* Nodes that have children. *)
+          | Kind.BindLhsChange _
+          | Kind.IfTestChange _
+          | Kind.JoinLhsChange _ ->
+            StabilizationNum.isNone t.RecomputedAt || isStaleWithRespectToAChild t
+          | Kind.ArrayFold _
+          | Kind.BindMain _
+          | Kind.Freeze _
+          | Kind.IfThenElse _
+          | Kind.JoinMain _
+          | Kind.Map _
+          | Kind.Map2 _
+          | Kind.StepFunction _
+          | Kind.UnorderedArrayFold _ ->
+            StabilizationNum.isNone t.RecomputedAt || isStaleWithRespectToAChild t
+          | Expert node ->
+            node.ForceStale
+            || StabilizationNum.isNone t.RecomputedAt
+            || isStaleWithRespectToAChild t
 
-let needs_to_be_computed t = is_necessary t && is_stale t
-let is_in_recompute_heap t = t.height_in_recompute_heap >= 0
-let is_in_adjust_heights_heap t = t.height_in_adjust_heights_heap >= 0
+    let needsToBeComputed (t: Node<'a>) : bool = isNecessary t && isStale t
 
-let get_parent t ~index =
-  Uopt.value_exn
-    (if index = 0 then t.parent0 else Uniform_array.get t.parent1_and_beyond (index - 1))
-;;
+    let isInRecomputeHeap (t: Node<'a>) : bool = t.HeightInRecomputeHeap >= 0
+    let isInAdjustHeightsHeap (t: Node<'a>) : bool = t.HeightInAdjustHeightsHeap >= 0
 
-let iteri_parents t ~f =
-  if t.num_parents > 0
-  then (
-    f 0 (Uopt.value_exn t.parent0);
-    for index = 1 to t.num_parents - 1 do
-      f index (Uopt.value_exn (Uniform_array.get t.parent1_and_beyond (index - 1)))
-    done)
-;;
+    let getParent (t: Node<'a>) (index: int) : NodeCrate =
+        if index = 0 then
+            t.Parent0
+        else
+            t.Parent1AndBeyond.[index - 1]
+        |> ValueOption.get
 
-let has_child t ~child =
-  let has = ref false in
-  iteri_children t ~f:(fun _ (T child') -> has := !has || same child child');
-  !has
-;;
+    let iteriParents (t: Node<'a>) (f: int -> NodeCrate -> unit) : unit =
+        if t.NumParents > 0 then
+            f 0 t.Parent0.Value
+            for index = 0 to t.NumParents - 1 do
+                f index t.Parent1AndBeyond.[index - 1].Value
 
-let has_invalid_child t =
-  let has = ref false in
-  iteri_children t ~f:(fun _ (T child) -> has := !has || not (is_valid child));
-  !has
-;;
+    let hasChild (t: Node<'a>) (child: Node<'b>) : bool =
+        let mutable has = false
+        iteriChildren t (fun _ child' ->
+            { new NodeEval<_> with
+                member _.Eval child' =
+                    has <- has || same child child'
+                    FakeUnit.ofUnit ()
+            }
+            |> child'.Apply
+            |> FakeUnit.toUnit
+        )
+        has
 
-let has_parent (t : _ t) ~parent =
-  let has = ref false in
-  iteri_parents t ~f:(fun _ (T parent') -> has := !has || same parent parent');
-  !has
-;;
+    let hasInvalidChild (t: Node<'a>) : bool =
+        let mutable has = false
+        iteriChildren t (fun _ child ->
+            { new NodeEval<_> with
+                member _.Eval child =
+                    has <- has || not (isValid child)
+                    FakeUnit.ofUnit ()
+            }
+            |> child.Apply
+            |> FakeUnit.toUnit
+        )
+        has
 
-let should_be_invalidated : type a. a t -> bool =
-  fun t ->
-  match t.kind with
-  (* nodes with no children *)
-  | Uninitialized -> assert false
-  | At _ -> false
-  | At_intervals _ -> false
-  | Const _ | Snapshot _ | Var _ -> false
-  | Invalid -> false
-  (* Nodes with a fixed set of children are invalid if any child is invalid. *)
-  | Array_fold _
-  | Freeze _
-  | Map _
-  | Map2 _
-  | Step_function _
-  | Unordered_array_fold _ -> has_invalid_child t
-  (* A *_change node is invalid if the node it is watching for changes is invalid (same
-     reason as above).  This is equivalent to [has_invalid_child t]. *)
-  | Bind_lhs_change { lhs; _ } -> not (is_valid lhs)
-  | If_test_change { test; _ } -> not (is_valid test)
-  | Join_lhs_change { lhs; _ } -> not (is_valid lhs)
-  (* [Bind_main], [If_then_else], and [Join_main] are invalid if their *_change child is,
-     but not necessarily if their other children are -- the graph may be restructured to
-     avoid the invalidity of those. *)
-  | Bind_main { lhs_change; _ } -> not (is_valid lhs_change)
-  | If_then_else { test_change; _ } -> not (is_valid test_change)
-  | Join_main { lhs_change; _ } -> not (is_valid lhs_change)
-  | Expert _ ->
-    (* This is similar to what we do for bind above, except that any invalid child can be
-       removed, so we can only tell if an expert node becomes invalid when all its
-       dependencies have fired (which in practice means when we are about to run it). *)
-    false
-;;
+    let hasParent (t: Node<'a>) (parent: Node<'b>) : bool =
+        let mutable has = false
+        iteriParents t (fun _ parent' ->
+            { new NodeEval<_> with
+                member _.Eval parent' =
+                    has <- has || same parent parent'
+                    FakeUnit.ofUnit ()
+            }
+            |> parent'.Apply
+            |> FakeUnit.toUnit
+        )
+        has
 
-let fold_observers (t : _ t) ~init ~f =
-  let r = ref t.observers in
-  let ac = ref init in
-  while Uopt.is_some !r do
-    let observer = Uopt.value_exn !r in
-    r := observer.next_in_observing;
-    ac := f !ac observer
-  done;
-  !ac
-;;
+    let shouldBeInvalidated<'a> (t : Node<'a>) : bool =
+          match t.Kind with
+          (* nodes with no children *)
+          | Kind.Uninitialized -> failwith "should not call"
+          | Kind.At _ -> false
+          | Kind.AtIntervals _ -> false
+          | Kind.Const _ | Kind.Snapshot _ | Kind.Var _ -> false
+          | Kind.Invalid -> false
+          (* Nodes with a fixed set of children are invalid if any child is invalid. *)
+          | Kind.ArrayFold _
+          | Kind.Freeze _
+          | Kind.Map _
+          | Kind.Map2 _
+          | Kind.StepFunction _
+          | Kind.UnorderedArrayFold _ -> hasInvalidChild t
+          (* A *_change node is invalid if the node it is watching for changes is invalid (same
+             reason as above).  This is equivalent to [has_invalid_child t]. *)
+          | Kind.BindLhsChange (cr, _) ->
+              { new BindEval<_> with
+                  member _.Eval cr =
+                      isValid cr.Lhs
+                      |> not
+              }
+              |> cr.Apply
+          | Kind.IfTestChange (cr, _) ->
+              { new IfThenElseEval<_> with
+                  member _.Eval cr =
+                      not (isValid cr.Test)
+              }
+              |> cr.Apply
+          | Kind.JoinLhsChange (cr, _) ->
+              { new JoinEval<_> with
+                  member _.Eval cr =
+                      not (isValid cr.Lhs)
+              }
+              |> cr.Apply
+          (* [Bind_main], [If_then_else], and [Join_main] are invalid if their *_change child is,
+             but not necessarily if their other children are -- the graph may be restructured to
+             avoid the invalidity of those. *)
+          | Kind.BindMain cr ->
+              { new BindMainEval<_, _> with
+                  member _.Eval cr =
+                      not (isValid cr.LhsChange)
+              }
+              |> cr.Apply
+          | Kind.IfThenElse ite -> not (isValid ite.TestChange)
+          | Kind.JoinMain join -> not (isValid join.LhsChange)
+          | Kind.Expert _ ->
+            (* This is similar to what we do for bind above, except that any invalid child can be
+               removed, so we can only tell if an expert node becomes invalid when all its
+               dependencies have fired (which in practice means when we are about to run it). *)
+            false
 
-let iter_observers t ~f = fold_observers t ~init:() ~f:(fun () observer -> f observer)
+    let foldObservers (t : Node<'a>) (init: 'acc) (f: 'acc -> InternalObserver<'a> -> 'acc) : 'acc =
+        let mutable r = t.Observers
+        let mutable ac = init
+        while r.IsSome do
+            let observer = r.Value
+            r <- observer.NextInObserving
+            ac <- f ac observer
 
-let invariant (type a) (invariant_a : a -> unit) (t : a t) =
-  Invariant.invariant t [%sexp_of: _ t] (fun () ->
-    [%test_eq: bool] (needs_to_be_computed t) (is_in_recompute_heap t);
-    if is_necessary t
-    then (
-      assert (t.height > Scope.height t.created_in);
-      iteri_children t ~f:(fun _ (T child) ->
-        assert (t.height > child.height);
-        assert (has_parent child ~parent:t));
-      assert (not (should_be_invalidated t)));
-    iteri_parents t ~f:(fun _ (T parent) ->
-      assert (has_child parent ~child:t);
-      assert (is_necessary parent);
-      assert (t.height < parent.height));
-    let check f = Invariant.check_field t f in
-    Fields.iter
-      ~id:(check Node_id.invariant)
-      ~state:ignore
-      ~recomputed_at:(check Stabilization_num.invariant)
-      ~value_opt:
-        (check (fun value_opt ->
-           if is_valid t && not (is_stale t) then assert (Uopt.is_some value_opt);
-           Uopt.invariant invariant_a value_opt))
-      ~kind:
-        (check (fun kind ->
-           Kind.invariant invariant_a kind;
-           match kind with
-           | Expert e ->
-             Expert.invariant_about_num_invalid_children e ~is_necessary:(is_necessary t)
-           | _ -> ()))
-      ~cutoff:(check (Cutoff.invariant invariant_a))
-      ~changed_at:
-        (check (fun changed_at ->
-           Stabilization_num.invariant changed_at;
-           if Stabilization_num.is_some t.recomputed_at
-           then assert (Stabilization_num.compare changed_at t.recomputed_at <= 0)))
+        ac
+
+    let iterObservers (t: Node<'a>) (f: InternalObserver<'a> -> unit) : unit = foldObservers t () (fun () -> f)
+
+    let invariant<'a> (invA : 'a -> unit) (t : Node<'a>) : unit =
+        if needsToBeComputed t <> isInRecomputeHeap t then
+            failwith "invariant failure"
+        if isNecessary t then
+            if t.Height <= Scope.height t.CreatedIn then
+                failwith "invariant failure"
+            iteriChildren t (fun _ child ->
+                { new NodeEval<_> with
+                    member _.Eval child =
+                        if t.Height <= child.Height then failwith "invariant failure"
+                        if not (hasParent child t) then failwith "invariant failure"
+                        FakeUnit.ofUnit ()
+                }
+                |> child.Apply
+                |> FakeUnit.toUnit
+            )
+            if shouldBeInvalidated t then
+                failwith "invariant failure"
+        iteriParents t (fun _ parent ->
+            { new NodeEval<_> with
+                member _.Eval parent =
+                 if not (hasChild parent t) then
+                     failwith "invariant failure"
+                 if not (isNecessary parent) then
+                     failwith "invariant failure"
+                 if t.Height >= parent.Height then
+                     failwith "invariant failure"
+                 FakeUnit.ofUnit ()
+            }
+            |> parent.Apply
+            |> FakeUnit.toUnit
+        )
+
+        NodeId.invariant t.Id
+        StabilizationNum.invariant t.RecomputedAt
+        do
+            if isValid t && not (isStale t) then
+                if t.ValueOpt.IsNone then failwith "invariant failure"
+            t.ValueOpt |> ValueOption.iter invA
+
+        do
+            Kind.invariant invA t.Kind
+            match kind with
+            | Kind.Expert e -> Expert.invariantAboutNumInvalidChildren e (isNecessary t)
+            | _ -> ()
+
+        Cutoff.invariant invA t.Cutoff
+
+        do
+            StabilizationNum.invariant t.ChangedAt
+            if StabilizationNum.isSome t.RecomputedAt then
+                if t.ChangedAt > t.RecomputedAt then
+                    failwith "invariant failure"
+
       ~num_on_update_handlers:
         (check
            ([%test_result: int]

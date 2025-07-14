@@ -8,11 +8,11 @@ open WoofWare.TimingWheel
 module internal StepFunctionNode =
     let physSame (t1 : StepFunctionNode<'a>) (t2 : StepFunctionNode<'b>) = Object.ReferenceEquals (t1, t2)
 
-    let rec advance_internal (t : StepFunctionNode<'a>) to_ a1 (steps : IEnumerator<TimeNs * 'a>) =
+    let rec advanceInternal (t : StepFunctionNode<'a>) (to_: TimeNs) (a1: 'a) (steps : IEnumerator<TimeNs * 'a>) : unit =
       if steps.MoveNext () then
         let step_at, a2 = steps.Current
         if to_ >= step_at then
-            advance_internal t to_ a2 steps
+            advanceInternal t to_ a2 steps
         else
             t.Value <- ValueSome a1
             t.UpcomingSteps <- stepsOld
@@ -22,4 +22,28 @@ module internal StepFunctionNode =
 
     let advance (t : StepFunctionNode<'a>) to_ =
         use s = t.UpcomingSteps.GetEnumerator ()
-        advance_internal t to_ (ValueOption.get t.Value) s
+        advanceInternal t to_ (ValueOption.get t.Value) s
+
+    let invariant<'a> (invA : 'a -> unit) (t : StepFunctionNode<'a>) : unit =
+        match t.Main.Kind with
+        | Kind.Invalid -> ()
+        | Kind.Const _ ->
+            // happens when upcomingSteps becomes empty
+            ()
+        | Kind.StepFunction t' -> if not (Object.ReferenceEquals (t, t')) then failwith "invariant failed"
+        | k -> failwith $"invariant failed: {k}"
+
+        Alarm.invariant t.Alarm
+
+        t.Value |> ValueOption.iter invA
+        match t.AlarmValue.Action with
+        | AlarmValueAction.StepFunction t2 ->
+            { new StepFunctionNodeEval<_> with
+                member _.Eval t2 =
+                    if not (Object.ReferenceEquals (t, t2)) then
+                        failwith "invariant failed"
+                    FakeUnit.ofUnit ()
+             }
+            |> t2.Apply
+            |> FakeUnit.toUnit
+        | k -> failwith $"invariant failed: {k}"

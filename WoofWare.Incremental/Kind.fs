@@ -219,3 +219,69 @@ module internal Kind =
             with
             | :? StopIteration as e -> e.Data0
             | _ -> reraise ()
+
+    let invariant<'a> (t : Kind<'a>) (inv : 'a -> unit) : unit =
+        match t with
+          | Kind.ArrayFold arrayFold ->
+              { new ArrayFoldEval<_, _> with
+                  member _.Eval arrayFold =
+                      ArrayFold.invariant ignore inv arrayFold
+                      |> FakeUnit.ofUnit
+              }
+              |> arrayFold.Apply
+              |> FakeUnit.toUnit
+          | Kind.At (at, _) -> At.invariant at
+          | Kind.AtIntervals (at_intervals, _) -> AtIntervals.invariant at_intervals
+          | Kind.BindLhsChange (bind, _) ->
+              { new BindEval<_> with
+                  member _.Eval bind =
+                      Bind.invariant ignore ignore bind
+                      |> FakeUnit.ofUnit
+              }
+              |> bind.Apply
+              |> FakeUnit.toUnit
+          | Kind.BindMain bind ->
+              { new BindMainEval<_, _> with
+                  member _.Eval bind =
+                      Bind.invariant inv ignore bind
+                      |> FakeUnit.ofUnit
+              }
+              |> bind.Apply
+              |> FakeUnit.toUnit
+          | Kind.Const a -> inv a
+          | Kind.Expert e -> Expert.invariant inv e
+          | Kind.Freeze freeze -> Freeze.invariant inv freeze
+          | Kind.IfTestChange (ifThenElse, _) ->
+              { new IfThenElseEval<_> with
+                  member _.Eval iTE =
+                      IfThenElse.invariant ignore iTE
+                      |> FakeUnit.ofUnit
+              }
+              |> ifThenElse.Apply
+              |> FakeUnit.toUnit
+          | Kind.IfThenElse iTE -> IfThenElse.invariant inv iTE
+          | Kind.Invalid -> ()
+          | Kind.JoinLhsChange (join, _) ->
+              { new JoinEval<_> with
+                  member _.Eval join =
+                      Join.invariant ignore join
+                      |> FakeUnit.ofUnit
+              }
+              |> join.Apply
+              |> FakeUnit.toUnit
+          | Kind.JoinMain join -> Join.invariant inv join
+          | Kind.Map _
+          | Kind.Map2 _ -> ()
+          | Kind.Snapshot snapshot -> Snapshot.invariant inv snapshot
+          | Kind.StepFunction step_function_node ->
+            StepFunctionNode.invariant inv step_function_node
+          | Kind.Uninitialized -> ()
+          | Kind.UnorderedArrayFold fold ->
+            { new UnorderedArrayFoldEval<_, _> with
+                member _.Eval fold =
+                    UnorderedArrayFold.invariant ignore inv fold
+                    |> FakeUnit.ofUnit
+            }
+            |> fold.Apply
+            |> FakeUnit.toUnit
+          | Kind.Var var -> Var.invariant ignore var

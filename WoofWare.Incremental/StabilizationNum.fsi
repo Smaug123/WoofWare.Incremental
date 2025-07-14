@@ -16,3 +16,5 @@ module StabilizationNum =
     val isSome : StabilizationNum -> bool
     val add1 : StabilizationNum -> StabilizationNum
     val toInt : StabilizationNum -> int
+
+    val invariant : StabilizationNum -> unit

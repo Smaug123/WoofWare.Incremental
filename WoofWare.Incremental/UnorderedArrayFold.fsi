@@ -30,3 +30,5 @@ module internal UnorderedArrayFold =
             unit
 
     val forceFullCompute : UnorderedArrayFold<'a, 'b> -> unit
+
+    val invariant<'a, 'b> : ('a -> unit) -> ('b -> unit) -> UnorderedArrayFold<'a, 'b> -> unit
