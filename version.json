@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "publicReleaseRefSpec": [
+    "^refs/heads/main$"
+  ],
+  "pathFilters": [
+    "WoofWare.Incremental",
+    "README.md",
+    "Directory.Build.props"
+  ]
+}

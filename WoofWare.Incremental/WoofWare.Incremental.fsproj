@@ -1,0 +1,64 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net5.0</TargetFramework>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="AssemblyInfo.fs" />
+        <Compile Include="FakeUnit.fs" />
+        <Compile Include="Map.fs" />
+        <Compile Include="List.fs" />
+        <Compile Include="Debug.fs" />
+        <Compile Include="StepFunction.fsi" />
+        <Compile Include="StepFunction.fs" />
+        <Compile Include="BeforeOrAfter.fs" />
+        <Compile Include="RaisedException.fsi" />
+        <Compile Include="RaisedException.fs" />
+        <Compile Include="StabilizationNum.fsi" />
+        <Compile Include="StabilizationNum.fs" />
+        <Compile Include="OnUpdateHandler.fsi" />
+        <Compile Include="OnUpdateHandler.fs" />
+        <Compile Include="NodeId.fs" />
+        <Compile Include="Cutoff.fsi" />
+        <Compile Include="Cutoff.fs" />
+        <Compile Include="DotUserInfo.fsi" />
+        <Compile Include="DotUserInfo.fs" />
+        <Compile Include="Types.fs" />
+        <Compile Include="Kind.fsi" />
+        <Compile Include="Kind.fs" />
+        <Compile Include="Bind.fsi" />
+        <Compile Include="Bind.fs" />
+        <Compile Include="NodeToDot.fsi" />
+        <Compile Include="NodeToDot.fs" />
+        <Compile Include="Observer.fsi" />
+        <Compile Include="Observer.fs" />
+        <Compile Include="ArrayFold.fsi" />
+        <Compile Include="ArrayFold.fs" />
+        <Compile Include="Expert.fsi" />
+        <Compile Include="Expert.fs" />
+        <Compile Include="ReduceBalanced.fsi" />
+        <Compile Include="ReduceBalanced.fs" />
+        <Compile Include="Var.fsi" />
+        <Compile Include="Var.fs" />
+        <Compile Include="Node.fs" />
+        <Compile Include="RecomputeHeap.fsi" />
+        <Compile Include="RecomputeHeap.fs" />
+        <Compile Include="UnorderedArrayFold.fsi" />
+        <Compile Include="UnorderedArrayFold.fs" />
+        <Compile Include="Scope.fsi" />
+        <Compile Include="Scope.fs" />
+        <Compile Include="StepFunctionNode.fsi" />
+        <Compile Include="StepFunctionNode.fs" />
+        <Compile Include="State.fs" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="TypeEquality" Version="0.3.0" />
+      <PackageReference Include="WoofWare.BalancedReducer" Version="1.0.2" />
+      <PackageReference Include="WoofWare.TimingWheel" Version="0.1.1" />
+      <PackageReference Include="WoofWare.WeakHashTable" Version="1.0.1" />
+    </ItemGroup>
+
+</Project>
