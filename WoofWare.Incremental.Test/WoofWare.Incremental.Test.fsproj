@@ -19,7 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\WoofWare.PlayFetch.fsproj" />
+      <ProjectReference Include="..\WoofWare.Incremental.fsproj" />
     </ItemGroup>
 
 </Project>
