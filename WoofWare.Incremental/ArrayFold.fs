@@ -1,4 +1,4 @@
-namespace WoofWare.PlayFetch
+namespace WoofWare.Incremental
 
 [<RequireQualifiedAccess>]
 module internal ArrayFold =

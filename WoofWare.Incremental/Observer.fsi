@@ -1,4 +1,4 @@
-namespace WoofWare.PlayFetch
+namespace WoofWare.Incremental
 
 module internal Observer =
     val observing : 'a Observer -> 'a Node

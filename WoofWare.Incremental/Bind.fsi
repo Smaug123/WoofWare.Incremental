@@ -1,4 +1,4 @@
-namespace WoofWare.PlayFetch
+namespace WoofWare.Incremental
 
 (** A module internal to Incremental. Users should see {!Incremental_intf}.
 

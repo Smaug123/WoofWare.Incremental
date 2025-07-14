@@ -1,4 +1,4 @@
-﻿namespace WoofWare.PlayFetch
+﻿namespace WoofWare.Incremental
 
 type VarEval<'ret> =
     abstract Eval<'a> : Var<'a> -> 'ret

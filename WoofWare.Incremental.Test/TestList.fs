@@ -1,8 +1,8 @@
-﻿namespace WoofWare.PlayFetch.Test
+﻿namespace WoofWare.Incremental.Test
 
 open FsCheck
 open NUnit.Framework
-open WoofWare.PlayFetch
+open WoofWare.Incremental
 
 [<RequireQualifiedAccess>]
 module TestList =

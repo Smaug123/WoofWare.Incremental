@@ -1,6 +1,6 @@
 // [State] defines the global state of which there is one instance for each call to
 // [Incremental.Make].
-namespace WoofWare.PlayFetch
+namespace WoofWare.Incremental
 
 module Node_update = On_update_handler.Node_update
 

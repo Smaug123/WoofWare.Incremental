@@ -1,4 +1,4 @@
-namespace WoofWare.PlayFetch
+namespace WoofWare.Incremental
 
 // A Var<'a> is a leaf in the incremental DAG.
 

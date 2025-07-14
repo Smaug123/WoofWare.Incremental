@@ -1,6 +1,6 @@
-namespace WoofWare.PlayFetch
+namespace WoofWare.Incremental
 
 open System.Runtime.CompilerServices
 
-[<assembly : InternalsVisibleTo("WoofWare.PlayFetch.Test")>]
+[<assembly : InternalsVisibleTo("WoofWare.Incremental.Test")>]
 do ()

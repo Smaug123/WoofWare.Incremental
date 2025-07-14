@@ -1,4 +1,4 @@
-module WoofWare.PlayFetch.Observer
+module WoofWare.Incremental.Observer
 
 [<RequireQualifiedAccess>]
 module internal Observer =

@@ -1,4 +1,4 @@
-namespace WoofWare.PlayFetch
+namespace WoofWare.Incremental
 
 // An UnorderedArrayFold<'a, 'acc> is a kind of DAG node, where 'a is the type of value being folded
 // and 'acc is the type of the accumulator.
