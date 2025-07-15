@@ -12,3 +12,5 @@ module NodeId =
     let next () =
         let result = Interlocked.Increment count
         NodeId result
+
+    let invariant (NodeId i) = if i < 1 then failwith "invariant failure"

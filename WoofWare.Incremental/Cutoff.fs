@@ -48,4 +48,13 @@ module internal Cutoff =
         | Cutoff.F f1, F f2 -> Object.ReferenceEquals (f1, f2)
         | Cutoff.F _, _ -> false
 
-    let physEqual = Cutoff.PhysEqual
+    let physEqual<'a> = Cutoff<'a>.PhysEqual
+
+    let invariant<'a> (_inv : 'a -> unit) (c : 'a Cutoff) =
+        match c with
+        | Cutoff.Always
+        | Cutoff.Never
+        | Cutoff.PhysEqual
+        | Cutoff.Compare _
+        | Cutoff.Equal _
+        | Cutoff.F _ -> ()

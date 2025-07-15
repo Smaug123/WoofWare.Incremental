@@ -100,7 +100,7 @@ module Node =
             || StabilizationNum.isNone t.RecomputedAt
             || isStaleWithRespectToAChild t
 
-    let needsToBeComputed (t: Node<'a>) : bool = isNecessary t && isStale t
+    let needsToBeComputed (t: Node<'a>) : bool = NodeHelpers.isNecessary t && isStale t
 
     let isInRecomputeHeap (t: Node<'a>) : bool = t.HeightInRecomputeHeap >= 0
     let isInAdjustHeightsHeap (t: Node<'a>) : bool = t.HeightInAdjustHeightsHeap >= 0
@@ -275,7 +275,7 @@ module Node =
     let invariant<'a> (invA : 'a -> unit) (t : Node<'a>) : unit =
         if needsToBeComputed t <> isInRecomputeHeap t then
             failwith "invariant failure"
-        if isNecessary t then
+        if NodeHelpers.isNecessary t then
             if t.Height <= Scope.height t.CreatedIn then
                 failwith "invariant failure"
             iteriChildren t (fun _ child ->
@@ -295,7 +295,7 @@ module Node =
                 member _.Eval parent =
                  if not (hasChild parent t) then
                      failwith "invariant failure"
-                 if not (isNecessary parent) then
+                 if not (NodeHelpers.isNecessary parent) then
                      failwith "invariant failure"
                  if t.Height >= parent.Height then
                      failwith "invariant failure"
@@ -314,8 +314,8 @@ module Node =
 
         do
             Kind.invariant invA t.Kind
-            match kind with
-            | Kind.Expert e -> Expert.invariantAboutNumInvalidChildren e (isNecessary t)
+            match t.Kind with
+            | Kind.Expert e -> Expert.invariantAboutNumInvalidChildren e (NodeHelpers.isNecessary t)
             | _ -> ()
 
         Cutoff.invariant invA t.Cutoff
@@ -353,7 +353,7 @@ module Node =
                 failwith "invariant failure"
 
         do
-            if isNecessary t then
+            if NodeHelpers.isNecessary t then
                 if t.Height < 0 then failwith "invariant failed"
             else
                 if t.Height <> -1 then failwith "invariant failed"
@@ -373,7 +373,7 @@ module Node =
             | ValueSome prev ->
                 { new NodeEval<_> with
                     member _.Eval prev =
-                        if not (packedSame t prev.NextInRecomputeHeap.Value) then
+                        if not (packedSame (NodeCrate.make t) prev.NextInRecomputeHeap.Value) then
                             failwith "invariant failure"
                         if t.HeightInRecomputeHeap <> prev.HeightInRecomputeHeap then
                             failwith "invariant failure"
@@ -391,7 +391,7 @@ module Node =
             | ValueSome next ->
                 { new NodeEval<_> with
                     member _.Eval next =
-                        if not (packedSame t next.PrevInRecomputeHeap.Value) then
+                        if not (packedSame (NodeCrate.make t) next.PrevInRecomputeHeap.Value) then
                             failwith "invariant failure"
                         if t.HeightInRecomputeHeap <> next.HeightInRecomputeHeap then
                             failwith "invariant failure"
@@ -405,201 +405,204 @@ module Node =
                 if t.HeightInAdjustHeightsHeap >= t.Height then
                     failwith "invariant failure"
 
-      ~next_in_adjust_heights_heap:
-        (check (fun (next_in_adjust_heights_heap : Packed.t Uopt.t) ->
-           if not (is_in_adjust_heights_heap t)
-           then assert (Uopt.is_none next_in_adjust_heights_heap)
-           else if Uopt.is_some next_in_adjust_heights_heap
-           then (
-             let (T next) = Uopt.value_exn next_in_adjust_heights_heap in
-             assert (is_in_adjust_heights_heap next);
-             assert (t.height_in_adjust_heights_heap = next.height_in_adjust_heights_heap))))
-      ~old_value_opt:(check (Uopt.invariant invariant_a))
-      ~observers:
-        (check (fun _ ->
-           iter_observers t ~f:(fun { state; observing; _ } ->
-             assert (phys_equal t observing);
-             match state with
-             | In_use | Disallowed -> ()
-             | Created | Unlinked -> assert false)))
-      ~my_parent_index_in_child_at_index:
-        (check (fun my_parent_index_in_child_at_index ->
-           (match t.kind with
-            | Expert _ -> ()
+        do
+            if not (isInAdjustHeightsHeap t) then
+                if t.NextInAdjustHeightsHeap.IsSome then failwith "invariant failure"
+            else
+                match t.NextInAdjustHeightsHeap with
+                | ValueNone -> ()
+                | ValueSome next ->
+                    { new NodeEval<_> with
+                        member _.Eval next =
+                            if not (isInAdjustHeightsHeap next) then
+                                failwith "invariant failure"
+                            if t.HeightInAdjustHeightsHeap <> next.HeightInAdjustHeightsHeap then
+                                failwith "invariant failure"
+                            FakeUnit.ofUnit ()
+                    }
+                    |> next.Apply
+                    |> FakeUnit.toUnit
+
+        t.OldValueOpt |> ValueOption.iter invA
+
+        iterObservers t (fun obs ->
+            if not (Object.ReferenceEquals (t, obs.Observing)) then
+                failwith "invariant failure"
+            match obs.State with
+            | InternalObserverState.Created
+            | InternalObserverState.Unlinked -> failwith "invariant failure"
+            | InternalObserverState.InUse
+            | InternalObserverState.Disallowed -> ()
+        )
+
+        do
+            match t.Kind with
+            | Kind.Expert _ -> ()
             | _ ->
-              [%test_result: int]
-                (Array.length my_parent_index_in_child_at_index)
-                ~expect:(initial_num_children t));
-           if is_necessary t
-           then
-             iteri_children t ~f:(fun child_index (T child) ->
-               assert (
-                 packed_same
-                   (T t)
-                   (get_parent
-                      child
-                      ~index:my_parent_index_in_child_at_index.(child_index))));
-           if debug && not (is_necessary t)
-           then Array.iter my_parent_index_in_child_at_index ~f:(fun x -> assert (x = -1))))
-      ~my_child_index_in_parent_at_index:
-        (check (fun my_child_index_in_parent_at_index ->
-           [%test_result: int]
-             (Array.length my_child_index_in_parent_at_index)
-             ~expect:(Uniform_array.length t.parent1_and_beyond + 1);
-           iteri_parents t ~f:(fun parent_index (T parent) ->
-             assert (
-               packed_same
-                 (T t)
-                 (Kind.slow_get_child
-                    parent.kind
-                    ~index:my_child_index_in_parent_at_index.(parent_index))));
-           if debug && not (is_necessary t)
-           then Array.iter my_child_index_in_parent_at_index ~f:(fun x -> assert (x = -1))))
+                if t.MyParentIndexInChildAtIndex.Length <> initialNumChildren t then
+                    failwith "invariant failure"
 
-let create state created_in kind =
-  let t =
-    { id = Node_id.next ()
-    ; state
-    ; recomputed_at = Stabilization_num.none
-    ; value_opt = Uopt.none
-    ; kind
-    ; cutoff = Cutoff.phys_equal
-    ; changed_at = Stabilization_num.none
-    ; num_on_update_handlers = 0
-    ; num_parents = 0
-    ; parent1_and_beyond = Uniform_array.empty
-    ; parent0 = Uopt.none
-    ; created_in
-    ; next_node_in_same_scope = Uopt.none
-    ; height = -1
-    ; height_in_recompute_heap = -1
-    ; prev_in_recompute_heap = Uopt.none
-    ; next_in_recompute_heap = Uopt.none
-    ; height_in_adjust_heights_heap = -1
-    ; next_in_adjust_heights_heap = Uopt.none
-    ; old_value_opt = Uopt.none
-    ; observers = Uopt.none
-    ; is_in_handle_after_stabilization = false
-    ; on_update_handlers = []
-    ; my_parent_index_in_child_at_index =
-        Array.create ~len:(Kind.initial_num_children kind) (-1)
-        (* [my_child_index_in_parent_at_index] has one element because it may need to hold
-       the child index of [parent0]. *)
-    ; my_child_index_in_parent_at_index = [| -1 |]
-    ; force_necessary = false
-    ; user_info = None
-    ; creation_backtrace =
-        (if state.keep_node_creation_backtrace then Some (Backtrace.get ()) else None)
-    }
-  in
-  Scope.add_node created_in t;
-  (* [invariant] does not yet hold here because many uses of [Node.create] use [kind =
-     Uninitialized], and then mutate [t.kind] later. *)
-  t
-;;
+            if NodeHelpers.isNecessary t then
+                iteriChildren t (fun childIndex child ->
+                    { new NodeEval<_> with
+                        member _.Eval child =
+                            if not (packedSame (NodeCrate.make t) (getParent child t.MyParentIndexInChildAtIndex.[childIndex])) then
+                                failwith "invariant failure"
+                            FakeUnit.ofUnit ()
+                    }
+                    |> child.Apply
+                    |> FakeUnit.toUnit
+                )
 
-let max_num_parents t = 1 + Uniform_array.length t.parent1_and_beyond
+            if Debug.globalFlag && not (NodeHelpers.isNecessary t) then
+                for x in t.MyParentIndexInChildAtIndex do
+                    if x <> -1 then failwith "invariant failure"
 
-let make_space_for_parent_if_necessary t =
-  if t.num_parents = max_num_parents t
-  then (
-    let new_max_num_parents = 2 * max_num_parents t in
-    t.parent1_and_beyond
-    <- Uniform_array.realloc t.parent1_and_beyond ~len:(new_max_num_parents - 1);
-    t.my_child_index_in_parent_at_index
-    <- Array.realloc t.my_child_index_in_parent_at_index ~len:new_max_num_parents (-1));
-  if debug then assert (t.num_parents < max_num_parents t)
-;;
+        do
+            if t.MyChildIndexInParentAtIndex.Length <> t.Parent1AndBeyond.Length + 1 then
+                failwith "invariant failure"
+            iteriParents t (fun parentIndex parent ->
+                { new NodeEval<_> with
+                    member _.Eval parent =
+                        if not (packedSame (NodeCrate.make t) (Kind.slowGetChild parent.Kind t.MyChildIndexInParentAtIndex.[parentIndex])) then
+                            failwith "invariant failure"
+                        FakeUnit.ofUnit ()
+                }
+                |> parent.Apply
+                |> FakeUnit.toUnit
+            )
+            if Debug.globalFlag && not (NodeHelpers.isNecessary t) then
+                for x in t.MyChildIndexInParentAtIndex do
+                    if x <> -1 then failwith "invariant failure"
 
-let make_space_for_child_if_necessary t ~child_index =
-  let max_num_children = Array.length t.my_parent_index_in_child_at_index in
-  if child_index >= max_num_children
-  then (
-    if debug then assert (child_index = max_num_children);
-    let new_max_num_children = Int.max 2 (2 * max_num_children) in
-    t.my_parent_index_in_child_at_index
-    <- Array.realloc t.my_parent_index_in_child_at_index ~len:new_max_num_children (-1));
-  if debug then assert (child_index < Array.length t.my_parent_index_in_child_at_index)
-;;
+    let maxNumParents (t: Node<'a>) : int = 1 + t.Parent1AndBeyond.Length
 
-let set_parent : type a. child:a t -> parent:Packed.t Uopt.t -> parent_index:int -> unit =
-  fun ~child ~parent ~parent_index ->
-  if parent_index = 0
-  then child.parent0 <- parent
-  else Uniform_array.set child.parent1_and_beyond (parent_index - 1) parent
-;;
+    let makeSpaceForParentIfNecessary t =
+      if t.NumParents = maxNumParents t then
+        let newMaxNumParents = 2 * maxNumParents t
+        t.Parent1AndBeyond <-
+            let realloc = Array.zeroCreate (newMaxNumParents - 1)
+            Array.blit t.Parent1AndBeyond 0 realloc 0 t.Parent1AndBeyond.Length
+            realloc
+        t.MyChildIndexInParentAtIndex <-
+            let realloc = Array.create newMaxNumParents -1
+            Array.blit t.MyChildIndexInParentAtIndex 0 realloc 0 t.MyChildIndexInParentAtIndex.Length
+            realloc
+      if Debug.globalFlag then
+          if t.NumParents >= maxNumParents t then
+              failwith "invariant failure"
 
-let link
-  : type a b. child:a t -> child_index:int -> parent:b t -> parent_index:int -> unit
-  =
-  fun ~child ~child_index ~parent ~parent_index ->
-  set_parent ~child ~parent:(Uopt.some (Packed.T parent)) ~parent_index;
-  child.my_child_index_in_parent_at_index.(parent_index) <- child_index;
-  parent.my_parent_index_in_child_at_index.(child_index) <- parent_index
-;;
+    let makeSpaceForChildIfNecessary t childIndex =
+      let maxNumChildren = Array.length t.MyParentIndexInChildAtIndex
+      if childIndex >= maxNumChildren then
+        if Debug.globalFlag then
+            if childIndex <> maxNumChildren then failwith "invariant failure"
+        let newMaxNumChildren = max 2 (2 * maxNumChildren)
+        t.MyParentIndexInChildAtIndex <-
+            let realloc = Array.create newMaxNumChildren -1
+            Array.blit t.MyParentIndexInChildAtIndex 0 realloc 0 t.MyParentIndexInChildAtIndex.Length
+            realloc
+      if Debug.globalFlag then
+          if childIndex >= t.MyParentIndexInChildAtIndex.Length then failwith "invariant failure"
 
-let unlink
-  : type a b. child:a t -> child_index:int -> parent:b t -> parent_index:int -> unit
-  =
-  fun ~child ~child_index ~parent ~parent_index ->
-  set_parent ~child ~parent:Uopt.none ~parent_index;
-  if debug
-  then (
-    child.my_child_index_in_parent_at_index.(parent_index) <- -1;
-    parent.my_parent_index_in_child_at_index.(child_index) <- -1)
-;;
+    let setParent<'a> (child:'a Node) (parent:NodeCrate voption) (parentIndex:int) : unit =
+      if parentIndex = 0
+      then child.Parent0 <- parent
+      else child.Parent1AndBeyond.[parentIndex - 1] <- parent
 
-let add_parent : type a b. child:a t -> parent:b t -> child_index:int -> unit =
-  fun ~child ~parent ~child_index ->
-  make_space_for_parent_if_necessary child;
-  make_space_for_child_if_necessary parent ~child_index;
-  link ~child ~child_index ~parent ~parent_index:child.num_parents;
-  child.num_parents <- child.num_parents + 1
-;;
+    let link<'a, 'b> (child : 'a Node) (childIndex : int) (parent : 'b Node) (parentIndex : int) : unit =
+      setParent child (ValueSome (NodeCrate.make parent)) parentIndex
+      child.MyChildIndexInParentAtIndex.[parentIndex] <- childIndex;
+      parent.MyParentIndexInChildAtIndex.[childIndex] <- parentIndex
 
-let remove_parent : type a b. child:a t -> parent:b t -> child_index:int -> unit =
-  fun ~child ~parent ~child_index ->
-  if debug then assert (child.num_parents >= 1);
-  let parent_index = parent.my_parent_index_in_child_at_index.(child_index) in
-  if debug then assert (packed_same (T parent) (get_parent child ~index:parent_index));
-  let last_parent_index = child.num_parents - 1 in
-  if parent_index < last_parent_index
-  then (
-    let (T parent) =
-      Uopt.value_exn (Uniform_array.get child.parent1_and_beyond (last_parent_index - 1))
-    in
-    link
-      ~child
-      ~child_index:child.my_child_index_in_parent_at_index.(last_parent_index)
-      ~parent
-      ~parent_index);
-  unlink ~child ~child_index ~parent ~parent_index:last_parent_index;
-  child.num_parents <- child.num_parents - 1
-;;
+    let unlink<'a, 'b> (child : 'a Node) (childIndex : int) (parent : 'b Node) (parentIndex : int) : unit =
+      setParent child ValueNone parentIndex
+      if Debug.globalFlag then
+        child.MyChildIndexInParentAtIndex.[parentIndex] <- -1
+        parent.MyParentIndexInChildAtIndex.[childIndex] <- -1
 
-let swap_children_except_in_kind parent ~child1 ~child_index1 ~child2 ~child_index2 =
-  if debug
-  then (
-    assert (packed_same (T child1) (Kind.slow_get_child parent.kind ~index:child_index1));
-    assert (packed_same (T child2) (Kind.slow_get_child parent.kind ~index:child_index2)));
-  let index_of_parent_in_child1 =
-    parent.my_parent_index_in_child_at_index.(child_index1)
-  in
-  let index_of_parent_in_child2 =
-    parent.my_parent_index_in_child_at_index.(child_index2)
-  in
-  if debug
-  then (
-    assert (
-      child1.my_child_index_in_parent_at_index.(index_of_parent_in_child1) = child_index1);
-    assert (
-      child2.my_child_index_in_parent_at_index.(index_of_parent_in_child2) = child_index2));
-  (* now start swapping *)
-  child1.my_child_index_in_parent_at_index.(index_of_parent_in_child1) <- child_index2;
-  child2.my_child_index_in_parent_at_index.(index_of_parent_in_child2) <- child_index1;
-  parent.my_parent_index_in_child_at_index.(child_index1) <- index_of_parent_in_child2;
-  parent.my_parent_index_in_child_at_index.(child_index2) <- index_of_parent_in_child1
-;;
+    let addParent<'a, 'b> (child : 'a Node) (parent : 'b Node) (childIndex : int) : unit =
+      makeSpaceForParentIfNecessary child
+      makeSpaceForChildIfNecessary parent childIndex
+      link child childIndex parent child.NumParents
+      child.NumParents <- child.NumParents + 1
+
+    let removeParent<'a, 'b> (child: 'a Node) (parent:'b Node) (childIndex:int) : unit =
+      if Debug.globalFlag then
+          if child.NumParents < 1 then
+              failwith "invariant failure"
+      let parentIndex = parent.MyParentIndexInChildAtIndex.[childIndex]
+      if Debug.globalFlag then
+          assert (packedSame (NodeCrate.make parent) (getParent child parentIndex))
+      let lastParentIndex = child.NumParents - 1
+      if parentIndex < lastParentIndex then
+        { new NodeEval<_> with
+            member _.Eval parent =
+                link child child.MyChildIndexInParentAtIndex.[lastParentIndex] parent parentIndex
+                |> FakeUnit.ofUnit
+        }
+        |> child.Parent1AndBeyond.[lastParentIndex - 1].Value.Apply
+        |> FakeUnit.toUnit
+      unlink child childIndex parent lastParentIndex
+      child.NumParents <- child.NumParents - 1
+
+    let swapChildrenExceptInKind parent child1 childIndex1 child2 childIndex2 : unit =
+      if Debug.globalFlag then
+        assert (packedSame (NodeCrate.make child1) (Kind.slowGetChild parent.Kind childIndex1))
+        assert (packedSame (NodeCrate.make child2) (Kind.slowGetChild parent.Kind childIndex2))
+
+      let indexOfParentInChild1 = parent.MyParentIndexInChildAtIndex.[childIndex1]
+      let indexOfParentInChild2 = parent.MyParentIndexInChildAtIndex.[childIndex2]
+
+      if Debug.globalFlag then
+        assert (child1.MyChildIndexInParentAtIndex.[indexOfParentInChild1] = childIndex1)
+        assert (child2.MyChildIndexInParentAtIndex.[indexOfParentInChild2] = childIndex2)
+
+      (* now start swapping *)
+      child1.MyChildIndexInParentAtIndex.[indexOfParentInChild1] <- childIndex2
+      child2.MyChildIndexInParentAtIndex.[indexOfParentInChild2] <- childIndex1
+      parent.MyParentIndexInChildAtIndex.[childIndex1] <- indexOfParentInChild2
+      parent.MyParentIndexInChildAtIndex.[childIndex2] <- indexOfParentInChild1
+
+    let create (state: State) (createdIn: Scope) (kind: Kind<'a>) : Node<'a> =
+      let t =
+        {
+          Id = NodeId.next ()
+        ; State = state
+        ; RecomputedAt = StabilizationNum.none
+        ; ValueOpt = ValueNone
+        ; Kind = kind
+        ; Cutoff = Cutoff.physEqual
+        ; ChangedAt = StabilizationNum.none
+        ; NumOnUpdateHandlers = 0
+        ; NumParents = 0
+        ; Parent1AndBeyond = [||]
+        ; Parent0 = ValueNone
+        ; CreatedIn = createdIn
+        ; NextNodeInSameScope = ValueNone
+        ; Height = -1
+        ; HeightInRecomputeHeap = -1
+        ; PrevInRecomputeHeap = ValueNone
+        ; NextInRecomputeHeap = ValueNone
+        ; HeightInAdjustHeightsHeap = -1
+        ; NextInAdjustHeightsHeap = ValueNone
+        ; OldValueOpt = ValueNone
+        ; Observers = ValueNone
+        ; IsInHandleAfterStabilization = false
+        ; OnUpdateHandlers = []
+        ; MyParentIndexInChildAtIndex = Array.create (Kind.initialNumChildren kind) -1
+            (* [my_child_index_in_parent_at_index] has one element because it may need to hold
+           the child index of [parent0]. *)
+        ; MyChildIndexInParentAtIndex = [| -1 |]
+        ; ForceNecessary = false
+        ; UserInfo = None
+        ; CreationBacktrace =
+            (if state.KeepNodeCreationBacktrace then Some (Backtrace.get ()) else None)
+        }
+      Scope.addNode createdIn t
+      // [invariant] does not yet hold here because many uses of [Node.create] use [kind = Uninitialized], and then mutate [t.kind] later.
+      t
+
 
 module Packed = struct
   type t = Packed.t = T : _ Types.Node.t -> t [@@unboxed]

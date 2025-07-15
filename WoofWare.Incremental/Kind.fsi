@@ -18,4 +18,4 @@ module internal Kind =
     val joinRhsChildIndex : int
     val iteriChildren<'a> : Kind<'a> -> f:(int -> NodeCrate -> unit) -> unit
 
-    val invariant<'a> : Kind<'a> -> ('a -> unit) -> unit
+    val invariant<'a> : ('a -> unit) -> Kind<'a> -> unit

@@ -220,7 +220,7 @@ module internal Kind =
             | :? StopIteration as e -> e.Data0
             | _ -> reraise ()
 
-    let invariant<'a> (t : Kind<'a>) (inv : 'a -> unit) : unit =
+    let invariant<'a>  (inv : 'a -> unit) (t : Kind<'a>) : unit =
         match t with
           | Kind.ArrayFold arrayFold ->
               { new ArrayFoldEval<_, _> with

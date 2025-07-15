@@ -20,3 +20,5 @@ module internal Cutoff =
     val polyEqual<'a when 'a : equality> : 'a Cutoff
     val equal<'a> : 'a Cutoff -> 'a Cutoff -> bool
     val shouldCutoff<'a> : 'a Cutoff -> old : 'a -> newValue : 'a -> bool
+
+    val invariant<'a> : ('a -> unit) -> 'a Cutoff -> unit
