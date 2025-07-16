@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net5.0</TargetFramework>
@@ -27,6 +27,8 @@
         <Compile Include="DotUserInfo.fs" />
         <Compile Include="Types.fs" />
         <Compile Include="NodeHelpers.fs" />
+        <Compile Include="AdjustHeightsHeap.fsi" />
+        <Compile Include="AdjustHeightsHeap.fs" />
         <Compile Include="Alarm.fs" />
         <Compile Include="At.fs" />
         <Compile Include="IfThenElse.fs" />
@@ -44,6 +46,8 @@
         <Compile Include="ArrayFold.fs" />
         <Compile Include="StepFunctionNode.fsi" />
         <Compile Include="StepFunctionNode.fs" />
+        <Compile Include="AlarmValueAction.fs" />
+        <Compile Include="AlarmValue.fs" />
         <Compile Include="UnorderedArrayFold.fsi" />
         <Compile Include="UnorderedArrayFold.fs" />
         <Compile Include="Var.fsi" />
@@ -58,6 +62,8 @@
         <Compile Include="ReduceBalanced.fs" />
         <Compile Include="Node.fs" />
         <Compile Include="RunOnUpdateHandlers.fs" />
+        <Compile Include="OnlyInDebug.fs" />
+        <Compile Include="Clock.fs" />
         <Compile Include="RecomputeHeap.fsi" />
         <Compile Include="RecomputeHeap.fs" />
         <Compile Include="State.fs" />

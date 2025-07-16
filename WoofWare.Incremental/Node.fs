@@ -604,6 +604,7 @@ module Node =
       t
 
 
+(*
 module Packed = struct
   type t = Packed.t = T : _ Types.Node.t -> t [@@unboxed]
 
@@ -650,3 +651,5 @@ module Packed = struct
   let iter_descendants ts ~f = ignore (iter_descendants_internal ts ~f : _ Hash_set.t)
   let append_user_info_graphviz (T t) = append_user_info_graphviz t
 end
+
+*)

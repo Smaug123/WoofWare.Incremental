@@ -32,7 +32,7 @@ and AlarmValueAction =
 and AlarmValue =
     {
         Action : AlarmValueAction
-        mutable NextFired : Option<AlarmValue>
+        mutable NextFired : AlarmValue voption
     }
 
 and ArrayFold<'a, 'acc> =
@@ -80,8 +80,15 @@ and Bind<'a, 'b> =
 
 and Clock =
     {
+        /// We use [timing_wheel] for time-based incrementals.
         TimingWheel : TimingWheel<AlarmValue>
+        /// A variable holding the current time.
         Now : Var<TimeNs>
+        /// The closure passed to TimingWheel.advanceClock. It links all the fired alarm values into
+        /// FiredAlarmValues.
+        /// After TimingWheel.advanceClock returns, it then walks through the linked list and actually fires them.
+        /// This two-pass approach is necessary because one is not allowed to call TimingWheel functions from the
+        /// HandleFired that one passes to TimingWheel.advanceClock.
         HandleFired : Alarm -> unit
         mutable FiredAlarmValues : AlarmValue option
     }
@@ -333,6 +340,7 @@ and NodeCrate =
 
 and Observer<'a> = 'a InternalObserver ref
 
+/// Extra state kept only when [Debug.globalFlag] for the purpose of writing assertions.
 and OnlyInDebug =
     {
         mutable CurrentlyRunningNode : NodeCrate option
