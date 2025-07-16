@@ -241,7 +241,7 @@ module Node =
         t.OnUpdateHandlers <- onUpdateHandler :: t.OnUpdateHandlers
         t.NumOnUpdateHandlers <- t.NumOnUpdateHandlers + 1
 
-    let runOnUpdateHandlers t nodeUpdate now =
+    let runOnUpdateHandlers (t: Node<'a>) (nodeUpdate: NodeUpdate<'a>) (now: StabilizationNum) : unit =
         let mutable r = t.OnUpdateHandlers
         while not r.IsEmpty do
             match r with

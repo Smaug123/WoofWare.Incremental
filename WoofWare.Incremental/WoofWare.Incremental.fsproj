@@ -57,6 +57,7 @@
         <Compile Include="ReduceBalanced.fsi" />
         <Compile Include="ReduceBalanced.fs" />
         <Compile Include="Node.fs" />
+        <Compile Include="RunOnUpdateHandlers.fs" />
         <Compile Include="RecomputeHeap.fsi" />
         <Compile Include="RecomputeHeap.fs" />
         <Compile Include="State.fs" />
