@@ -2,6 +2,12 @@
 // [Incremental.Make].
 namespace WoofWare.Incremental
 
+type internal StateStats =
+    {
+        MaxNumParents : int
+        PercentageOfNodesByNumParents : (int * float) list
+    }
+
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
 module State =
@@ -13,7 +19,7 @@ module State =
       let mutable r = t.AllObservers
       while r.IsSome do
           let observer = r.Value
-          r <- InternalObserver.Packed.nextInAll observer
+          r <- InternalObserverCrate.nextInAll observer
           f observer
 
     let directlyObserved (t : State) : NodeCrate list =
@@ -29,46 +35,45 @@ module State =
         )
         r
 
-    let iter_observer_descendants t ~f = Node.Packed.iter_descendants (directly_observed t) ~f
+    let iterObserverDependents (t: State) (f: NodeCrate -> unit) : unit = NodeCrate.iterDescendants (directlyObserved t) f
 
-    module Stats = struct
-      type t =
-        { max_num_parents : int
-        ; percentage_of_nodes_by_num_parents : (int * Percent.t) list
-        }
-      [@@deriving sexp]
-    end
+    let stats (t : State) : StateStats =
+      let mutable maxNumParents = -1
+      let mutable numNecessaryNodes = 0
+      iterObserverDependents t (fun node ->
+          numNecessaryNodes <- numNecessaryNodes + 1
+          let numParents = NodeCrate.numParents node
+          maxNumParents <- max maxNumParents numParents
+      )
+      let maxNumParents = maxNumParents
+      let numNodesByNumParents = Array.zeroCreate (maxNumParents + 1)
 
-    let stats t =
-      let max_num_parents = ref (-1) in
-      let num_necessary_nodes = ref 0 in
-      iter_observer_descendants t ~f:(fun (T node) ->
-        incr num_necessary_nodes;
-        max_num_parents := Int.max !max_num_parents node.num_parents);
-      let max_num_parents = !max_num_parents in
-      let num_nodes_by_num_parents = Array.create ~len:(max_num_parents + 1) 0 in
-      iter_observer_descendants t ~f:(fun (T node) ->
-        let num_parents = node.num_parents in
-        num_nodes_by_num_parents.(num_parents) <- num_nodes_by_num_parents.(num_parents) + 1);
-      let percentage_of_nodes_by_num_parents =
-        Array.foldi num_nodes_by_num_parents ~init:[] ~f:(fun i ac num_nodes ->
-          if num_nodes = 0
-          then ac
-          else (i, Percent.of_mult (float num_nodes /. float !num_necessary_nodes)) :: ac)
-        |> List.rev
-      in
-      { Stats.max_num_parents; percentage_of_nodes_by_num_parents }
-    ;;
+      iterObserverDependents t (fun node ->
+          let numParents = NodeCrate.numParents node
+          numNodesByNumParents.[numParents] <- numNodesByNumParents.[numParents] + 1
+      )
 
-    let am_stabilizing t =
-      match t.status with
-      | Running_on_update_handlers | Stabilizing -> true
-      | Not_stabilizing -> false
-      | Stabilize_previously_raised raised_exn ->
-        Raised_exn.reraise_with_message
-          raised_exn
-          "cannot call am_stabilizing -- stabilize previously raised"
-    ;;
+      let _, percentageOfNodesByNumParents =
+          ((0, []), numNodesByNumParents)
+          ||> Array.fold (fun (i, acc) numNodes ->
+              if numNodes = 0 then
+                  i + 1, acc
+              else
+                let elt = i, float numNodes / float numNecessaryNodes
+                i + 1, elt :: acc
+          )
+
+      {
+            MaxNumParents = maxNumParents
+            PercentageOfNodesByNumParents = List.rev percentageOfNodesByNumParents
+      }
+
+    let amStabilizing t =
+      match t.Status with
+      | Status.Running_on_update_handlers | Status.Stabilizing -> true
+      | Status.Not_stabilizing -> false
+      | Status.Stabilize_previously_raised raised_exn ->
+        failwith "TODO: reraise exception: 'cannot call am_stabilizing -- stabilize previously raised'"
 
     let invariant t =
       match t.status with
@@ -1799,140 +1804,132 @@ module State =
     ;;
 
     module Expert = struct
-      (* Given that invalid node are at attempt at avoiding breaking the entire incremental
-         computation on problems, let's just ignore any operation on an invalid incremental
-         rather than raising. *)
-      let expert_kind_of_node (node : _ Node.t) =
-        match node.kind with
-        | Expert e -> Uopt.some e
-        | Invalid -> Uopt.none
-        | kind -> raise_s [%sexp "unexpected kind for expert node", (kind : _ Kind.t)]
-      ;;
+    /// Given that invalid node are at attempt at avoiding breaking the entire incremental
+    /// computation on problems, let's just ignore any operation on an invalid incremental
+    /// rather than raising.
+    let expertKindOfNode (node : 'a Node) =
+        match node.Kind with
+        | Kind.Expert e -> Some e
+        | Kind.Invalid -> None
+        | k -> failwith $"unexpected kind {k} for expert node"
 
-      let create state ~on_observability_change f =
-        let e = Expert.create ~f ~on_observability_change in
-        let node = create_node state (Expert e) in
-        if debug
-        then
-          if Option.is_some state.only_in_debug.currently_running_node
+    let create' state onObservabilityChange f =
+        let e = Expert.create f onObservabilityChange
+        let node = createNode state (Expert e) in
+        if Debug.globalFlag then
+          if Option.isSome state.OnlyInDebug.CurrentlyRunningNode
           then
-            state.only_in_debug.expert_nodes_created_by_current_node
-            <- T node :: state.only_in_debug.expert_nodes_created_by_current_node;
+            state.OnlyInDebug.ExpertNodesCreatedByCurrentNode <- T node :: state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
         node
-      ;;
 
-      let currently_running_node_exn state name =
-        match state.only_in_debug.currently_running_node with
-        | None -> raise_s [%sexp ("can only call " ^ name ^ " during stabilization" : string)]
-        | Some current -> current
-      ;;
+  let currently_running_node_exn state name =
+    match state.only_in_debug.currently_running_node with
+    | None -> raise_s [%sexp ("can only call " ^ name ^ " during stabilization" : string)]
+    | Some current -> current
+  ;;
 
-      (* Note that the two following functions are not symmetric of one another: in [let y =
-         map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
-         only a parent of [x] if y is necessary. *)
-      let assert_currently_running_node_is_child state node name =
-        let (T current) = currently_running_node_exn state name in
-        if not (Node.has_child node ~child:current)
+  (* Note that the two following functions are not symmetric of one another: in [let y =
+     map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
+     only a parent of [x] if y is necessary. *)
+  let assert_currently_running_node_is_child state node name =
+    let (T current) = currently_running_node_exn state name in
+    if not (Node.has_child node ~child:current)
+    then
+      raise_s
+        [%sexp
+          ("can only call " ^ name ^ " on parent nodes" : string)
+          , ~~(node.kind : _ Kind.t)
+          , ~~(current.kind : _ Kind.t)]
+  ;;
+
+  let assert_currently_running_node_is_parent state node name =
+    let (T current) = currently_running_node_exn state name in
+    if not (Node.has_parent ~parent:current node)
+    then
+      raise_s
+        [%sexp
+          ("can only call " ^ name ^ " on children nodes" : string)
+          , ~~(node.kind : _ Kind.t)
+          , ~~(current.kind : _ Kind.t)]
+  ;;
+
+  let make_stale (node : _ Node.t) =
+    let state = node.state in
+    let e_opt = expert_kind_of_node node in
+    if Uopt.is_some e_opt
+    then (
+      if debug then assert_currently_running_node_is_child state node "make_stale";
+      let e = Uopt.unsafe_value e_opt in
+      match Expert.make_stale e with
+      | `Already_stale -> ()
+      | `Ok ->
+        if Node.is_necessary node && not (Node.is_in_recompute_heap node)
+        then Recompute_heap.add state.recompute_heap node)
+  ;;
+
+  let invalidate (node : _ Node.t) =
+    let state = node.state in
+    if debug then assert_currently_running_node_is_child state node "invalidate";
+    invalidate_node node;
+    propagate_invalidity state
+  ;;
+
+  let add_dependency (node : _ Node.t) (dep : _ Expert.edge) =
+    let state = node.state in
+    let e_opt = expert_kind_of_node node in
+    if Uopt.is_some e_opt
+    then (
+      if debug
+      then
+        if am_stabilizing state
+           && not
+                (List.mem
+                   ~equal:phys_equal
+                   state.only_in_debug.expert_nodes_created_by_current_node
+                   (T node))
+        then assert_currently_running_node_is_child state node "add_dependency";
+      let e = Uopt.unsafe_value e_opt in
+      let new_child_index = Expert.add_child_edge e (E dep) in
+      (* [node] is not guaranteed to be necessary, even if we are running in a child of
+         [node], because we could be running due to a parent other than [node] making us
+         necessary. *)
+      if Node.is_necessary node
+      then (
+        add_parent ~child:dep.child ~parent:node ~child_index:new_child_index;
+        if debug then assert (Node.needs_to_be_computed node);
+        if not (Node.is_in_recompute_heap node)
+        then Recompute_heap.add state.recompute_heap node))
+  ;;
+
+  let remove_dependency (node : _ Node.t) (edge : _ Expert.edge) =
+    let state = node.state in
+    let e_opt = expert_kind_of_node node in
+    if Uopt.is_some e_opt
+    then (
+      if debug then assert_currently_running_node_is_child state node "remove_dependency";
+      let e = Uopt.unsafe_value e_opt in
+      (* [node] is not guaranteed to be necessary, for the reason stated in
+         [add_dependency] *)
+      let edge_index = Uopt.value_exn edge.index in
+      let (E last_edge) = Expert.last_child_edge_exn e in
+      let last_edge_index = Uopt.value_exn last_edge.index in
+      if edge_index <> last_edge_index
+      then (
+        if Node.is_necessary node
         then
-          raise_s
-            [%sexp
-              ("can only call " ^ name ^ " on parent nodes" : string)
-              , ~~(node.kind : _ Kind.t)
-              , ~~(current.kind : _ Kind.t)]
-      ;;
-
-      let assert_currently_running_node_is_parent state node name =
-        let (T current) = currently_running_node_exn state name in
-        if not (Node.has_parent ~parent:current node)
-        then
-          raise_s
-            [%sexp
-              ("can only call " ^ name ^ " on children nodes" : string)
-              , ~~(node.kind : _ Kind.t)
-              , ~~(current.kind : _ Kind.t)]
-      ;;
-
-      let make_stale (node : _ Node.t) =
-        let state = node.state in
-        let e_opt = expert_kind_of_node node in
-        if Uopt.is_some e_opt
-        then (
-          if debug then assert_currently_running_node_is_child state node "make_stale";
-          let e = Uopt.unsafe_value e_opt in
-          match Expert.make_stale e with
-          | `Already_stale -> ()
-          | `Ok ->
-            if Node.is_necessary node && not (Node.is_in_recompute_heap node)
-            then Recompute_heap.add state.recompute_heap node)
-      ;;
-
-      let invalidate (node : _ Node.t) =
-        let state = node.state in
-        if debug then assert_currently_running_node_is_child state node "invalidate";
-        invalidate_node node;
-        propagate_invalidity state
-      ;;
-
-      let add_dependency (node : _ Node.t) (dep : _ Expert.edge) =
-        let state = node.state in
-        let e_opt = expert_kind_of_node node in
-        if Uopt.is_some e_opt
-        then (
-          if debug
-          then
-            if am_stabilizing state
-               && not
-                    (List.mem
-                       ~equal:phys_equal
-                       state.only_in_debug.expert_nodes_created_by_current_node
-                       (T node))
-            then assert_currently_running_node_is_child state node "add_dependency";
-          let e = Uopt.unsafe_value e_opt in
-          let new_child_index = Expert.add_child_edge e (E dep) in
-          (* [node] is not guaranteed to be necessary, even if we are running in a child of
-             [node], because we could be running due to a parent other than [node] making us
-             necessary. *)
-          if Node.is_necessary node
-          then (
-            add_parent ~child:dep.child ~parent:node ~child_index:new_child_index;
-            if debug then assert (Node.needs_to_be_computed node);
-            if not (Node.is_in_recompute_heap node)
-            then Recompute_heap.add state.recompute_heap node))
-      ;;
-
-      let remove_dependency (node : _ Node.t) (edge : _ Expert.edge) =
-        let state = node.state in
-        let e_opt = expert_kind_of_node node in
-        if Uopt.is_some e_opt
-        then (
-          if debug then assert_currently_running_node_is_child state node "remove_dependency";
-          let e = Uopt.unsafe_value e_opt in
-          (* [node] is not guaranteed to be necessary, for the reason stated in
-             [add_dependency] *)
-          let edge_index = Uopt.value_exn edge.index in
-          let (E last_edge) = Expert.last_child_edge_exn e in
-          let last_edge_index = Uopt.value_exn last_edge.index in
-          if edge_index <> last_edge_index
-          then (
-            if Node.is_necessary node
-            then
-              Node.swap_children_except_in_kind
-                node
-                ~child1:edge.child
-                ~child_index1:edge_index
-                ~child2:last_edge.child
-                ~child_index2:last_edge_index;
-            Expert.swap_children e ~child_index1:edge_index ~child_index2:last_edge_index;
-            if debug then Node.invariant ignore node);
-          Expert.remove_last_child_edge_exn e;
-          if debug then assert (Node.is_stale node);
-          if Node.is_necessary node
-          then (
-            remove_child ~child:edge.child ~parent:node ~child_index:last_edge_index;
-            if not (Node.is_in_recompute_heap node)
-            then Recompute_heap.add state.recompute_heap node;
-            if not (Node.is_valid edge.child) then Expert.decr_invalid_children e))
-      ;;
-    end
-
-
+          Node.swap_children_except_in_kind
+            node
+            ~child1:edge.child
+            ~child_index1:edge_index
+            ~child2:last_edge.child
+            ~child_index2:last_edge_index;
+        Expert.swap_children e ~child_index1:edge_index ~child_index2:last_edge_index;
+        if debug then Node.invariant ignore node);
+      Expert.remove_last_child_edge_exn e;
+      if debug then assert (Node.is_stale node);
+      if Node.is_necessary node
+      then (
+        remove_child ~child:edge.child ~parent:node ~child_index:last_edge_index;
+        if not (Node.is_in_recompute_heap node)
+        then Recompute_heap.add state.recompute_heap node;
+        if not (Node.is_valid edge.child) then Expert.decr_invalid_children e))

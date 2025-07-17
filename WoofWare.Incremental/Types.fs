@@ -146,9 +146,9 @@ and InternalObserver<'a> =
         mutable State : InternalObserverState
         Observing : Node<'a>
         mutable OnUpdateHandlers : 'a OnUpdateHandler list
-        mutable PrevInAll : InternalObserverCrate option
-        mutable NextInAll : InternalObserverCrate option
-        mutable PrevInObserving : InternalObserver<'a> option
+        mutable PrevInAll : InternalObserverCrate voption
+        mutable NextInAll : InternalObserverCrate voption
+        mutable PrevInObserving : InternalObserver<'a> voption
         mutable NextInObserving : InternalObserver<'a> voption
     }
 

@@ -44,7 +44,7 @@ module internal Expert =
         for i = 0 to numChildren - 1 do
           { new ExpertEdgeEval<_> with
               member _.Eval r =
-                  if not (Node.isValid r.Child) then
+                  if not (NodeHelpers.isValid r.Child) then
                       countInvalidChildren <- countInvalidChildren + 1
                   FakeUnit.ofUnit ()
           }

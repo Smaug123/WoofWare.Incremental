@@ -666,3 +666,10 @@ module NodeCrate =
         }
         |> nodeCrate.Apply
         |> FakeUnit.toUnit
+
+    let private numParentsEval =
+        { new NodeEval<_> with
+            member _.Eval n = n.NumParents
+         }
+
+    let numParents (c : NodeCrate) = c.Apply numParentsEval

@@ -27,6 +27,8 @@
         <Compile Include="DotUserInfo.fs" />
         <Compile Include="Types.fs" />
         <Compile Include="NodeHelpers.fs" />
+        <Compile Include="InternalObserver.fsi" />
+        <Compile Include="InternalObserver.fs" />
         <Compile Include="AdjustHeightsHeap.fsi" />
         <Compile Include="AdjustHeightsHeap.fs" />
         <Compile Include="Alarm.fs" />
@@ -67,6 +69,8 @@
         <Compile Include="RecomputeHeap.fsi" />
         <Compile Include="RecomputeHeap.fs" />
         <Compile Include="State.fs" />
+        <Compile Include="Expert1.fsi" />
+        <Compile Include="Expert1.fs" />
     </ItemGroup>
 
     <ItemGroup>
