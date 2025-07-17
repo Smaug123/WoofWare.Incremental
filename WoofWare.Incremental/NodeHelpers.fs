@@ -38,7 +38,3 @@ module internal NodeHelpers =
             | _ -> false
         )
         || n.ForceNecessary
-
-[<RequireQualifiedAccess>]
-module NodeCrateHelpers =
-    let asList 

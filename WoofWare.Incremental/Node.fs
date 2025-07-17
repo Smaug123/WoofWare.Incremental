@@ -603,53 +603,66 @@ module Node =
       // [invariant] does not yet hold here because many uses of [Node.create] use [kind = Uninitialized], and then mutate [t.kind] later.
       t
 
+[<RequireQualifiedAccess>]
+module NodeCrate =
+    open System.Collections.Generic
 
-(*
-module Packed = struct
-  type t = Packed.t = T : _ Types.Node.t -> t [@@unboxed]
+    let invariant (t : NodeCrate) =
+        { new NodeEval<_> with
+            member _.Eval x= Node.invariant ignore x |> FakeUnit.ofUnit
+        }
+        |> t.Apply
+        |> FakeUnit.toUnit
 
-  let sexp_of_t (T t) = t |> [%sexp_of: _ t]
-  let invariant (T t) = invariant ignore t
+    type AsList = {
+        Next: NodeCrate -> NodeCrate voption
+    }
 
-  module As_list (M : sig
-      val next : Packed.t -> Packed.t Uopt.t
-    end) =
-  struct
-    type t = Packed.t Uopt.t
+    module AsList =
+        let fold (m : AsList) (t: NodeCrate voption) (init: 'acc) (f: 'acc -> NodeCrate -> 'acc) : 'acc =
+            let mutable ac = init
+            let mutable r = t
+            while r.IsSome do
+                let packedNode = r.Value
+                r <- m.Next packedNode
+                ac <- f ac packedNode
+            ac
 
-    let fold t ~init ~f =
-      let ac = ref init in
-      let r = ref t in
-      while Uopt.is_some !r do
-        let packed_node = Uopt.unsafe_value !r in
-        r := M.next packed_node;
-        ac := f !ac packed_node
-      done;
-      !ac
-    ;;
+        let iter (m: AsList) (t: NodeCrate voption) (f: NodeCrate -> unit) : unit =
+            fold m t () (fun () n -> f n)
 
-    let iter t ~f = fold t ~init:() ~f:(fun () n -> f n)
-    let invariant t = iter t ~f:invariant
-    let length t = fold t ~init:0 ~f:(fun n _ -> n + 1)
-    let to_list t = List.rev (fold t ~init:[] ~f:(fun ac n -> n :: ac))
-    let sexp_of_t t = to_list t |> [%sexp_of: Packed.t list]
-  end
+        let length (m: AsList) (t: NodeCrate voption) : int =
+            fold m t 0 (fun n _ -> n + 1)
 
-  let iter_descendants_internal ts ~f =
-    let seen = Node_id.Hash_set.create () in
-    let rec iter_descendants (T t) =
-      if not (Hash_set.mem seen t.id)
-      then (
-        Hash_set.add seen t.id;
-        f (T t);
-        iteri_children t ~f:(fun _ t -> iter_descendants t))
-    in
-    List.iter ts ~f:iter_descendants;
-    seen
-  ;;
+        let toList (m: AsList) (t: NodeCrate voption) : NodeCrate list =
+            fold m t [] (fun ac n -> n :: ac) |> List.rev
 
-  let iter_descendants ts ~f = ignore (iter_descendants_internal ts ~f : _ Hash_set.t)
-  let append_user_info_graphviz (T t) = append_user_info_graphviz t
-end
+        let invariant (m : AsList) (t : NodeCrate voption) = iter m t invariant
 
-*)
+    let iterDescendantsInternal (ts: NodeCrate list) (f: NodeCrate -> unit) : HashSet<NodeId> =
+        let seen = HashSet<NodeId>()
+        let rec iterDescendants (nodeCrate: NodeCrate) =
+            { new NodeEval<_> with
+                member _.Eval (t: Node<'a>) =
+                    if not (seen.Contains t.Id) then
+                        seen.Add t.Id |> ignore
+                        f nodeCrate
+                        Node.iteriChildren t (fun _ childCrate -> iterDescendants childCrate)
+                    FakeUnit.ofUnit ()
+            }
+            |> nodeCrate.Apply
+            |> FakeUnit.toUnit
+        List.iter iterDescendants ts
+        seen
+
+    let iterDescendants (ts: NodeCrate list) (f: NodeCrate -> unit) : unit =
+        iterDescendantsInternal ts f |> ignore
+
+    let appendUserInfoGraphviz (nodeCrate: NodeCrate) (label: string list) (attrs: Map<string, string>) : unit =
+        { new NodeEval<_> with
+            member _.Eval (t: Node<'a>) =
+                Node.appendUserInfoGraphviz t label attrs
+                |> FakeUnit.ofUnit
+        }
+        |> nodeCrate.Apply
+        |> FakeUnit.toUnit
