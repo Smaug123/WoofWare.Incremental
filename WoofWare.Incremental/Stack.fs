@@ -17,3 +17,5 @@ module internal Stack =
         match s.TryPop () with
         | false, _ -> None
         | true, v -> Some v
+
+    let create<'a> () = Stack<'a> ()

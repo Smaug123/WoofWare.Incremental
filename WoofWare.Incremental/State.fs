@@ -2,6 +2,7 @@
 // [Incremental.Make].
 namespace WoofWare.Incremental
 
+open System.Collections.Concurrent
 open System.Collections.Generic
 open TypeEquality
 open System
@@ -1622,114 +1623,130 @@ module State =
       if Node.needsToBeComputed node && not (Node.isInRecomputeHeap node)
       then RecomputeHeap.add t.RecomputeHeap node
 
-    let advance_clock (clock : Clock.t) ~to_ =
-      let t = Clock.incr_state clock in
-      ensure_not_stabilizing t ~name:"advance_clock" ~allow_in_update_handler:true;
-      if debug then invariant t;
-      if Time_ns.( > ) to_ (now clock)
-      then (
-        set_var_while_not_stabilizing clock.now to_;
-        Timing_wheel.advance_clock clock.timing_wheel ~to_ ~handle_fired:clock.handle_fired;
-        Timing_wheel.fire_past_alarms clock.timing_wheel ~handle_fired:clock.handle_fired;
-        while Uopt.is_some clock.fired_alarm_values do
-          let alarm_value = Uopt.unsafe_value clock.fired_alarm_values in
-          clock.fired_alarm_values <- alarm_value.next_fired;
-          alarm_value.next_fired <- Uopt.none;
-          match alarm_value.action with
-          | At { main; _ } ->
-            if Node.is_valid main
-            then (
-              Node.set_kind main (Const After);
-              make_stale main)
-          | At_intervals ({ main; base; interval; _ } as at_intervals) ->
-            if Node.is_valid main
-            then (
-              at_intervals.alarm
-              <- add_alarm
-                   clock
-                   ~at:(next_interval_alarm_strict clock ~base ~interval)
-                   alarm_value;
-              make_stale main)
-          | Snapshot { main; value_at; _ } ->
-            if debug then assert (Node.is_valid main);
-            set_freeze main ~child:value_at ~only_freeze_when:(fun _ -> true);
-            make_stale main
-          | Step_function { main; _ } -> if Node.is_valid main then make_stale main
-        done;
-        if debug then invariant t)
-    ;;
+    let advanceClock (clock : Clock) to_ =
+      let t = Clock.incrState clock
+      ensureNotStabilizing t "advance_clock" true
+      if Debug.globalFlag then invariant t
+      if to_ > (Clock.now clock) then
+        setVarWhileNotStabilizing clock.Now to_
+        TimingWheel.advanceClock clock.TimingWheel to_ clock.HandleFired
+        TimingWheel.firePastAlarms clock.TimingWheel clock.HandleFired
+        while clock.FiredAlarmValues.IsSome do
+          let alarmValue = clock.FiredAlarmValues.Value
+          clock.FiredAlarmValues <- alarmValue.NextFired
+          alarmValue.NextFired <- ValueNone
+          match alarmValue.Action with
+          | AlarmValueAction.At action ->
+            let main = action.Main
+            if NodeHelpers.isValid main then
+              Node.setKind main (Kind.Const BeforeOrAfter.After)
+              makeStale main
+          | AlarmValueAction.AtIntervals atIntervals ->
+            let main = atIntervals.Main
+            let base_ = atIntervals.Base
+            let interval = atIntervals.Interval
+            if NodeHelpers.isValid main then
+              atIntervals.Alarm <- addAlarm clock (nextIntervalAlarmStrict clock base_ interval) alarmValue
+              makeStale main
+          | AlarmValueAction.Snapshot snap ->
+            { new SnapshotEval<_> with
+                member _.Eval snap =
+                    let main = snap.Main
+                    let valueAt = snap.ValueAt
+                    if Debug.globalFlag then assert (NodeHelpers.isValid main);
+                    setFreeze main valueAt (fun _ -> true);
+                    makeStale main
+                   |> FakeUnit.ofUnit
+            }
+            |> snap.Apply
+            |> FakeUnit.toUnit
+          | AlarmValueAction.StepFunction sf ->
+              { new StepFunctionNodeEval<_> with
+                  member _.Eval sf =
+                      let main = sf.Main
+                      if NodeHelpers.isValid main then makeStale main
+                      FakeUnit.ofUnit ()
+              }
+              |> sf.Apply
+              |> FakeUnit.toUnit
+        if Debug.globalFlag then invariant t
 
-    let create_clock t ~timing_wheel_config ~start =
-      let timing_wheel = Timing_wheel.create ~config:timing_wheel_config ~start in
-      let rec clock : Clock.t =
-        { now = create_var t start
-        ; handle_fired
-        ; fired_alarm_values = Uopt.none
-        ; timing_wheel
+    let createClock t timingWheelConfig start =
+      let timingWheel = TimingWheel.create timingWheelConfig start
+      let now = createVar t None start
+      let mutable clock' = Unchecked.defaultof<_>
+
+      let handleFired (alarm: TimingWheel.Alarm) : unit =
+        let alarmValue = TimingWheel.Alarm.value timingWheel alarm
+        alarmValue.NextFired <- clock'.FiredAlarmValues
+        clock'.FiredAlarmValues <- Some alarmValue
+
+      let clock : Clock =
+        {
+          Clock.Now = now
+          HandleFired = handleFired
+          FiredAlarmValues = None
+          TimingWheel = timingWheel
         }
-      and handle_fired alarm =
-        let alarm_value = Timing_wheel.Alarm.value clock.timing_wheel alarm in
-        alarm_value.next_fired <- clock.fired_alarm_values;
-        clock.fired_alarm_values <- Uopt.some alarm_value
-      in
+      clock' <- clock
+
       clock
-    ;;
 
-    let create (module Config : Config.Incremental_config) ~max_height_allowed =
-      let adjust_heights_heap = Adjust_heights_heap.create ~max_height_allowed in
-      let recompute_heap = Recompute_heap.create ~max_height_allowed in
+    let create (config : IncrementalConfig) (maxHeightAllowed: int) : State =
+      let adjustHeightsHeap = AdjustHeightsHeap.create maxHeightAllowed
+      let recomputeHeap = RecomputeHeap.create maxHeightAllowed
       let t =
-        { status = Not_stabilizing
-        ; bind_lhs_change_should_invalidate_rhs = Config.bind_lhs_change_should_invalidate_rhs
-        ; stabilization_num = Stabilization_num.zero
-        ; current_scope = Scope.top
-        ; adjust_heights_heap
-        ; recompute_heap
-        ; propagate_invalidity = Stack.create ()
-        ; num_active_observers = 0
-        ; all_observers = Uopt.none
-        ; finalized_observers = Thread_safe_queue.create ()
-        ; disallowed_observers = Stack.create ()
-        ; new_observers = Stack.create ()
-        ; set_during_stabilization = Stack.create ()
-        ; handle_after_stabilization = Stack.create ()
-        ; run_on_update_handlers = Stack.create ()
-        ; only_in_debug = Only_in_debug.create ()
-        ; weak_hashtbls = Thread_safe_queue.create ()
-        ; keep_node_creation_backtrace = false
-        ; num_nodes_became_necessary = 0
-        ; num_nodes_became_unnecessary = 0
-        ; num_nodes_changed = 0
-        ; num_nodes_invalidated = 0
-        ; num_nodes_created = 0
-        ; num_nodes_recomputed = 0
-        ; num_nodes_recomputed_directly_because_one_child = 0
-        ; num_nodes_recomputed_directly_because_min_height = 0
-        ; num_var_sets = 0
+        {
+          Status = Status.Not_stabilizing
+          BindLhsChangeShouldInvalidateRhs = Config.bind_lhs_change_should_invalidate_rhs
+          StabilizationNum = StabilizationNum.zero
+          CurrentScope = Scope.top
+          AdjustHeightsHeap = adjustHeightsHeap
+          RecomputeHeap = recomputeHeap
+          PropagateInvalidity = Stack.create ()
+          NumActiveObservers = 0
+          AllObservers = ValueNone
+          FinalizedObservers = ConcurrentQueue ()
+          DisallowedObservers = Stack.create ()
+          NewObservers = Stack.create ()
+          SetDuringStabilization = Stack.create ()
+          HandleAfterStabilization = Stack.create ()
+          RunOnUpdateHandlers = Stack.create ()
+          OnlyInDebug = OnlyInDebug.create ()
+          WeakHashTables = ConcurrentQueue ()
+          KeepNodeCreationBacktrace = false
+          NumNodesBecameNecessary = 0
+          NumNodesBecameUnnecessary = 0
+          NumNodesChanged = 0
+          NumNodesInvalidated = 0
+          NumNodesCreated = 0
+          NumNodesRecomputed = 0
+          NumNodesRecomputedDirectlyBecauseOneChild = 0
+          NumNodesRecomputedDirectlyBecauseMinHeight = 0
+          NumVarSets = 0
         }
-      in
       t
-    ;;
 
-    let weak_memoize_fun_by_key
-      ?(initial_size = default_hash_table_initial_size)
+    let weakMemoizeFunByKey
+      initialSize
       t
-      hashable
       project_key
       f
       =
-      let scope = t.current_scope in
-      let table = Weak_hashtbl.create ~size:initial_size hashable in
-      let packed = Packed_weak_hashtbl.T table in
-      Weak_hashtbl.set_run_when_unused_data table ~thread_safe_f:(fun () ->
-        Thread_safe_queue.enqueue t.weak_hashtbls packed);
-      stage (fun a ->
+      let initialSize = defaultArg initialSize DEFAULT_HASH_TABLE_INITIAL_SIZE
+      let scope = t.CurrentScope
+      let table = WeakHashTable.create (Some initialSize)
+      let packed = WeakHashTableCrate.make table
+      WeakHashTable.setRunWhenUnusedData table (fun () ->
+        t.WeakHashTables.Enqueue packed
+      )
+      Staged.stage (fun a ->
         let key = project_key a in
-        match Weak_hashtbl.find table key with
+        match WeakHashTable.find table key with
         | Some b -> b
         | None ->
-          let b = within_scope t scope ~f:(fun () -> f a) in
-          Weak_hashtbl.add_exn table ~key ~data:b;
+          let b = withinScope t scope (fun () -> f a) in
+          WeakHashTable.addThrowing table key b
           b)
     ;;
 
@@ -1752,11 +1769,10 @@ module State =
             state.OnlyInDebug.ExpertNodesCreatedByCurrentNode <- T node :: state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
         node
 
-  let currently_running_node_exn state name =
-    match state.only_in_debug.currently_running_node with
-    | None -> raise_s [%sexp ("can only call " ^ name ^ " during stabilization" : string)]
+  let currentlyRunningNodeThrowing state name =
+    match state.OnlyInDebug.CurrentlyRunningNode with
+    | None -> failwith $"can only call currentlyRunningNode during stabilization"
     | Some current -> current
-  ;;
 
   (* Note that the two following functions are not symmetric of one another: in [let y =
      map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
@@ -1783,8 +1799,8 @@ module State =
           , ~~(current.kind : _ Kind.t)]
   ;;
 
-  let make_stale (node : _ Node.t) =
-    let state = node.state in
+  let makeStale (node : 'a Node) =
+    let state = node.State
     let e_opt = expert_kind_of_node node in
     if Uopt.is_some e_opt
     then (

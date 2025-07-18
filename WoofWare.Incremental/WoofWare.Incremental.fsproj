@@ -70,8 +70,8 @@
         <Compile Include="OnlyInDebug.fs" />
         <Compile Include="Clock.fs" />
         <Compile Include="State.fs" />
-        <None Include="Expert1.fsi" />
-        <None Include="Expert1.fs" />
+        <Compile Include="Expert1.fsi" />
+        <Compile Include="Expert1.fs" />
         <None Include="ReduceBalanced.fsi" />
         <None Include="ReduceBalanced.fs" />
     </ItemGroup>
