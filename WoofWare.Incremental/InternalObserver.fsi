@@ -3,7 +3,7 @@ namespace WoofWare.Incremental
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal InternalObserver =
-    val invariant : 'a InternalObserver -> unit
+    val invariant : ('a -> unit) -> 'a InternalObserver -> unit
     val same : 'a InternalObserver -> 'b InternalObserver -> bool
     val observing : 'a InternalObserver -> 'a Node
     val useIsAllowed : 'a InternalObserver -> bool

@@ -35,12 +35,12 @@ module State =
         )
         r
 
-    let iterObserverDependents (t: State) (f: NodeCrate -> unit) : unit = NodeCrate.iterDescendants (directlyObserved t) f
+    let iterObserverDescendants (t: State) (f: NodeCrate -> unit) : unit = NodeCrate.iterDescendants (directlyObserved t) f
 
     let stats (t : State) : StateStats =
       let mutable maxNumParents = -1
       let mutable numNecessaryNodes = 0
-      iterObserverDependents t (fun node ->
+      iterObserverDescendants t (fun node ->
           numNecessaryNodes <- numNecessaryNodes + 1
           let numParents = NodeCrate.numParents node
           maxNumParents <- max maxNumParents numParents
@@ -48,7 +48,7 @@ module State =
       let maxNumParents = maxNumParents
       let numNodesByNumParents = Array.zeroCreate (maxNumParents + 1)
 
-      iterObserverDependents t (fun node ->
+      iterObserverDescendants t (fun node ->
           let numParents = NodeCrate.numParents node
           numNodesByNumParents.[numParents] <- numNodesByNumParents.[numParents] + 1
       )
@@ -68,37 +68,48 @@ module State =
             PercentageOfNodesByNumParents = List.rev percentageOfNodesByNumParents
       }
 
-    let amStabilizing t =
+    let amStabilizing (t: State) : bool =
       match t.Status with
       | Status.Running_on_update_handlers | Status.Stabilizing -> true
       | Status.Not_stabilizing -> false
       | Status.Stabilize_previously_raised raised_exn ->
         failwith "TODO: reraise exception: 'cannot call am_stabilizing -- stabilize previously raised'"
 
-    let invariant t =
-      match t.status with
-      | Stabilize_previously_raised _ -> ()
-      | Running_on_update_handlers | Stabilizing | Not_stabilizing ->
-        Invariant.invariant t [%sexp_of: t] (fun () ->
-          let check f = Invariant.check_field t f in
-          iter_observers t ~f:(fun (T internal_observer) ->
-            (match internal_observer.state with
-             | In_use | Disallowed -> ()
-             | Created | Unlinked ->
-               failwiths
-                 "member of all_observers with unexpected state"
-                 internal_observer
-                 [%sexp_of: _ Internal_observer.t]);
-            Internal_observer.invariant ignore internal_observer);
-          iter_observer_descendants t ~f:(fun (T node) ->
-            Node.invariant ignore node;
-            if not (am_stabilizing t) then assert (Uopt.is_none node.old_value_opt);
-            assert (node.height <= Adjust_heights_heap.max_height_seen t.adjust_heights_heap));
-          assert (
-            Adjust_heights_heap.max_height_allowed t.adjust_heights_heap
-            = Recompute_heap.max_height_allowed t.recompute_heap);
+    let invariant (t : State) : unit =
+      match t.Status with
+      | Status.Stabilize_previously_raised _ -> ()
+      | Status.Running_on_update_handlers | Status.Stabilizing | Status.Not_stabilizing ->
+        iterObservers t (fun obs ->
+            { new InternalObserverEval<_> with
+                member _.Eval obs =
+                    match obs.State with
+                    | InternalObserverState.InUse | InternalObserverState.Disallowed -> ()
+                    | InternalObserverState.Created
+                    | InternalObserverState.Unlinked -> failwith "member of allObservers with unexpected state"
+                    InternalObserver.invariant ignore obs
+                    FakeUnit.ofUnit ()
+            }
+            |> obs.Apply
+            |> FakeUnit.toUnit
+        )
+        iterObserverDescendants t (fun node ->
+            { new NodeEval<_> with
+                member _.Eval node =
+                    Node.invariant ignore node
+                    if not (amStabilizing t) then
+                        if node.OldValueOpt.IsSome then failwith "invariant failed"
+                    if node.Height > AdjustHeightsHeap.maxHeightSeen t.AdjustHeightsHeap then
+                        failwith "invariant failed"
+                    FakeUnit.ofUnit ()
+            }
+            |> node.Apply
+            |> FakeUnit.toUnit
+        )
+
+        if AdjustHeightsHeap.maxHeightAllowed t.AdjustHeightsHeap <> RecomputeHeap.maxHeightAllowed t.RecomputeHeap then
+          failwith "invariant failed"
+
           Fields.iter
-            ~status:ignore
             ~bind_lhs_change_should_invalidate_rhs:ignore
             ~stabilization_num:(check Stabilization_num.invariant)
             ~current_scope:
@@ -113,8 +124,6 @@ module State =
                  assert (Stack.is_empty propagate_invalidity)))
             ~num_active_observers:
               (check (fun num_active_observers -> assert (num_active_observers >= 0)))
-            ~all_observers:ignore
-            ~finalized_observers:ignore
             ~new_observers:
               (check
                  (Stack.invariant (fun packed ->
@@ -150,18 +159,6 @@ module State =
             ~handle_after_stabilization:(check (Stack.invariant Node.Packed.invariant))
             ~run_on_update_handlers:(check (Stack.invariant Run_on_update_handlers.invariant))
             ~only_in_debug:(check Only_in_debug.invariant)
-            ~weak_hashtbls:ignore
-            ~keep_node_creation_backtrace:ignore
-            ~num_nodes_became_necessary:ignore
-            ~num_nodes_became_unnecessary:ignore
-            ~num_nodes_changed:ignore
-            ~num_nodes_created:ignore
-            ~num_nodes_invalidated:ignore
-            ~num_nodes_recomputed:ignore
-            ~num_nodes_recomputed_directly_because_one_child:ignore
-            ~num_nodes_recomputed_directly_because_min_height:ignore
-            ~num_var_sets:ignore)
-    ;;
 
     let ensure_not_stabilizing t ~name ~allow_in_update_handler =
       match t.status with
