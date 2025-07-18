@@ -275,7 +275,6 @@ and Node<'a> =
             /// [parent1_and_beyond] holds the remaining parents.  The order of the parents doesn't
             /// matter.  One node may occur multiple times as a parent of another (e.g. consider
             /// [map2 n1 n1 ~f]).
-
             /// This representation is optimized for the overwhelmingly common case that a node has
             /// only one parent.
             mutable NumParents : int
@@ -432,7 +431,6 @@ and State =
         ///  push it on [run_on_update_handlers].  Then, once we've considered all nodes in
         ///  [handle_after_stabilization], we iterate through [run_on_update_handlers] and
         ///  actually run the handlers.
-
         ///  These two passes are essential for correctness.  During the first pass, we haven't
         ///  run any user handlers, so we know that the state is exactly as it was when
         ///  stabilization finished.  In particular, we know that if a node is necessary, then
@@ -517,4 +515,3 @@ module NodeExtensions =
             { new NodeCrate with
                 member _.Apply e = e.Eval node
             }
-

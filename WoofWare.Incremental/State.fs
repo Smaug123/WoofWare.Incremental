@@ -13,240 +13,287 @@ type internal StateStats =
     }
 
 [<RequireQualifiedAccess>]
-[<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module State =
-    let numStabilizes (t : State) = StabilizationNum.toInt t.StabilizationNum
-    let maxHeightAllowed (t : State) = AdjustHeightsHeap.maxHeightAllowed t.AdjustHeightsHeap
-    let maxHeightSeen (t : State) = AdjustHeightsHeap.maxHeightSeen t.AdjustHeightsHeap
+    let numStabilizes (t : State) =
+        StabilizationNum.toInt t.StabilizationNum
+
+    let maxHeightAllowed (t : State) =
+        AdjustHeightsHeap.maxHeightAllowed t.AdjustHeightsHeap
+
+    let maxHeightSeen (t : State) =
+        AdjustHeightsHeap.maxHeightSeen t.AdjustHeightsHeap
 
     let iterObservers (t : State) f =
-      let mutable r = t.AllObservers
-      while r.IsSome do
-          let observer = r.Value
-          r <- InternalObserverCrate.nextInAll observer
-          f observer
+        let mutable r = t.AllObservers
+
+        while r.IsSome do
+            let observer = r.Value
+            r <- InternalObserverCrate.nextInAll observer
+            f observer
 
     let directlyObserved (t : State) : NodeCrate list =
         let mutable r = []
-        iterObservers t (fun obs ->
-            { new InternalObserverEval<_> with
-                member _.Eval obs =
-                    r <- NodeCrate.make obs.Observing :: r
-                    FakeUnit.ofUnit ()
-            }
-            |> obs.Apply
-            |> FakeUnit.toUnit
-        )
+
+        iterObservers
+            t
+            (fun obs ->
+                { new InternalObserverEval<_> with
+                    member _.Eval obs =
+                        r <- NodeCrate.make obs.Observing :: r
+                        FakeUnit.ofUnit ()
+                }
+                |> obs.Apply
+                |> FakeUnit.toUnit
+            )
+
         r
 
-    let iterObserverDescendants (t: State) (f: NodeCrate -> unit) : unit = NodeCrate.iterDescendants (directlyObserved t) f
+    let iterObserverDescendants (t : State) (f : NodeCrate -> unit) : unit =
+        NodeCrate.iterDescendants (directlyObserved t) f
 
     let stats (t : State) : StateStats =
-      let mutable maxNumParents = -1
-      let mutable numNecessaryNodes = 0
-      iterObserverDescendants t (fun node ->
-          numNecessaryNodes <- numNecessaryNodes + 1
-          let numParents = NodeCrate.numParents node
-          maxNumParents <- max maxNumParents numParents
-      )
-      let maxNumParents = maxNumParents
-      let numNodesByNumParents = Array.zeroCreate (maxNumParents + 1)
+        let mutable maxNumParents = -1
+        let mutable numNecessaryNodes = 0
 
-      iterObserverDescendants t (fun node ->
-          let numParents = NodeCrate.numParents node
-          numNodesByNumParents.[numParents] <- numNodesByNumParents.[numParents] + 1
-      )
+        iterObserverDescendants
+            t
+            (fun node ->
+                numNecessaryNodes <- numNecessaryNodes + 1
+                let numParents = NodeCrate.numParents node
+                maxNumParents <- max maxNumParents numParents
+            )
 
-      let _, percentageOfNodesByNumParents =
-          ((0, []), numNodesByNumParents)
-          ||> Array.fold (fun (i, acc) numNodes ->
-              if numNodes = 0 then
-                  i + 1, acc
-              else
-                let elt = i, float numNodes / float numNecessaryNodes
-                i + 1, elt :: acc
-          )
+        let maxNumParents = maxNumParents
+        let numNodesByNumParents = Array.zeroCreate (maxNumParents + 1)
 
-      {
+        iterObserverDescendants
+            t
+            (fun node ->
+                let numParents = NodeCrate.numParents node
+                numNodesByNumParents.[numParents] <- numNodesByNumParents.[numParents] + 1
+            )
+
+        let _, percentageOfNodesByNumParents =
+            ((0, []), numNodesByNumParents)
+            ||> Array.fold (fun (i, acc) numNodes ->
+                if numNodes = 0 then
+                    i + 1, acc
+                else
+                    let elt = i, float numNodes / float numNecessaryNodes
+                    i + 1, elt :: acc
+            )
+
+        {
             MaxNumParents = maxNumParents
             PercentageOfNodesByNumParents = List.rev percentageOfNodesByNumParents
-      }
+        }
 
-    let amStabilizing (t: State) : bool =
-      match t.Status with
-      | Status.Running_on_update_handlers | Status.Stabilizing -> true
-      | Status.Not_stabilizing -> false
-      | Status.Stabilize_previously_raised raised_exn ->
-        failwith "TODO: reraise exception: 'cannot call am_stabilizing -- stabilize previously raised'"
+    let amStabilizing (t : State) : bool =
+        match t.Status with
+        | Status.Running_on_update_handlers
+        | Status.Stabilizing -> true
+        | Status.Not_stabilizing -> false
+        | Status.Stabilize_previously_raised raised_exn ->
+            failwith "TODO: reraise exception: 'cannot call am_stabilizing -- stabilize previously raised'"
 
     let invariant (t : State) : unit =
-      match t.Status with
-      | Status.Stabilize_previously_raised _ -> ()
-      | Status.Running_on_update_handlers | Status.Stabilizing | Status.Not_stabilizing ->
-        iterObservers t (fun obs ->
-            { new InternalObserverEval<_> with
-                member _.Eval obs =
-                    match obs.State with
-                    | InternalObserverState.InUse | InternalObserverState.Disallowed -> ()
-                    | InternalObserverState.Created
-                    | InternalObserverState.Unlinked -> failwith "member of allObservers with unexpected state"
-                    InternalObserver.invariant ignore obs
-                    FakeUnit.ofUnit ()
-            }
-            |> obs.Apply
-            |> FakeUnit.toUnit
-        )
-        iterObserverDescendants t (fun node ->
-            { new NodeEval<_> with
-                member _.Eval node =
-                    Node.invariant ignore node
-                    if not (amStabilizing t) then
-                        if node.OldValueOpt.IsSome then failwith "invariant failed"
-                    if node.Height > AdjustHeightsHeap.maxHeightSeen t.AdjustHeightsHeap then
-                        failwith "invariant failed"
-                    FakeUnit.ofUnit ()
-            }
-            |> node.Apply
-            |> FakeUnit.toUnit
-        )
+        match t.Status with
+        | Status.Stabilize_previously_raised _ -> ()
+        | Status.Running_on_update_handlers
+        | Status.Stabilizing
+        | Status.Not_stabilizing ->
+            iterObservers
+                t
+                (fun obs ->
+                    { new InternalObserverEval<_> with
+                        member _.Eval obs =
+                            match obs.State with
+                            | InternalObserverState.InUse
+                            | InternalObserverState.Disallowed -> ()
+                            | InternalObserverState.Created
+                            | InternalObserverState.Unlinked -> failwith "member of allObservers with unexpected state"
 
-        if AdjustHeightsHeap.maxHeightAllowed t.AdjustHeightsHeap <> RecomputeHeap.maxHeightAllowed t.RecomputeHeap then
-          failwith "invariant failed"
+                            InternalObserver.invariant ignore obs
+                            FakeUnit.ofUnit ()
+                    }
+                    |> obs.Apply
+                    |> FakeUnit.toUnit
+                )
 
-        StabilizationNum.invariant t.StabilizationNum
+            iterObserverDescendants
+                t
+                (fun node ->
+                    { new NodeEval<_> with
+                        member _.Eval node =
+                            Node.invariant ignore node
 
-        if not (Object.ReferenceEquals (t.CurrentScope, Scope.top)) then
-            failwith "invariant failed"
+                            if not (amStabilizing t) then
+                                if node.OldValueOpt.IsSome then
+                                    failwith "invariant failed"
 
-        RecomputeHeap.invariant t.RecomputeHeap
+                            if node.Height > AdjustHeightsHeap.maxHeightSeen t.AdjustHeightsHeap then
+                                failwith "invariant failed"
 
-        do
-            if AdjustHeightsHeap.length t.AdjustHeightsHeap <> 0 then failwith "invariant failed"
-            AdjustHeightsHeap.invariant t.AdjustHeightsHeap
+                            FakeUnit.ofUnit ()
+                    }
+                    |> node.Apply
+                    |> FakeUnit.toUnit
+                )
 
-        if not (Stack.isEmpty t.PropagateInvalidity) then
-            failwith "invariant failed"
+            if
+                AdjustHeightsHeap.maxHeightAllowed t.AdjustHeightsHeap
+                <> RecomputeHeap.maxHeightAllowed t.RecomputeHeap
+            then
+                failwith "invariant failed"
 
-        if t.NumActiveObservers < 0 then
-            failwith "invariant failed"
+            StabilizationNum.invariant t.StabilizationNum
 
-        do
-            t.NewObservers
-            |> Stack.invariant
-                (fun packed ->
+            if not (Object.ReferenceEquals (t.CurrentScope, Scope.top)) then
+                failwith "invariant failed"
+
+            RecomputeHeap.invariant t.RecomputeHeap
+
+            do
+                if AdjustHeightsHeap.length t.AdjustHeightsHeap <> 0 then
+                    failwith "invariant failed"
+
+                AdjustHeightsHeap.invariant t.AdjustHeightsHeap
+
+            if not (Stack.isEmpty t.PropagateInvalidity) then
+                failwith "invariant failed"
+
+            if t.NumActiveObservers < 0 then
+                failwith "invariant failed"
+
+            do
+                t.NewObservers
+                |> Stack.invariant (fun packed ->
                     InternalObserverCrate.invariant packed
+
                     match InternalObserverCrate.state packed with
                     | InternalObserverState.InUse
                     | InternalObserverState.Disallowed ->
-                       // When an observer is added to [new_observers], it has [state = Created].
-                       // The only possible transitions from there are to [Unlinked] or to
-                       // [In_use], which also removes it from [new_observers], never to be added
-                       // again.  Thus it is impossible for an observer in [new_observers] to be
-                       // [In_use] or [Disallowed].
+                        // When an observer is added to [new_observers], it has [state = Created].
+                        // The only possible transitions from there are to [Unlinked] or to
+                        // [In_use], which also removes it from [new_observers], never to be added
+                        // again.  Thus it is impossible for an observer in [new_observers] to be
+                        // [In_use] or [Disallowed].
                         failwith "invariant failed"
-                    | InternalObserverState.Created | InternalObserverState.Unlinked -> ()
+                    | InternalObserverState.Created
+                    | InternalObserverState.Unlinked -> ()
                 )
 
-        do
-            t.DisallowedObservers
-            |> Stack.invariant (fun packed ->
-                InternalObserverCrate.invariant packed
-                match InternalObserverCrate.state packed with
-                | InternalObserverState.Disallowed -> ()
-                | _ -> failwith "invariant failed"
-            )
+            do
+                t.DisallowedObservers
+                |> Stack.invariant (fun packed ->
+                    InternalObserverCrate.invariant packed
 
-        do
-            match t.Status with
-            | Status.Stabilize_previously_raised _ -> failwith "invariant failed"
-            | Status.Running_on_update_handlers | Status.Not_stabilizing ->
-                if not (Stack.isEmpty t.SetDuringStabilization) then
-                    failwith "invariant failed"
-            | Status.Stabilizing ->
-                t.SetDuringStabilization
-                |> Stack.invariant
-                    (fun v ->
+                    match InternalObserverCrate.state packed with
+                    | InternalObserverState.Disallowed -> ()
+                    | _ -> failwith "invariant failed"
+                )
+
+            do
+                match t.Status with
+                | Status.Stabilize_previously_raised _ -> failwith "invariant failed"
+                | Status.Running_on_update_handlers
+                | Status.Not_stabilizing ->
+                    if not (Stack.isEmpty t.SetDuringStabilization) then
+                        failwith "invariant failed"
+                | Status.Stabilizing ->
+                    t.SetDuringStabilization
+                    |> Stack.invariant (fun v ->
                         { new VarEval<_> with
                             member _.Eval var =
                                 if var.ValueSetDuringStabilization.IsNone then
                                     failwith "invariant failed"
+
                                 FakeUnit.ofUnit ()
                         }
                         |> v.Apply
                         |> FakeUnit.toUnit
                     )
 
-        Stack.invariant NodeCrate.invariant t.HandleAfterStabilization
-        Stack.invariant RunOnUpdateHandlers.invariant t.RunOnUpdateHandlers
-        OnlyInDebug.invariant t.OnlyInDebug
+            Stack.invariant NodeCrate.invariant t.HandleAfterStabilization
+            Stack.invariant RunOnUpdateHandlers.invariant t.RunOnUpdateHandlers
+            OnlyInDebug.invariant t.OnlyInDebug
 
     let ensureNotStabilizing t name allowInUpdateHandler =
         match t.Status with
         | Status.Not_stabilizing -> ()
         | Status.Running_on_update_handlers ->
             if not allowInUpdateHandler then
-              failwith $"cannot %s{name} during on-update handlers"
+                failwith $"cannot %s{name} during on-update handlers"
         | Status.Stabilize_previously_raised raised ->
             RaisedException.reraiseWithMessage raised $"cannot %s{name} -- stabilize previously raised"
-        | Status.Stabilizing ->
-            failwith $"cannot %s{name} during stabilization"
+        | Status.Stabilizing -> failwith $"cannot %s{name} during stabilization"
 
-    let setHeight (node : 'a Node) (height: int) : unit =
-      let t = node.State
-      AdjustHeightsHeap.setHeight t.AdjustHeightsHeap node height
+    let setHeight (node : 'a Node) (height : int) : unit =
+        let t = node.State
+        AdjustHeightsHeap.setHeight t.AdjustHeightsHeap node height
 
-    let setMaxHeightAllowed (t: State) (height: int) : unit =
-      ensureNotStabilizing t "set_max_height_allowed" true
-      AdjustHeightsHeap.setMaxHeightAllowed t.AdjustHeightsHeap height;
-      RecomputeHeap.setMaxHeightAllowed t.RecomputeHeap height
+    let setMaxHeightAllowed (t : State) (height : int) : unit =
+        ensureNotStabilizing t "set_max_height_allowed" true
+        AdjustHeightsHeap.setMaxHeightAllowed t.AdjustHeightsHeap height
+        RecomputeHeap.setMaxHeightAllowed t.RecomputeHeap height
 
     let handleAfterStabilization<'a> (node : 'a Node) : unit =
-      if not node.IsInHandleAfterStabilization then
-        let t = node.State
-        node.IsInHandleAfterStabilization <- true
-        Stack.push (NodeCrate.make node) t.HandleAfterStabilization
+        if not node.IsInHandleAfterStabilization then
+            let t = node.State
+            node.IsInHandleAfterStabilization <- true
+            Stack.push (NodeCrate.make node) t.HandleAfterStabilization
 
     let rec removeChildren<'a> (parent : 'a Node) : unit =
-      Node.iteriChildren parent (fun childIndex child ->
-        { new NodeEval<_> with
-            member _.Eval child =
-                removeChild child parent childIndex
-                |> FakeUnit.ofUnit
-        }
-        |> child.Apply
-        |> FakeUnit.toUnit
-     )
+        Node.iteriChildren
+            parent
+            (fun childIndex child ->
+                { new NodeEval<_> with
+                    member _.Eval child =
+                        removeChild child parent childIndex |> FakeUnit.ofUnit
+                }
+                |> child.Apply
+                |> FakeUnit.toUnit
+            )
 
-    and removeChild<'a, 'b> (child : 'b Node) (parent : 'a Node) (childIndex : int): unit =
-      Node.removeParent child parent childIndex
-      checkIfUnnecessary child
+    and removeChild<'a, 'b> (child : 'b Node) (parent : 'a Node) (childIndex : int) : unit =
+        Node.removeParent child parent childIndex
+        checkIfUnnecessary child
 
     and checkIfUnnecessary<'a> (node : 'a Node) : unit =
-      if not (NodeHelpers.isNecessary node) then becameUnnecessary node
+        if not (NodeHelpers.isNecessary node) then
+            becameUnnecessary node
 
     and becameUnnecessary<'a> (node : 'a Node) : unit =
-      let t = node.State
-      t.NumNodesBecameUnnecessary <- t.NumNodesBecameUnnecessary + 1
-      if node.NumOnUpdateHandlers > 0 then handleAfterStabilization node
-      node.Height <- -1
-      removeChildren node
-      match node.Kind with
-       | Kind.UnorderedArrayFold u ->
-           { new UnorderedArrayFoldEval<_, _> with
-               member _.Eval u =
-                   UnorderedArrayFold.forceFullCompute u
-                   |> FakeUnit.ofUnit
-           }
-           |> u.Apply
-           |> FakeUnit.toUnit
-       | Kind.Expert p -> Expert.observabilityChange p false
-       | _ -> ()
-      if Debug.globalFlag then
-          assert (not (Node.needsToBeComputed node))
-      if Node.isInRecomputeHeap node then RecomputeHeap.remove t.RecomputeHeap node
+        let t = node.State
+        t.NumNodesBecameUnnecessary <- t.NumNodesBecameUnnecessary + 1
+
+        if node.NumOnUpdateHandlers > 0 then
+            handleAfterStabilization node
+
+        node.Height <- -1
+        removeChildren node
+
+        match node.Kind with
+        | Kind.UnorderedArrayFold u ->
+            { new UnorderedArrayFoldEval<_, _> with
+                member _.Eval u =
+                    UnorderedArrayFold.forceFullCompute u |> FakeUnit.ofUnit
+            }
+            |> u.Apply
+            |> FakeUnit.toUnit
+        | Kind.Expert p -> Expert.observabilityChange p false
+        | _ -> ()
+
+        if Debug.globalFlag then
+            assert (not (Node.needsToBeComputed node))
+
+        if Node.isInRecomputeHeap node then
+            RecomputeHeap.remove t.RecomputeHeap node
 
     let removeAlarm (clock : Clock) (alarm : TimingWheel.Alarm) : unit =
-      if TimingWheel.mem clock.TimingWheel alarm then TimingWheel.remove clock.TimingWheel alarm
+        if TimingWheel.mem clock.TimingWheel alarm then
+            TimingWheel.remove clock.TimingWheel alarm
 
     (* An invalid node is node whose kind is [Invalid].  A node's kind is set to [Invalid]
        when the lhs of its scope changes, or one if its children propagate the invalidity
@@ -274,65 +321,77 @@ module State =
        binds). *)
 
     let rec invalidateNode<'a> (node : 'a Node) : unit =
-      if not (NodeHelpers.isValid node) then
+        if not (NodeHelpers.isValid node) then
             ()
-      else
-        let t = node.State
-        if node.NumOnUpdateHandlers > 0 then handleAfterStabilization node
-        node.ValueOpt <- ValueNone
-        if Debug.globalFlag then assert node.OldValueOpt.IsNone
-        node.ChangedAt <- t.StabilizationNum
-        node.RecomputedAt <- t.StabilizationNum
-        t.NumNodesInvalidated <- t.NumNodesInvalidated + 1
-        if NodeHelpers.isNecessary node then
-          removeChildren node
-          // The node doesn't have children any more, so we can lower its height as much as
-          // possible, to one greater than the scope it was created in.  Also, because we
-          // are lowering the height, we don't need to adjust any of its ancestors' heights.
-          // We could leave the height alone, but we may as well lower it as much as
-          // possible to avoid making the heights of any future ancestors unnecessarily
-          // large.
-          node.Height <- Scope.height node.CreatedIn + 1
-        // We don't set [node.created_in] or [node.next_node_in_same_scope]; we leave [node]
-        // in the scope it was created in.  If that scope is ever invalidated, then that
-        // will clear [node.next_node_in_same_scope]
-        match node.Kind with
-         | Kind.At (at, _) -> removeAlarm at.Clock at.Alarm
-         | Kind.AtIntervals (atIntervals, _) -> removeAlarm atIntervals.Clock atIntervals.Alarm
-         | Kind.BindMain bind ->
-             { new BindMainEval<_, _> with
-                 member _.Eval bind =
-                     invalidateNodesCreatedOnRhs bind.AllNodesCreatedOnRhs
-                     |> FakeUnit.ofUnit
-              }
-             |> bind.Apply
-             |> FakeUnit.toUnit
-         | Kind.StepFunction sf -> removeAlarm sf.Clock sf.Alarm
-         | _ -> ()
-        Node.setKind node Kind.Invalid
-        (* If we called [propagate_invalidity] right away on the parents, we would get into
+        else
+            let t = node.State
+
+            if node.NumOnUpdateHandlers > 0 then
+                handleAfterStabilization node
+
+            node.ValueOpt <- ValueNone
+
+            if Debug.globalFlag then
+                assert node.OldValueOpt.IsNone
+
+            node.ChangedAt <- t.StabilizationNum
+            node.RecomputedAt <- t.StabilizationNum
+            t.NumNodesInvalidated <- t.NumNodesInvalidated + 1
+
+            if NodeHelpers.isNecessary node then
+                removeChildren node
+                // The node doesn't have children any more, so we can lower its height as much as
+                // possible, to one greater than the scope it was created in.  Also, because we
+                // are lowering the height, we don't need to adjust any of its ancestors' heights.
+                // We could leave the height alone, but we may as well lower it as much as
+                // possible to avoid making the heights of any future ancestors unnecessarily
+                // large.
+                node.Height <- Scope.height node.CreatedIn + 1
+            // We don't set [node.created_in] or [node.next_node_in_same_scope]; we leave [node]
+            // in the scope it was created in.  If that scope is ever invalidated, then that
+            // will clear [node.next_node_in_same_scope]
+            match node.Kind with
+            | Kind.At (at, _) -> removeAlarm at.Clock at.Alarm
+            | Kind.AtIntervals (atIntervals, _) -> removeAlarm atIntervals.Clock atIntervals.Alarm
+            | Kind.BindMain bind ->
+                { new BindMainEval<_, _> with
+                    member _.Eval bind =
+                        invalidateNodesCreatedOnRhs bind.AllNodesCreatedOnRhs |> FakeUnit.ofUnit
+                }
+                |> bind.Apply
+                |> FakeUnit.toUnit
+            | Kind.StepFunction sf -> removeAlarm sf.Clock sf.Alarm
+            | _ -> ()
+
+            Node.setKind node Kind.Invalid
+            (* If we called [propagate_invalidity] right away on the parents, we would get into
            trouble.  The parent would disconnect itself from the current node, thus
            modifying the list of parents we iterate on.  Even if we made a special case, it
            still wouldn't be enough to handle other cases where the list of parents is
            modified (e.g. when [lhs] is invalidated in the example in the comment about
            [can_recompute_now] far below). *)
-        for index = 0 to node.NumParents - 1 do
-          Stack.push (Node.getParent node index) t.PropagateInvalidity
-        if Debug.globalFlag then assert (not (Node.needsToBeComputed node))
-        if Node.isInRecomputeHeap node then RecomputeHeap.remove t.RecomputeHeap node
+            for index = 0 to node.NumParents - 1 do
+                Stack.push (Node.getParent node index) t.PropagateInvalidity
+
+            if Debug.globalFlag then
+                assert (not (Node.needsToBeComputed node))
+
+            if Node.isInRecomputeHeap node then
+                RecomputeHeap.remove t.RecomputeHeap node
 
     and invalidateNodesCreatedOnRhs (node : NodeCrate voption) : unit =
-      let mutable r = node
-      while r.IsSome do
-        { new NodeEval<_> with
-            member _.Eval nodeOnRhs =
-                r <- nodeOnRhs.NextNodeInSameScope
-                nodeOnRhs.NextNodeInSameScope <- ValueNone
-                invalidateNode nodeOnRhs
-                FakeUnit.ofUnit ()
-        }
-        |> r.Value.Apply
-        |> FakeUnit.toUnit
+        let mutable r = node
+
+        while r.IsSome do
+            { new NodeEval<_> with
+                member _.Eval nodeOnRhs =
+                    r <- nodeOnRhs.NextNodeInSameScope
+                    nodeOnRhs.NextNodeInSameScope <- ValueNone
+                    invalidateNode nodeOnRhs
+                    FakeUnit.ofUnit ()
+            }
+            |> r.Value.Apply
+            |> FakeUnit.toUnit
 
     (* When [not t.bind_lhs_change_should_invalidate_rhs] and a bind's lhs changes, we move
        nodes created on the bind's rhs up to its parent bind, as opposed to [Scope.Top].  This
@@ -342,6 +401,7 @@ module State =
        computed should the parent bind's lhs change. *)
     let rescopeNodesCreatedOnRhs (_t : State) (firstNodeOnRhs : NodeCrate voption) (newScope : Scope) =
         let mutable r = firstNodeOnRhs
+
         while r.IsSome do
             { new NodeEval<_> with
                 member _.Eval nodeOnRhs =
@@ -354,14 +414,15 @@ module State =
             |> r.Value.Apply
             |> FakeUnit.toUnit
 
-    let propagateInvalidity t: unit =
+    let propagateInvalidity t : unit =
         let mutable node = None
-        while (node <- Stack.pop t.PropagateInvalidity; node.IsSome) do
+
+        while (node <- Stack.pop t.PropagateInvalidity
+               node.IsSome) do
             { new NodeEval<_> with
                 member _.Eval node =
                     if NodeHelpers.isValid node then
-                        invalidateNode node
-                        |> FakeUnit.ofUnit
+                        invalidateNode node |> FakeUnit.ofUnit
                     else
                     // [Node.needs_to_be_computed node] is true because
                     // - node is necessary. This is because children can only point to necessary parents
@@ -378,20 +439,24 @@ module State =
                     //   explicitly when adding or removing children.
                     if Debug.globalFlag then
                         assert (Node.needsToBeComputed node)
+
                     match node.Kind with
                     | Kind.Expert expert ->
-                       // If multiple children are invalid, they will push us as many times on the
-                       // propagation stack, so we count them right.
-                       Expert.incrInvalidChildren expert
+                        // If multiple children are invalid, they will push us as many times on the
+                        // propagation stack, so we count them right.
+                        Expert.incrInvalidChildren expert
                     | kind ->
                         if Debug.globalFlag then
                             match kind with
-                            | Kind.BindMain _ | Kind.IfThenElse _ | Kind.JoinMain _ -> ()
+                            | Kind.BindMain _
+                            | Kind.IfThenElse _
+                            | Kind.JoinMain _ -> ()
                             | _ -> failwith "nodes with no children are never pushed on the stack"
                     // We do not check [Node.needs_to_be_computed node] here, because it should be
                     // true, and because computing it takes O(number of children), node can be pushed
                     // on the stack once per child, and expert nodes can have lots of children.
-                    if not (Node.isInRecomputeHeap node) then RecomputeHeap.add t.RecomputeHeap node
+                    if not (Node.isInRecomputeHeap node) then
+                        RecomputeHeap.add t.RecomputeHeap node
 
                     FakeUnit.ofUnit ()
             }
@@ -403,333 +468,392 @@ module State =
     /// are accurate.  There is no guarantee about the relative heights of [child] and [parent]
     /// though.
     let rec addParentWithoutAdjustingHeights<'a, 'b> (child : 'a Node) (parent : 'b Node) (childIndex : int) : unit =
-      if Debug.globalFlag then assert (NodeHelpers.isNecessary parent)
-      let t = child.State
-      let wasNecessary = NodeHelpers.isNecessary child
-      Node.addParent child parent childIndex
-      if not (NodeHelpers.isValid child) then Stack.push (NodeCrate.make parent) t.PropagateInvalidity
-      if not wasNecessary then becameNecessary' child;
-      match parent.Kind with
-      | Kind.Expert e -> Expert.runEdgeCallback e childIndex
-      | _ -> ()
+        if Debug.globalFlag then
+            assert (NodeHelpers.isNecessary parent)
+
+        let t = child.State
+        let wasNecessary = NodeHelpers.isNecessary child
+        Node.addParent child parent childIndex
+
+        if not (NodeHelpers.isValid child) then
+            Stack.push (NodeCrate.make parent) t.PropagateInvalidity
+
+        if not wasNecessary then
+            becameNecessary' child
+
+        match parent.Kind with
+        | Kind.Expert e -> Expert.runEdgeCallback e childIndex
+        | _ -> ()
 
     and becameNecessary'<'a> (node : 'a Node) : unit =
-      // [Scope.is_necessary node.created_in] is true (assuming the scope itself is valid)
-      // because [Node.iter_children] below first visits the lhs-change of bind nodes and
-      // then the rhs.
-      if NodeHelpers.isValid node && not (Scope.isNecessary node.CreatedIn) then
-        failwith
-          "Trying to make a node necessary whose defining bind is not necessary"
-      let t = node.State
-      t.NumNodesBecameNecessary <- t.NumNodesBecameNecessary + 1
-      if node.NumOnUpdateHandlers > 0 then handleAfterStabilization node
-      // Since [node] became necessary, to restore the invariant, we need to:
+        // [Scope.is_necessary node.created_in] is true (assuming the scope itself is valid)
+        // because [Node.iter_children] below first visits the lhs-change of bind nodes and
+        // then the rhs.
+        if NodeHelpers.isValid node && not (Scope.isNecessary node.CreatedIn) then
+            failwith "Trying to make a node necessary whose defining bind is not necessary"
 
-      // - add parent pointers to [node] from its children.
-      // - set [node]'s height.
-      // - add [node] to the recompute heap, if necessary.
-      setHeight node (Scope.height node.CreatedIn + 1)
-      Node.iteriChildren node (fun childIndex child ->
-        { new NodeEval<_> with
-            member _.Eval child =
-                addParentWithoutAdjustingHeights child node childIndex
-                // Now that child is necessary, it should have a valid height.
-                if Debug.globalFlag then assert (child.Height >= 0);
-                if child.Height >= node.Height then setHeight node (child.Height + 1)
-                FakeUnit.ofUnit ()
-         }
-        |> child.Apply
-        |> FakeUnit.toUnit
-      )
-      // Now that the height is correct, maybe add [node] to the recompute heap.  [node]
-      // just became necessary, so it can't have been in the recompute heap.  Since [node]
-      // is necessary, we should add it to the recompute heap iff it is stale.
-      if Debug.globalFlag then
-          assert (not (Node.isInRecomputeHeap node))
-          assert (NodeHelpers.isNecessary node)
-      if Node.isStale node then RecomputeHeap.add t.RecomputeHeap node
-      match node.Kind with
-      | Kind.Expert p -> Expert.observabilityChange p true
-      | _ -> ()
+        let t = node.State
+        t.NumNodesBecameNecessary <- t.NumNodesBecameNecessary + 1
+
+        if node.NumOnUpdateHandlers > 0 then
+            handleAfterStabilization node
+        // Since [node] became necessary, to restore the invariant, we need to:
+
+        // - add parent pointers to [node] from its children.
+        // - set [node]'s height.
+        // - add [node] to the recompute heap, if necessary.
+        setHeight node (Scope.height node.CreatedIn + 1)
+
+        Node.iteriChildren
+            node
+            (fun childIndex child ->
+                { new NodeEval<_> with
+                    member _.Eval child =
+                        addParentWithoutAdjustingHeights child node childIndex
+                        // Now that child is necessary, it should have a valid height.
+                        if Debug.globalFlag then
+                            assert (child.Height >= 0)
+
+                        if child.Height >= node.Height then
+                            setHeight node (child.Height + 1)
+
+                        FakeUnit.ofUnit ()
+                }
+                |> child.Apply
+                |> FakeUnit.toUnit
+            )
+        // Now that the height is correct, maybe add [node] to the recompute heap.  [node]
+        // just became necessary, so it can't have been in the recompute heap.  Since [node]
+        // is necessary, we should add it to the recompute heap iff it is stale.
+        if Debug.globalFlag then
+            assert (not (Node.isInRecomputeHeap node))
+            assert (NodeHelpers.isNecessary node)
+
+        if Node.isStale node then
+            RecomputeHeap.add t.RecomputeHeap node
+
+        match node.Kind with
+        | Kind.Expert p -> Expert.observabilityChange p true
+        | _ -> ()
 
     let becameNecessary node =
-      becameNecessary' node
-      propagateInvalidity node.State
+        becameNecessary' node
+        propagateInvalidity node.State
 
-    let addParent (child: Node<'a>) (parent: Node<'b>) (childIndex: int) : unit =
-      if Debug.globalFlag then assert (NodeHelpers.isNecessary parent)
-      let t = parent.State
-      // In the case when the edge being added creates a cycle, it is possible for the
-      // recursion in [add_parent_without_adjusting_heights] to reach [parent] as a descendant
-      // of [child].  In that case, the recursion terminates, because [Node.is_necessary
-      // parent].  We then return here and subsequently detect the cycle in
-      // [adjust_heights].
-      addParentWithoutAdjustingHeights child parent childIndex;
-      // We adjust heights so that we ensure there are no cycles before calling
-      // [propagate_invalidity].
-      if child.Height >= parent.Height then
-        AdjustHeightsHeap.adjustHeights
-          t.AdjustHeightsHeap
-          t.RecomputeHeap
-          child
-          parent
-      propagateInvalidity t
-      if Debug.globalFlag then assert (NodeHelpers.isNecessary parent)
-      // we only add necessary parents
-      if (not (Node.isInRecomputeHeap parent)) && (StabilizationNum.isNone parent.RecomputedAt || Node.edgeIsStale child parent) then
-          RecomputeHeap.add t.RecomputeHeap parent
+    let addParent (child : Node<'a>) (parent : Node<'b>) (childIndex : int) : unit =
+        if Debug.globalFlag then
+            assert (NodeHelpers.isNecessary parent)
 
-    let runWithScope (t: State) (scope: Scope) (f: unit -> 'a) : 'a =
-      let saved = t.CurrentScope
-      t.CurrentScope <- scope
-      try
-        f ()
-      finally
-        t.CurrentScope <- saved
+        let t = parent.State
+        // In the case when the edge being added creates a cycle, it is possible for the
+        // recursion in [add_parent_without_adjusting_heights] to reach [parent] as a descendant
+        // of [child].  In that case, the recursion terminates, because [Node.is_necessary
+        // parent].  We then return here and subsequently detect the cycle in
+        // [adjust_heights].
+        addParentWithoutAdjustingHeights child parent childIndex
+        // We adjust heights so that we ensure there are no cycles before calling
+        // [propagate_invalidity].
+        if child.Height >= parent.Height then
+            AdjustHeightsHeap.adjustHeights t.AdjustHeightsHeap t.RecomputeHeap child parent
 
-    let withinScope (t: State) (scope: Scope) (f: unit -> 'a) : 'a =
-      if not (Scope.isValid scope) then
-          failwith "attempt to run within an invalid scope"
-      runWithScope t scope f
+        propagateInvalidity t
 
-    let changeChild<'a, 'b> (parent : 'a Node) (oldChild : 'b Node voption) (newChild : 'b Node) (childIndex : int) : unit =
-      match oldChild with
-      | ValueNone ->
-          addParent newChild parent childIndex
-      | ValueSome oldChild ->
-        if not (Object.ReferenceEquals (oldChild, newChild)) then
-          // We remove [old_child] before adding [new_child], because they share the same child index.
-          Node.removeParent oldChild parent childIndex
-          // We force [old_child] to temporarily be necessary so that [add_parent] can't
-          // mistakenly think it is unnecessary and transition it to necessary (which would
-          // add duplicate edges and break things horribly).
-          oldChild.ForceNecessary <- true
-          addParent newChild parent childIndex
-          oldChild.ForceNecessary <- false
-          // We [check_if_unnecessary] after [add_parent], so that we don't unnecessarily
-          // transition nodes from necessary to unnecessary and then back again.
-          checkIfUnnecessary oldChild
+        if Debug.globalFlag then
+            assert (NodeHelpers.isNecessary parent)
+        // we only add necessary parents
+        if
+            (not (Node.isInRecomputeHeap parent))
+            && (StabilizationNum.isNone parent.RecomputedAt || Node.edgeIsStale child parent)
+        then
+            RecomputeHeap.add t.RecomputeHeap parent
+
+    let runWithScope (t : State) (scope : Scope) (f : unit -> 'a) : 'a =
+        let saved = t.CurrentScope
+        t.CurrentScope <- scope
+
+        try
+            f ()
+        finally
+            t.CurrentScope <- saved
+
+    let withinScope (t : State) (scope : Scope) (f : unit -> 'a) : 'a =
+        if not (Scope.isValid scope) then
+            failwith "attempt to run within an invalid scope"
+
+        runWithScope t scope f
+
+    let changeChild<'a, 'b>
+        (parent : 'a Node)
+        (oldChild : 'b Node voption)
+        (newChild : 'b Node)
+        (childIndex : int)
+        : unit
+        =
+        match oldChild with
+        | ValueNone -> addParent newChild parent childIndex
+        | ValueSome oldChild ->
+            if not (Object.ReferenceEquals (oldChild, newChild)) then
+                // We remove [old_child] before adding [new_child], because they share the same child index.
+                Node.removeParent oldChild parent childIndex
+                // We force [old_child] to temporarily be necessary so that [add_parent] can't
+                // mistakenly think it is unnecessary and transition it to necessary (which would
+                // add duplicate edges and break things horribly).
+                oldChild.ForceNecessary <- true
+                addParent newChild parent childIndex
+                oldChild.ForceNecessary <- false
+                // We [check_if_unnecessary] after [add_parent], so that we don't unnecessarily
+                // transition nodes from necessary to unnecessary and then back again.
+                checkIfUnnecessary oldChild
 
     let addAlarm (clock : Clock) (at : TimeNs) alarmValue =
-      if Debug.globalFlag then assert (at > Clock.now clock)
-      TimingWheel.add clock.TimingWheel at alarmValue
+        if Debug.globalFlag then
+            assert (at > Clock.now clock)
+
+        TimingWheel.add clock.TimingWheel at alarmValue
 
     let rec recompute<'a> (node : 'a Node) : unit =
-      let t = node.State
-      if Debug.globalFlag then
-        t.OnlyInDebug.CurrentlyRunningNode <- Some (NodeCrate.make node)
-        t.OnlyInDebug.ExpertNodesCreatedByCurrentNode <- []
-      t.NumNodesRecomputed <- t.NumNodesRecomputed + 1
-      node.RecomputedAt <- t.StabilizationNum
-      match node.Kind with
-      | Kind.ArrayFold arrayFold ->
+        let t = node.State
+
+        if Debug.globalFlag then
+            t.OnlyInDebug.CurrentlyRunningNode <- Some (NodeCrate.make node)
+            t.OnlyInDebug.ExpertNodesCreatedByCurrentNode <- []
+
+        t.NumNodesRecomputed <- t.NumNodesRecomputed + 1
+        node.RecomputedAt <- t.StabilizationNum
+
+        match node.Kind with
+        | Kind.ArrayFold arrayFold ->
             { new ArrayFoldEval<_, _> with
                 member _.Eval arrayFold =
-                  maybeChangeValue node (ArrayFold.compute arrayFold)
-                  |> FakeUnit.ofUnit
+                    maybeChangeValue node (ArrayFold.compute arrayFold) |> FakeUnit.ofUnit
             }
             |> arrayFold.Apply
             |> FakeUnit.toUnit
-      | Kind.At (at, teq) ->
-        // It is a bug if we try to compute an [At] node after [at].  [advance_clock] was
-        // supposed to convert it to a [Const] at the appropriate time.
-        if Debug.globalFlag then assert (at.At > (Clock.now at.Clock))
-        maybeChangeValue node (Teq.castFrom teq BeforeOrAfter.Before)
-      | Kind.AtIntervals (_, teq) -> maybeChangeValue node (Teq.castFrom teq ())
-      | Kind.BindLhsChange (bind, teq) ->
-          { new BindEval<_> with
-              member _.Eval bind =
-                  let oldRhs = bind.Rhs
-                  let oldAllNodesCreatedOnRhs = bind.AllNodesCreatedOnRhs
-                  // We clear [all_nodes_created_on_rhs] so it will hold just the nodes created by
-                  // this call to [f].
-                  bind.AllNodesCreatedOnRhs <- ValueNone
-                  let rhs = runWithScope t bind.RhsScope (fun () -> bind.F (Node.valueThrowing bind.Lhs))
-                  bind.Rhs <- ValueSome rhs
-                  // Anticipate what [maybe_change_value] will do, to make sure Bind_main is stale
-                  // right away. This way, if the new child is invalid, we'll satisfy the invariant
-                  // saying that [needs_to_be_computed bind_main] in [propagate_invalidity]
-                  node.ChangedAt <- t.StabilizationNum
-                  changeChild bind.Main oldRhs rhs Kind.bindRhsChildIndex
-                  if oldRhs.IsSome then
-                   // We invalidate after [change_child], because invalidation changes the [kind] of
-                   // nodes to [Invalid], which means that we can no longer visit their children.
-                   // Also, the [old_rhs] nodes are typically made unnecessary by [change_child], and
-                   // so by invalidating afterwards, we will not waste time adding them to the
-                   // recompute heap and then removing them.
-                   if t.BindLhsChangeShouldInvalidateRhs then
-                       invalidateNodesCreatedOnRhs oldAllNodesCreatedOnRhs
-                   else
-                     rescopeNodesCreatedOnRhs
-                       t
-                       oldAllNodesCreatedOnRhs
-                       bind.Main.CreatedIn
-                   propagateInvalidity t
-                   (* [node] was valid at the start of the [Bind_lhs_change] branch, and invalidation
+        | Kind.At (at, teq) ->
+            // It is a bug if we try to compute an [At] node after [at].  [advance_clock] was
+            // supposed to convert it to a [Const] at the appropriate time.
+            if Debug.globalFlag then
+                assert (at.At > (Clock.now at.Clock))
+
+            maybeChangeValue node (Teq.castFrom teq BeforeOrAfter.Before)
+        | Kind.AtIntervals (_, teq) -> maybeChangeValue node (Teq.castFrom teq ())
+        | Kind.BindLhsChange (bind, teq) ->
+            { new BindEval<_> with
+                member _.Eval bind =
+                    let oldRhs = bind.Rhs
+                    let oldAllNodesCreatedOnRhs = bind.AllNodesCreatedOnRhs
+                    // We clear [all_nodes_created_on_rhs] so it will hold just the nodes created by
+                    // this call to [f].
+                    bind.AllNodesCreatedOnRhs <- ValueNone
+
+                    let rhs =
+                        runWithScope t bind.RhsScope (fun () -> bind.F (Node.valueThrowing bind.Lhs))
+
+                    bind.Rhs <- ValueSome rhs
+                    // Anticipate what [maybe_change_value] will do, to make sure Bind_main is stale
+                    // right away. This way, if the new child is invalid, we'll satisfy the invariant
+                    // saying that [needs_to_be_computed bind_main] in [propagate_invalidity]
+                    node.ChangedAt <- t.StabilizationNum
+                    changeChild bind.Main oldRhs rhs Kind.bindRhsChildIndex
+
+                    if oldRhs.IsSome then
+                        // We invalidate after [change_child], because invalidation changes the [kind] of
+                        // nodes to [Invalid], which means that we can no longer visit their children.
+                        // Also, the [old_rhs] nodes are typically made unnecessary by [change_child], and
+                        // so by invalidating afterwards, we will not waste time adding them to the
+                        // recompute heap and then removing them.
+                        if t.BindLhsChangeShouldInvalidateRhs then
+                            invalidateNodesCreatedOnRhs oldAllNodesCreatedOnRhs
+                        else
+                            rescopeNodesCreatedOnRhs t oldAllNodesCreatedOnRhs bind.Main.CreatedIn
+
+                        propagateInvalidity t
+                    (* [node] was valid at the start of the [Bind_lhs_change] branch, and invalidation
                       only visits higher nodes, so [node] is still valid. *)
-                  if Debug.globalFlag then assert (NodeHelpers.isValid node)
-                  maybeChangeValue node (Teq.castFrom teq ())
-                  FakeUnit.ofUnit ()
-          }
-          |> bind.Apply
-          |> FakeUnit.toUnit
-      | Kind.BindMain bind ->
-          { new BindMainEval<'a, FakeUnit> with
-              member _.Eval<'b> (bind : Bind<'a, 'b>) : FakeUnit =
-                  copyChild<'b> node bind.Rhs.Value
-                  |> FakeUnit.ofUnit
-          }
-          |> bind.Apply
-          |> FakeUnit.toUnit
-      | Kind.Const a -> maybeChangeValue node a
-      | Kind.Freeze freeze ->
-        let value = Node.valueThrowing freeze.Child
-        if freeze.OnlyFreezeWhen value then
-          removeChildren node
-          Node.setKind node (Kind.Const value)
-          if NodeHelpers.isNecessary node then
-              setHeight node 0
-          else
-              becameUnnecessary node
-        maybeChangeValue node value
-      | Kind.IfTestChange (ifTestChange, teq) ->
-        { new IfThenElseEval<_> with
-            member _.Eval ifTestChange =
-                let main = ifTestChange.Main
-                let currentBranch = ifTestChange.CurrentBranch
+                    if Debug.globalFlag then
+                        assert (NodeHelpers.isValid node)
 
-                let desiredBranch = if Node.valueThrowing ifTestChange.Test then ifTestChange.Then else ifTestChange.Else
-                ifTestChange.CurrentBranch <- ValueSome desiredBranch
-                // see the comment in BindLhsChange
-                node.ChangedAt <- t.StabilizationNum
-                changeChild main currentBranch desiredBranch Kind.ifBranchChildIndex
+                    maybeChangeValue node (Teq.castFrom teq ())
+                    FakeUnit.ofUnit ()
+            }
+            |> bind.Apply
+            |> FakeUnit.toUnit
+        | Kind.BindMain bind ->
+            { new BindMainEval<'a, FakeUnit> with
+                member _.Eval<'b> (bind : Bind<'a, 'b>) : FakeUnit =
+                    copyChild<'b> node bind.Rhs.Value |> FakeUnit.ofUnit
+            }
+            |> bind.Apply
+            |> FakeUnit.toUnit
+        | Kind.Const a -> maybeChangeValue node a
+        | Kind.Freeze freeze ->
+            let value = Node.valueThrowing freeze.Child
 
-                maybeChangeValue node (Teq.castFrom teq ())
-                FakeUnit.ofUnit ()
-         }
-        |> ifTestChange.Apply
-        |> FakeUnit.toUnit
-      | Kind.IfThenElse ite ->
-        copyChild node ite.CurrentBranch.Value
-      | Kind.Invalid ->
-        failwith "We never have invalid nodes in the recompute heap; they are never stale."
-      | Kind.JoinLhsChange (join, teq) ->
-        { new JoinEval<_> with
-            member _.Eval join =
-                let lhs = join.Lhs
-                let main = join.Main
-                let oldRhs = join.Rhs
-                let rhs = Node.valueThrowing lhs
-                join.Rhs <- ValueSome rhs
-                // see the comment in BindLhsChange
-                node.ChangedAt <- t.StabilizationNum
-                changeChild main oldRhs rhs Kind.joinRhsChildIndex
-                maybeChangeValue node (Teq.castFrom teq ())
-                FakeUnit.ofUnit ()
-        }
-        |> join.Apply
-        |> FakeUnit.toUnit
-      | Kind.JoinMain join ->
-          copyChild node join.Rhs.Value
-      | Kind.Map map ->
-          { new MapEval<_, _> with
-              member _.Eval (f, n1) =
-                  maybeChangeValue node (f (Node.valueThrowing n1))
-                  |> FakeUnit.ofUnit
-          }
-          |> map.Apply
-          |> FakeUnit.toUnit
-      | Kind.Snapshot snap ->
-        // It is a bug if we try to compute a [Snapshot] and the alarm should have fired.
-        // [advance_clock] was supposed to convert it to a [Freeze] at the appropriate
-        // time.
-        if Debug.globalFlag then assert (snap.At > (Clock.now snap.Clock));
-        maybeChangeValue node snap.Before
-      | Kind.StepFunction stepFunctionNode ->
-        let clock = stepFunctionNode.Clock
-        let child = stepFunctionNode.Child
-        match stepFunctionNode.Child with
-        | ValueNone -> ()
-        | ValueSome child ->
-          if child.ChangedAt > stepFunctionNode.ExtractedStepFunctionFromChildAt then
-            stepFunctionNode.ExtractedStepFunctionFromChildAt <- child.ChangedAt
-            removeAlarm clock stepFunctionNode.Alarm
-            let stepFunction = Node.valueThrowing child
-            stepFunctionNode.Value <- ValueSome (StepFunction.init stepFunction)
-            stepFunctionNode.UpcomingSteps <- StepFunction.steps stepFunction
-            (* If the child is a constant, we drop our reference to it, to avoid holding on to
+            if freeze.OnlyFreezeWhen value then
+                removeChildren node
+                Node.setKind node (Kind.Const value)
+
+                if NodeHelpers.isNecessary node then
+                    setHeight node 0
+                else
+                    becameUnnecessary node
+
+            maybeChangeValue node value
+        | Kind.IfTestChange (ifTestChange, teq) ->
+            { new IfThenElseEval<_> with
+                member _.Eval ifTestChange =
+                    let main = ifTestChange.Main
+                    let currentBranch = ifTestChange.CurrentBranch
+
+                    let desiredBranch =
+                        if Node.valueThrowing ifTestChange.Test then
+                            ifTestChange.Then
+                        else
+                            ifTestChange.Else
+
+                    ifTestChange.CurrentBranch <- ValueSome desiredBranch
+                    // see the comment in BindLhsChange
+                    node.ChangedAt <- t.StabilizationNum
+                    changeChild main currentBranch desiredBranch Kind.ifBranchChildIndex
+
+                    maybeChangeValue node (Teq.castFrom teq ())
+                    FakeUnit.ofUnit ()
+            }
+            |> ifTestChange.Apply
+            |> FakeUnit.toUnit
+        | Kind.IfThenElse ite -> copyChild node ite.CurrentBranch.Value
+        | Kind.Invalid -> failwith "We never have invalid nodes in the recompute heap; they are never stale."
+        | Kind.JoinLhsChange (join, teq) ->
+            { new JoinEval<_> with
+                member _.Eval join =
+                    let lhs = join.Lhs
+                    let main = join.Main
+                    let oldRhs = join.Rhs
+                    let rhs = Node.valueThrowing lhs
+                    join.Rhs <- ValueSome rhs
+                    // see the comment in BindLhsChange
+                    node.ChangedAt <- t.StabilizationNum
+                    changeChild main oldRhs rhs Kind.joinRhsChildIndex
+                    maybeChangeValue node (Teq.castFrom teq ())
+                    FakeUnit.ofUnit ()
+            }
+            |> join.Apply
+            |> FakeUnit.toUnit
+        | Kind.JoinMain join -> copyChild node join.Rhs.Value
+        | Kind.Map map ->
+            { new MapEval<_, _> with
+                member _.Eval (f, n1) =
+                    maybeChangeValue node (f (Node.valueThrowing n1)) |> FakeUnit.ofUnit
+            }
+            |> map.Apply
+            |> FakeUnit.toUnit
+        | Kind.Snapshot snap ->
+            // It is a bug if we try to compute a [Snapshot] and the alarm should have fired.
+            // [advance_clock] was supposed to convert it to a [Freeze] at the appropriate
+            // time.
+            if Debug.globalFlag then
+                assert (snap.At > (Clock.now snap.Clock))
+
+            maybeChangeValue node snap.Before
+        | Kind.StepFunction stepFunctionNode ->
+            let clock = stepFunctionNode.Clock
+            let child = stepFunctionNode.Child
+
+            match stepFunctionNode.Child with
+            | ValueNone -> ()
+            | ValueSome child ->
+                if child.ChangedAt > stepFunctionNode.ExtractedStepFunctionFromChildAt then
+                    stepFunctionNode.ExtractedStepFunctionFromChildAt <- child.ChangedAt
+                    removeAlarm clock stepFunctionNode.Alarm
+                    let stepFunction = Node.valueThrowing child
+                    stepFunctionNode.Value <- ValueSome (StepFunction.init stepFunction)
+                    stepFunctionNode.UpcomingSteps <- StepFunction.steps stepFunction
+                    (* If the child is a constant, we drop our reference to it, to avoid holding on to
                the entire step function. *)
-            if Node.isConst child then
-              removeChildren node
-              stepFunctionNode.Child <- ValueNone
-              setHeight node (Scope.height node.CreatedIn + 1)
+                    if Node.isConst child then
+                        removeChildren node
+                        stepFunctionNode.Child <- ValueNone
+                        setHeight node (Scope.height node.CreatedIn + 1)
 
-        StepFunctionNode.advance stepFunctionNode (Clock.now clock)
-        let stepFunctionValue = stepFunctionNode.Value.Value
-        match Sequence.hd stepFunctionNode.UpcomingSteps with
-         | None -> if child.IsNone then Node.setKind node (Kind.Const stepFunctionValue)
-         | Some (at, _) ->
-           stepFunctionNode.Alarm <- addAlarm clock at stepFunctionNode.AlarmValue
-        maybeChangeValue node stepFunctionValue
-      | Kind.UnorderedArrayFold u ->
-          { new UnorderedArrayFoldEval<_, _> with
-              member _.Eval u = maybeChangeValue node (UnorderedArrayFold.compute u) |> FakeUnit.ofUnit
-          }
-          |> u.Apply
-          |> FakeUnit.toUnit
-      | Kind.Uninitialized -> failwith "expected initialised"
-      | Kind.Var var -> maybeChangeValue node var.Value
-      | Kind.Map2 map2 ->
-        { new Map2Eval<_, _> with
-            member _.Eval (f, n1, n2) =
-                maybeChangeValue node (f (Node.valueThrowing n1) (Node.valueThrowing n2))
-                |> FakeUnit.ofUnit
-        }
-        |> map2.Apply
-        |> FakeUnit.toUnit
-      | Kind.Expert expert ->
-        match Expert.beforeMainComputation expert with
-        | BeforeMainComputationResult.Invalid ->
-          invalidateNode node
-          propagateInvalidity t
-        | BeforeMainComputationResult.Ok -> maybeChangeValue node (expert.F ())
+            StepFunctionNode.advance stepFunctionNode (Clock.now clock)
+            let stepFunctionValue = stepFunctionNode.Value.Value
+
+            match Sequence.hd stepFunctionNode.UpcomingSteps with
+            | None ->
+                if child.IsNone then
+                    Node.setKind node (Kind.Const stepFunctionValue)
+            | Some (at, _) -> stepFunctionNode.Alarm <- addAlarm clock at stepFunctionNode.AlarmValue
+
+            maybeChangeValue node stepFunctionValue
+        | Kind.UnorderedArrayFold u ->
+            { new UnorderedArrayFoldEval<_, _> with
+                member _.Eval u =
+                    maybeChangeValue node (UnorderedArrayFold.compute u) |> FakeUnit.ofUnit
+            }
+            |> u.Apply
+            |> FakeUnit.toUnit
+        | Kind.Uninitialized -> failwith "expected initialised"
+        | Kind.Var var -> maybeChangeValue node var.Value
+        | Kind.Map2 map2 ->
+            { new Map2Eval<_, _> with
+                member _.Eval (f, n1, n2) =
+                    maybeChangeValue node (f (Node.valueThrowing n1) (Node.valueThrowing n2))
+                    |> FakeUnit.ofUnit
+            }
+            |> map2.Apply
+            |> FakeUnit.toUnit
+        | Kind.Expert expert ->
+            match Expert.beforeMainComputation expert with
+            | BeforeMainComputationResult.Invalid ->
+                invalidateNode node
+                propagateInvalidity t
+            | BeforeMainComputationResult.Ok -> maybeChangeValue node (expert.F ())
 
     and copyChild<'a> (parent : 'a Node) (child : 'a Node) : unit =
-      if NodeHelpers.isValid child then
-          maybeChangeValue parent (Node.valueThrowing child)
-      else
-        invalidateNode parent
-        propagateInvalidity parent.State
+        if NodeHelpers.isValid child then
+            maybeChangeValue parent (Node.valueThrowing child)
+        else
+            invalidateNode parent
+            propagateInvalidity parent.State
 
     and maybeChangeValue<'a> (node : 'a Node) (newValue : 'a) : unit =
-      let t = node.State
-      let oldValueOpt = node.ValueOpt
-      if oldValueOpt.IsNone || not (Cutoff.shouldCutoff node.Cutoff oldValueOpt.Value newValue) then
-        node.ValueOpt <- ValueSome newValue
-        node.ChangedAt <- t.StabilizationNum
-        t.NumNodesChanged <- t.NumNodesChanged + 1
-        if node.NumOnUpdateHandlers > 0 then
-          node.OldValueOpt <- oldValueOpt
-          handleAfterStabilization node
-        if node.NumParents >= 1 then
-          for parentIndex = 1 to node.NumParents - 1 do
-            let parent = node.Parent1AndBeyond.[parentIndex - 1].Value
-            { new NodeEval<_> with
-                member _.Eval parent =
-                    match parent.Kind with
-                     | Kind.Expert expert ->
-                       let child_index = node.MyChildIndexInParentAtIndex.[parentIndex] in
-                       Expert.runEdgeCallback childIndex expert
-                     | Kind.Unordered_array_fold u ->
-                       UnorderedArrayFold.childChanged
-                         u
-                         node
-                         node.MyChildIndexInParentAtIndex.[parentIndex]
-                         oldValueOpt
-                         newValue
-                     | _ -> ()
-                    if Debug.globalFlag then assert (Node.needsToBeComputed parent)
-                    (* We don't do the [can_recompute_now] optimization.  Since most nodes only have
+        let t = node.State
+        let oldValueOpt = node.ValueOpt
+
+        if
+            oldValueOpt.IsNone
+            || not (Cutoff.shouldCutoff node.Cutoff oldValueOpt.Value newValue)
+        then
+            node.ValueOpt <- ValueSome newValue
+            node.ChangedAt <- t.StabilizationNum
+            t.NumNodesChanged <- t.NumNodesChanged + 1
+
+            if node.NumOnUpdateHandlers > 0 then
+                node.OldValueOpt <- oldValueOpt
+                handleAfterStabilization node
+
+            if node.NumParents >= 1 then
+                for parentIndex = 1 to node.NumParents - 1 do
+                    let parent = node.Parent1AndBeyond.[parentIndex - 1].Value
+
+                    { new NodeEval<_> with
+                        member _.Eval parent =
+                            match parent.Kind with
+                            | Kind.Expert expert ->
+                                let child_index = node.MyChildIndexInParentAtIndex.[parentIndex] in
+                                Expert.runEdgeCallback childIndex expert
+                            | Kind.Unordered_array_fold u ->
+                                UnorderedArrayFold.childChanged
+                                    u
+                                    node
+                                    node.MyChildIndexInParentAtIndex.[parentIndex]
+                                    oldValueOpt
+                                    newValue
+                            | _ -> ()
+
+                            if Debug.globalFlag then
+                                assert (Node.needsToBeComputed parent)
+                            (* We don't do the [can_recompute_now] optimization.  Since most nodes only have
                        one parent, it is not probably not a big loss.  If we did it anyway, we'd
                        have to be careful, because while we iterate over the list of parents, we
                        would execute them, and in particular we can execute lhs-change nodes who can
@@ -745,79 +869,94 @@ module State =
                        would execute the second child of the [lhs], which doesn't exist anymore and
                        incremental would segfault (there may be a less naive way of making this work
                        though). *)
-                    if not (Node.isInRecomputeHeap parent) then RecomputeHeap.add t.RecomputeHeap parent
-                    FakeUnit.ofUnit ()
-            }
-            |> parent.Apply
-            |> FakeUnit.toUnit
+                            if not (Node.isInRecomputeHeap parent) then
+                                RecomputeHeap.add t.RecomputeHeap parent
 
-          { new NodeEval<_> with
-              member _.Eval parent =
-                  match parent.Kind with
-                   | Kind.Expert p ->
-                     let child_index = node.MyChildIndexInParentAtIndex.[0]
-                     Expert.runEdgeCallback childIndex p
-                   | Kind.UnorderedArrayFold u ->
-                     UnorderedArrayFold.childChanged
-                       u
-                       node
-                       node.MyChildIndexInParentAtIndex.[0]
-                       old_value_opt
-                       new_value
-                   | _ -> ()
-                  if Debug.globalFlag then assert (Node.needsToBeComputed parent)
-                  if not (Node.isInRecomputeHeap parent) then
-                    let canRecomputeNow =
-                      match parent.Kind with
-                      | Kind.Uninitialized -> failwith "expected initialised"
-                      | Kind.At _
-                      | Kind.AtIntervals _
-                      | Kind.Const _ | Invalid | Snapshot _ | Var _ -> failwith "these nodes aren't parents"
-                      (* These nodes have more than one child. *)
-                      | Kind.ArrayFold _
-                      | Kind.Map2 _
-                      | Kind.UnorderedArrayFold _
-                      | Kind.Expert _ -> failwith "these nodes have more than one child"
-                      (* We can immediately recompute [parent] if no other node needs to be stable
+                            FakeUnit.ofUnit ()
+                    }
+                    |> parent.Apply
+                    |> FakeUnit.toUnit
+
+                { new NodeEval<_> with
+                    member _.Eval parent =
+                        match parent.Kind with
+                        | Kind.Expert p ->
+                            let child_index = node.MyChildIndexInParentAtIndex.[0]
+                            Expert.runEdgeCallback childIndex p
+                        | Kind.UnorderedArrayFold u ->
+                            UnorderedArrayFold.childChanged
+                                u
+                                node
+                                node.MyChildIndexInParentAtIndex.[0]
+                                old_value_opt
+                                new_value
+                        | _ -> ()
+
+                        if Debug.globalFlag then
+                            assert (Node.needsToBeComputed parent)
+
+                        if not (Node.isInRecomputeHeap parent) then
+                            let canRecomputeNow =
+                                match parent.Kind with
+                                | Kind.Uninitialized -> failwith "expected initialised"
+                                | Kind.At _
+                                | Kind.AtIntervals _
+                                | Kind.Const _
+                                | Invalid
+                                | Snapshot _
+                                | Var _ -> failwith "these nodes aren't parents"
+                                (* These nodes have more than one child. *)
+                                | Kind.ArrayFold _
+                                | Kind.Map2 _
+                                | Kind.UnorderedArrayFold _
+                                | Kind.Expert _ -> failwith "these nodes have more than one child"
+                                (* We can immediately recompute [parent] if no other node needs to be stable
                          before computing it.  If [parent] has a single child (i.e. [node]), then
                          this amounts to checking that [parent] won't be invalidated, i.e. that
                          [parent]'s scope has already stabilized. *)
-                      | Kind.BindLhsChange _ -> node.Height > Scope.height parent.CreatedIn
-                      | Kind.Freeze _ -> node.Height > Scope.height parent.CreatedIn
-                      | Kind.IfTestChange _ -> node.Height > Scope.height parent.CreatedIn
-                      | Kind.JoinLhsChange _ -> node.Height > Scope.height parent.CreatedIn
-                      | Kind.Map _ -> node.Height > Scope.height parent.CreatedIn
-                      | Kind.StepFunction _ -> node.Height > Scope.height parent.CreatedIn
-                      (* For these, we need to check that the "_change" child has already been
+                                | Kind.BindLhsChange _ -> node.Height > Scope.height parent.CreatedIn
+                                | Kind.Freeze _ -> node.Height > Scope.height parent.CreatedIn
+                                | Kind.IfTestChange _ -> node.Height > Scope.height parent.CreatedIn
+                                | Kind.JoinLhsChange _ -> node.Height > Scope.height parent.CreatedIn
+                                | Kind.Map _ -> node.Height > Scope.height parent.CreatedIn
+                                | Kind.StepFunction _ -> node.Height > Scope.height parent.CreatedIn
+                                (* For these, we need to check that the "_change" child has already been
                          evaluated (if needed).  If so, this also implies:
 
                          {[
                            node.height > Scope.height parent.created_in
                          ]} *)
-                      | Kind.BindMain b -> node.height > b.lhs_change.height
-                      | Kind.IfThenElse i -> node.height > i.test_change.height
-                      | Kind.JoinMain j -> node.height > j.lhs_change.height
-                    if canRecomputeNow then
-                      t.NumNodesRecomputedDirectlyBecauseOneChild <- t.NumNodesRecomputedDirectlyBecauseOneChild + 1
-                      recompute parent
-                    else if parent.Height <= RecomputeHeap.minHeight t.RecomputeHeap then
-                      (* If [parent.height] is [<=] the height of all nodes in the recompute heap
+                                | Kind.BindMain b -> node.height > b.lhs_change.height
+                                | Kind.IfThenElse i -> node.height > i.test_change.height
+                                | Kind.JoinMain j -> node.height > j.lhs_change.height
+
+                            if canRecomputeNow then
+                                t.NumNodesRecomputedDirectlyBecauseOneChild <-
+                                    t.NumNodesRecomputedDirectlyBecauseOneChild + 1
+
+                                recompute parent
+                            else if parent.Height <= RecomputeHeap.minHeight t.RecomputeHeap then
+                                (* If [parent.height] is [<=] the height of all nodes in the recompute heap
                          (possibly because the recompute heap is empty), then we can recompute
                          [parent] immediately and save adding it to and then removing it from the
                          recompute heap. *)
-                      t.NumNodesRecomputedDirectlyBecauseMinHeight <- t.NumNodesRecomputedDirectlyBecauseMinHeight + 1
-                      recompute parent
-                    else
-                      if Debug.globalFlag then
-                          assert (Node.needsToBeComputed parent)
-                          assert (not (Node.isInRecomputeHeap parent))
-                      RecomputeHeap.add t.RecomputeHeap parent
-          }
-          |> node.Parent0.Value.Apply
-          |> FakeUnit.toUnit
-      if Debug.globalFlag then invariant t
+                                t.NumNodesRecomputedDirectlyBecauseMinHeight <-
+                                    t.NumNodesRecomputedDirectlyBecauseMinHeight + 1
 
-    (*
+                                recompute parent
+                            else
+                                if Debug.globalFlag then
+                                    assert (Node.needsToBeComputed parent)
+                                    assert (not (Node.isInRecomputeHeap parent))
+
+                                RecomputeHeap.add t.RecomputeHeap parent
+                }
+                |> node.Parent0.Value.Apply
+                |> FakeUnit.toUnit
+
+        if Debug.globalFlag then
+            invariant t
+
     let[@inline always] recompute_first_node_that_is_necessary r =
       let (T node) = Recompute_heap.remove_min r in
       if debug && not (Node.needs_to_be_computed node)
@@ -1783,5 +1922,3 @@ module State =
         if not (Node.is_in_recompute_heap node)
         then Recompute_heap.add state.recompute_heap node;
         if not (Node.is_valid edge.child) then Expert.decr_invalid_children e))
-
-*)

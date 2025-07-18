@@ -8,4 +8,4 @@ module internal Observer =
     let incrState<'a> (t : Observer<'a>) = InternalObserver.incrState t.Value
 
     let onUpdateThrowing<'a> (t : Observer<'a>) onUpdateHandler =
-      InternalObserver.onUpdateThrowing t.Value onUpdateHandler
+        InternalObserver.onUpdateThrowing t.Value onUpdateHandler

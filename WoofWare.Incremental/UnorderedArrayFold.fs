@@ -84,6 +84,7 @@ module internal UnorderedArrayFold =
                 member _.Eval t' =
                     if not (same f t') then
                         failwith "invariant failed"
+
                     FakeUnit.ofUnit ()
             }
             |> t'.Apply
@@ -94,17 +95,25 @@ module internal UnorderedArrayFold =
 
         for child in f.Children do
             child.ValueOpt |> ValueOption.iter invA
+
             if f.NumChangesSinceLastFullCompute < f.FullComputeEveryNChanges then
                 if child.ValueOpt.IsNone then
                     failwith "invariant failed"
 
         f.FoldValue |> ValueOption.iter invB
-        if f.FoldValue.IsSome <> (f.NumChangesSinceLastFullCompute < f.FullComputeEveryNChanges) then
+
+        if
+            f.FoldValue.IsSome
+            <> (f.NumChangesSinceLastFullCompute < f.FullComputeEveryNChanges)
+        then
             failwith "invariant failed"
 
         do
-            if f.NumChangesSinceLastFullCompute < 0 then failwith "invariant failed"
-            if f.NumChangesSinceLastFullCompute > f.FullComputeEveryNChanges then failwith "invariant failed"
+            if f.NumChangesSinceLastFullCompute < 0 then
+                failwith "invariant failed"
+
+            if f.NumChangesSinceLastFullCompute > f.FullComputeEveryNChanges then
+                failwith "invariant failed"
 
         if f.FullComputeEveryNChanges <= 0 then
             failwith "invariant failed"

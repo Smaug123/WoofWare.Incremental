@@ -10,12 +10,12 @@ module internal Kind =
     /// <c>index</c> was negative, or was greater-or-equal <c>maxNumChildren t</c>,
     /// or if the <c>index</c>'th child is currently undefined.
     /// </exception>
-    val slowGetChild<'a> : Kind<'a> -> index:int -> NodeCrate
+    val slowGetChild<'a> : Kind<'a> -> index : int -> NodeCrate
 
     val bindRhsChildIndex : int
     val freezeChildIndex : int
     val ifBranchChildIndex : int
     val joinRhsChildIndex : int
-    val iteriChildren<'a> : Kind<'a> -> f:(int -> NodeCrate -> unit) -> unit
+    val iteriChildren<'a> : Kind<'a> -> f : (int -> NodeCrate -> unit) -> unit
 
     val invariant<'a> : ('a -> unit) -> Kind<'a> -> unit

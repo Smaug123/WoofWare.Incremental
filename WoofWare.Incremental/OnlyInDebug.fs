@@ -5,11 +5,9 @@ namespace WoofWare.Incremental
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal OnlyInDebug =
     let create () =
-      {
-          CurrentlyRunningNode = None
-          ExpertNodesCreatedByCurrentNode = []
-      }
+        {
+            CurrentlyRunningNode = None
+            ExpertNodesCreatedByCurrentNode = []
+        }
 
-    let invariant (t : OnlyInDebug) : unit =
-        ()
-
+    let invariant (t : OnlyInDebug) : unit = ()

@@ -10,7 +10,9 @@ module internal IfThenElse =
         do
             match t.Main.Kind with
             | Kind.Invalid -> ()
-            | Kind.IfThenElse t' -> if not (Object.ReferenceEquals (t, t')) then failwith "invariant failure"
+            | Kind.IfThenElse t' ->
+                if not (Object.ReferenceEquals (t, t')) then
+                    failwith "invariant failure"
             | _ -> ()
 
         do
@@ -21,6 +23,7 @@ module internal IfThenElse =
                     member _.Eval t' =
                         if not (Object.ReferenceEquals (t, t')) then
                             failwith "invariant failure"
+
                         FakeUnit.ofUnit ()
                 }
                 |> cr.Apply
@@ -31,5 +34,10 @@ module internal IfThenElse =
             match t.CurrentBranch with
             | ValueNone -> ()
             | ValueSome currentBranch ->
-                if not (Object.ReferenceEquals (currentBranch, t.Then) || Object.ReferenceEquals (currentBranch, t.Else)) then
+                if
+                    not (
+                        Object.ReferenceEquals (currentBranch, t.Then)
+                        || Object.ReferenceEquals (currentBranch, t.Else)
+                    )
+                then
                     failwith "invariant failure"

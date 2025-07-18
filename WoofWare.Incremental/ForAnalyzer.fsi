@@ -21,7 +21,7 @@ module ForAnalyzer =
     type Kind =
         | ArrayFold
         | At of TimeNs
-        | AtIntervals of base': TimeNs * interval : TimeNs.Span
+        | AtIntervals of base' : TimeNs * interval : TimeNs.Span
         | BindLhsChange
         | BindMain
         | Const
@@ -33,7 +33,7 @@ module ForAnalyzer =
         | JoinLhsChange
         | JoinMain
         | Map
-        | Snapshot of at: TimeNs
+        | Snapshot of at : TimeNs
         | StepFunction
         | Uninitialized
         | UnorderedArrayFold
@@ -46,5 +46,17 @@ module ForAnalyzer =
 
     /// Args to the addNode callback:
     /// id, kind, cutoff, children, bindChildren, userInfo, recomputedAt, changedAt, height
-    val traverse : NodeCrate list -> addNode: (NodeId -> Kind -> Cutoff -> NodeId seq -> NodeId seq -> DotUserInfo option -> StabilizationNum -> StabilizationNum -> int -> unit) -> unit
-
+    val traverse :
+        NodeCrate list ->
+        addNode :
+            (NodeId
+                -> Kind
+                -> Cutoff
+                -> NodeId seq
+                -> NodeId seq
+                -> DotUserInfo option
+                -> StabilizationNum
+                -> StabilizationNum
+                -> int
+                -> unit) ->
+            unit

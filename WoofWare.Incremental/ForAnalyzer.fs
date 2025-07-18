@@ -37,7 +37,7 @@ module ForAnalyzer =
     type Kind =
         | ArrayFold
         | At of TimeNs
-        | AtIntervals of base': TimeNs * interval : TimeNs.Span
+        | AtIntervals of base' : TimeNs * interval : TimeNs.Span
         | BindLhsChange
         | BindMain
         | Const
@@ -49,7 +49,7 @@ module ForAnalyzer =
         | JoinLhsChange
         | JoinMain
         | Map
-        | Snapshot of at: TimeNs
+        | Snapshot of at : TimeNs
         | StepFunction
         | Uninitialized
         | UnorderedArrayFold
@@ -62,7 +62,7 @@ module ForAnalyzer =
             match k with
             | Kind.ArrayFold -> "ArrayFold"
             | Kind.At int64 -> $"At(%i{int64})"
-            | Kind.AtIntervals(base', interval) -> $"AtIntervals(%i{base'}, {interval}"
+            | Kind.AtIntervals (base', interval) -> $"AtIntervals(%i{base'}, {interval}"
             | Kind.BindLhsChange -> "BindLhsChange"
             | Kind.BindMain -> "BindMain"
             | Kind.Const -> "Const"
@@ -84,17 +84,18 @@ module ForAnalyzer =
         let ofKind (k : WoofWare.Incremental.Kind<'a>) : Kind =
             match k with
             | WoofWare.Incremental.Kind.ArrayFold _ -> Kind.ArrayFold
-            | WoofWare.Incremental.Kind.At(at, _) -> Kind.At at.At
-            | WoofWare.Incremental.Kind.AtIntervals(atIntervals, _) -> Kind.AtIntervals (atIntervals.Base, atIntervals.Interval)
+            | WoofWare.Incremental.Kind.At (at, _) -> Kind.At at.At
+            | WoofWare.Incremental.Kind.AtIntervals (atIntervals, _) ->
+                Kind.AtIntervals (atIntervals.Base, atIntervals.Interval)
             | WoofWare.Incremental.Kind.BindLhsChange _ -> Kind.BindLhsChange
             | WoofWare.Incremental.Kind.BindMain bindMainCrate -> Kind.BindMain
             | WoofWare.Incremental.Kind.Const foo -> Kind.Const
             | WoofWare.Incremental.Kind.Expert expert -> Kind.Expert
             | WoofWare.Incremental.Kind.Freeze freeze -> Kind.Freeze
-            | WoofWare.Incremental.Kind.IfTestChange(fThenElseCrate, teq) -> Kind.IfTestChange
+            | WoofWare.Incremental.Kind.IfTestChange (fThenElseCrate, teq) -> Kind.IfTestChange
             | WoofWare.Incremental.Kind.IfThenElse ifThenElse -> Kind.IfThenElse
             | WoofWare.Incremental.Kind.Invalid -> Kind.Invalid
-            | WoofWare.Incremental.Kind.JoinLhsChange(joinCrate, teq) -> Kind.JoinLhsChange
+            | WoofWare.Incremental.Kind.JoinLhsChange (joinCrate, teq) -> Kind.JoinLhsChange
             | WoofWare.Incremental.Kind.JoinMain join -> Kind.JoinMain
             | WoofWare.Incremental.Kind.Map mapCrate -> Kind.Map
             | WoofWare.Incremental.Kind.Snapshot snapshot -> Kind.Snapshot snapshot.At
@@ -136,27 +137,42 @@ module ForAnalyzer =
 
     /// Args to the addNode callback:
     /// id, kind, cutoff, children, bindChildren, userInfo, recomputedAt, changedAt, height
-    let traverse (packedList : NodeCrate list) (addNode: NodeId -> Kind -> Cutoff -> NodeId seq -> NodeId seq -> DotUserInfo option -> StabilizationNum -> StabilizationNum -> int -> unit) : unit =
+    let traverse
+        (packedList : NodeCrate list)
+        (addNode :
+            NodeId
+                -> Kind
+                -> Cutoff
+                -> NodeId seq
+                -> NodeId seq
+                -> DotUserInfo option
+                -> StabilizationNum
+                -> StabilizationNum
+                -> int
+                -> unit)
+        : unit
+        =
         let mapOfIter iterator f =
             let out = ResizeArray ()
             iterator (fun x -> out.Add (f x))
             out
 
-        NodeCrate.iterDescendants packedList (fun packedNode ->
-            let children =
-                mapOfIter (fun f -> NodeCrate.iteriChildren packedNode (fun _ node -> f node)) NodeCrate.nodeId
+        NodeCrate.iterDescendants
+            packedList
+            (fun packedNode ->
+                let children =
+                    mapOfIter (fun f -> NodeCrate.iteriChildren packedNode (fun _ node -> f node)) NodeCrate.nodeId
 
-            let bindChildren =
-                mapOfIter (maybeIterOnBindNodesCreatedOnRhs packedNode) NodeCrate.nodeId
+                let bindChildren =
+                    mapOfIter (maybeIterOnBindNodesCreatedOnRhs packedNode) NodeCrate.nodeId
 
-            let id = NodeCrate.nodeId packedNode
-            let kind = kind packedNode
-            let cutoff = cutoff packedNode
-            let userInfo = NodeCrate.userInfo packedNode
-            let recomputedAt = NodeCrate.recomputedAt packedNode
-            let changedAt = NodeCrate.changedAt packedNode
-            let height = NodeCrate.height packedNode
+                let id = NodeCrate.nodeId packedNode
+                let kind = kind packedNode
+                let cutoff = cutoff packedNode
+                let userInfo = NodeCrate.userInfo packedNode
+                let recomputedAt = NodeCrate.recomputedAt packedNode
+                let changedAt = NodeCrate.changedAt packedNode
+                let height = NodeCrate.height packedNode
 
-            addNode id kind cutoff children bindChildren userInfo recomputedAt changedAt height
-        )
-
+                addNode id kind cutoff children bindChildren userInfo recomputedAt changedAt height
+            )

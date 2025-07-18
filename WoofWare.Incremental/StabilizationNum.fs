@@ -39,4 +39,6 @@ module StabilizationNum =
     let add1 (StabilizationNum i) = i + 1 |> StabilizationNum
     let toInt (StabilizationNum i) = i
 
-    let invariant (StabilizationNum i) = if i < -1 then failwith "invariant failed"
+    let invariant (StabilizationNum i) =
+        if i < -1 then
+            failwith "invariant failed"

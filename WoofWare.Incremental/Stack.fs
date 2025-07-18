@@ -7,8 +7,7 @@ module internal Stack =
 
     let isEmpty<'a> (s : Stack<'a>) : bool = s.Count = 0
 
-    let push<'a> (a : 'a) (s : Stack<'a>) : unit =
-        s.Push a
+    let push<'a> (a : 'a) (s : Stack<'a>) : unit = s.Push a
 
     let invariant<'a> (invA : 'a -> unit) (s : Stack<'a>) : unit =
         for i in s do
