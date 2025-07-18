@@ -58,7 +58,7 @@ and AtIntervals =
         Main : Node<unit>
         Base : TimeNs
         Interval : TimeNs.Span
-        Alarm : TimingWheel.Alarm
+        mutable Alarm : TimingWheel.Alarm
         Clock : Clock
     }
 
@@ -93,7 +93,7 @@ and Clock =
         /// This two-pass approach is necessary because one is not allowed to call TimingWheel functions from the
         /// HandleFired that one passes to TimingWheel.advanceClock.
         HandleFired : TimingWheel.Alarm -> unit
-        mutable FiredAlarmValues : AlarmValue option
+        mutable FiredAlarmValues : AlarmValue voption
     }
 
 and ExpertEdge<'a> =
@@ -509,72 +509,91 @@ module BindCrate =
         }
 
 [<AutoOpen>]
-module NodeExtensions =
+module CrateExtensions =
     type NodeCrate with
         static member make (node : Node<'a>) : NodeCrate =
             { new NodeCrate with
                 member _.Apply e = e.Eval node
             }
 
-[<RequireQualifiedAccess>]
-module InternalObserverCrate =
-    let make (i: InternalObserver<'a>) : InternalObserverCrate =
-        { new InternalObserverCrate with member _.Apply e = e.Eval i }
+    type InternalObserverCrate with
+        static member make (i : InternalObserver<'a>) : InternalObserverCrate =
+            { new InternalObserverCrate with
+                member _.Apply e = e.Eval i
+            }
 
 [<RequireQualifiedAccess>]
 module VarCrate =
-    let make (v: Var<'a>) : VarCrate =
-        { new VarCrate with member _.Apply e = e.Eval v }
+    let make (v : Var<'a>) : VarCrate =
+        { new VarCrate with
+            member _.Apply e = e.Eval v
+        }
 
 [<RequireQualifiedAccess>]
 module MapCrate =
-    let make (f: 'a -> 'b) (n: Node<'a>) : MapCrate<'b> =
+    let make (f : 'a -> 'b) (n : Node<'a>) : MapCrate<'b> =
         { new MapCrate<_> with
             member _.Apply e = e.Eval (f, n)
         }
 
 [<RequireQualifiedAccess>]
 module Map2Crate =
-    let make (f: 'a -> 'b -> 'c) (n1: Node<'a>) (n2: Node<'b>) : Map2Crate<'c> =
+    let make (f : 'a -> 'b -> 'c) (n1 : Node<'a>) (n2 : Node<'b>) : Map2Crate<'c> =
         { new Map2Crate<_> with
             member _.Apply e = e.Eval (f, n1, n2)
         }
 
 [<RequireQualifiedAccess>]
 module BindMainCrate =
-    let make (f: Bind<'a,'b>) : BindMainCrate<'a> =
+    let make (f : Bind<'a, 'b>) : BindMainCrate<'a> =
         { new BindMainCrate<_> with
             member _.Apply e = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
 module JoinCrate =
-    let make (f: Join<'a>) : JoinCrate =
+    let make (f : Join<'a>) : JoinCrate =
         { new JoinCrate with
             member _.Apply e = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
 module IfThenElseCrate =
-    let make (f: IfThenElse<'a>) : IfThenElseCrate =
-        { new IfThenElseCrate with member _.Apply e = e.Eval f }
+    let make (f : IfThenElse<'a>) : IfThenElseCrate =
+        { new IfThenElseCrate with
+            member _.Apply e = e.Eval f
+        }
 
 [<RequireQualifiedAccess>]
 module ArrayFoldCrate =
-    let make (f: ArrayFold<'a,'b>) : ArrayFoldCrate<'b> =
-        { new ArrayFoldCrate<_> with member _.Apply e = e.Eval f }
+    let make (f : ArrayFold<'a, 'b>) : ArrayFoldCrate<'b> =
+        { new ArrayFoldCrate<_> with
+            member _.Apply e = e.Eval f
+        }
 
 [<RequireQualifiedAccess>]
 module UnorderedArrayFoldCrate =
-    let make (f: UnorderedArrayFold<'a,'b>) : UnorderedArrayFoldCrate<'b> =
-        { new UnorderedArrayFoldCrate<_> with member _.Apply e = e.Eval f }
+    let make (f : UnorderedArrayFold<'a, 'b>) : UnorderedArrayFoldCrate<'b> =
+        { new UnorderedArrayFoldCrate<_> with
+            member _.Apply e = e.Eval f
+        }
 
 [<RequireQualifiedAccess>]
 module SnapshotCrate =
-    let make (f: Snapshot<'a>) : SnapshotCrate =
-        { new SnapshotCrate with member _.Apply e = e.Eval f }
+    let make (f : Snapshot<'a>) : SnapshotCrate =
+        { new SnapshotCrate with
+            member _.Apply e = e.Eval f
+        }
 
 [<RequireQualifiedAccess>]
 module StepFunctionNodeCrate =
-    let make (f: StepFunctionNode<'a>) : StepFunctionNodeCrate =
-        { new StepFunctionNodeCrate with member _.Apply e = e.Eval f }
+    let make (f : StepFunctionNode<'a>) : StepFunctionNodeCrate =
+        { new StepFunctionNodeCrate with
+            member _.Apply e = e.Eval f
+        }
+
+module ExpertEdgeCrate =
+    let make (f : ExpertEdge<'a>) : ExpertEdgeCrate =
+        { new ExpertEdgeCrate with
+            member _.Apply e = e.Eval f
+        }

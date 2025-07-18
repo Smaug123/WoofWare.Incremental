@@ -3,7 +3,7 @@ namespace WoofWare.Incremental
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal RecomputeHeap =
-    val create : max_height_allowed : int -> RecomputeHeap
+    val create : maxHeightAllowed : int -> RecomputeHeap
     val length : RecomputeHeap -> int
 
     /// <summary>The maximum <c>Node.Height</c> allowed for <c>node</c> in this heap.</summary>

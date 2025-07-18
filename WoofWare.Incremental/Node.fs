@@ -828,6 +828,13 @@ module NodeCrate =
 
     let nextInAdjustHeightsHeap (n : NodeCrate) : NodeCrate voption = n.Apply nextInAdjustHeightsHeapEval
 
+    let private nextInRecomputeHeapEval =
+        { new NodeEval<_> with
+            member _.Eval n = n.NextInRecomputeHeap
+        }
+
+    let nextInRecomputeHeap (n : NodeCrate) : NodeCrate voption = n.Apply nextInRecomputeHeapEval
+
     let private heightInAdjustHeightsHeapEval =
         { new NodeEval<_> with
             member _.Eval n = n.HeightInAdjustHeightsHeap

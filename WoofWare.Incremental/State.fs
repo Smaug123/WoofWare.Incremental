@@ -961,442 +961,490 @@ module State =
             invariant t
 
     let inline recomputeFirstNodeThatIsNecessary r =
-      let node = RecomputeHeap.removeMin r
-      { new NodeEval<_> with
-          member _.Eval node =
-              if Debug.globalFlag && not (Node.needsToBeComputed node) then
-                failwith "node unexpectedly does not need to be computed"
-              recompute node
-      }
-      |> node.Apply
-
-    let unlinkDisallowedObservers (t: State) : unit =
-      while not (Stack.isEmpty t.DisallowedObservers) do
-        let packed = Stack.pop(t.DisallowedObservers).Value
-        { new InternalObserverEval<_> with
-            member _.Eval internalObserver =
-                if Debug.globalFlag then
-                    assert internalObserver.State.IsDisallowed
-                internalObserver.State <- InternalObserverState.Unlinked
-
-                { new InternalObserverEval<_> with
-                    member _.Eval allObservers =
-                        if InternalObserver.same internalObserver allObservers then
-                            t.AllObservers <- internalObserver.NextInAll
-                        InternalObserver.unlink internalObserver
-                        checkIfUnnecessary internalObserver.Observing
-                        FakeUnit.ofUnit ()
-                }
-                |> t.AllObservers.Value.Apply
-        }
-        |> packed.Apply
-        |> FakeUnit.toUnit
-
-    let disallowFutureUse (internalObserver: InternalObserver<'a>) : unit =
-      let t = InternalObserver.incrState internalObserver in
-      match internalObserver.State with
-      | InternalObserverState.Disallowed | InternalObserverState.Unlinked -> ()
-      | InternalObserverState.Created ->
-        t.NumActiveObservers <- t.NumActiveObservers - 1
-        internalObserver.State <- InternalObserverState.Unlinked
-        internalObserver.OnUpdateHandlers <- []
-      | InternalObserverState.InUse ->
-        t.NumActiveObservers <- t.NumActiveObservers - 1
-        internalObserver.State <- InternalObserverState.Disallowed
-        Stack.push (InternalObserverCrate.make internalObserver) t.DisallowedObservers
-
-    let disallowFinalizedObservers (t: State) : unit =
-      let disallowIfFinalized (internalObserver : InternalObserverCrate) =
-        { new InternalObserverEval<_> with
-            member _.Eval internalObserver =
-                if List.isEmpty internalObserver.OnUpdateHandlers then disallowFutureUse internalObserver
-                FakeUnit.ofUnit ()
-        }
-        |> internalObserver.Apply
-        |> FakeUnit.toUnit
-      t.FinalizedObservers
-      |> ThreadSafeQueue.dequeue_until_empty disallow_if_finalized
-
-    let observerFinalizer (t : State) =
-      Staged.stage (fun observer ->
-        let internalObserver = !observer in
-        ThreadSafeQueue.enqueue t.FinalizedObservers (InternalObserverCrate.make internalObserver))
-
-    let createObserver (shouldFinalize : bool option) (observing : 'a Node) : InternalObserver<'a> =
-      let shouldFinalize = defaultArg shouldFinalize true
-      let t = observing.State
-      let internalObserver : InternalObserver<_> =
-        {
-         State = InternalObserverState.Created
-         Observing = observing
-         OnUpdateHandlers = []
-         PrevInAll = ValueNone
-         NextInAll = ValueNone
-         PrevInObserving = ValueNone
-         NextInObserving = ValueNone
-        }
-      Stack.push (InternalObserverCrate.make internalObserver) t.NewObservers
-      let mutable observer = internalObserver in
-      if shouldFinalize then
-          Gc.Expert.add_finalizer_ignore observer (Staged.unstage (ovserverFinalizer t))
-      t.NumActiveObservers <- t.NumActiveObservers + 1
-      observer
-
-    let addNewObservers (t : State) : unit =
-      while not (Stack.isEmpty t.NewObservers) do
-        let packed = Stack.pop t.NewObservers |> Option.get
-
-        { new InternalObserverEval<_> with
-            member _.Eval internalObserver =
-                match internalObserver.State with
-                | InternalObserverState.InUse | InternalObserverState.Disallowed -> failwith "oh no"
-                | InternalObserverState.Unlinked -> ()
-                | InternalObserverState.Created ->
-                  internalObserver.State <- InternalObserverState.InUse;
-                  let oldAllObservers = t.AllObservers
-                  match oldAllObservers with
-                  | ValueSome oldAllObservers' ->
-                    internalObserver.NextInAll <- oldAllObservers;
-                    Packed.set_prev_in_all oldAllObservers' (ValueSome packed)
-                  | ValueNone -> ()
-                  t.AllObservers <- ValueSome packed
-                  let observing = internalObserver.Observing
-                  let wasNecessary = NodeHelpers.isNecessary observing
-                  observing.NumOnUpdateHandlers <- observing.NumOnUpdateHandlers + List.length internalObserver.OnUpdateHandlers
-                  let oldObservers = observing.Observers
-                  match oldObservers with
-                  | ValueSome oldObservers' ->
-                    internalObserver.NextInObserving <- oldObservers
-                    oldObservers'.PrevInObserving <- ValueSome internalObserver
-                  | ValueNone -> ()
-                  observing.Observers <- ValueSome internalObserver
-                  // By adding [internal_observer] to [observing.observers], we may have added
-                  // on-update handlers to [observing].  We need to handle [observing] after this
-                  // stabilization to give those handlers a chance to run.
-                  handleAfterStabilization observing
-                  if Debug.globalFlag then assert (NodeHelpers.isNecessary observing)
-                  if not wasNecessary then becameNecessary observing
-                FakeUnit.ofUnit ()
-        }
-        |> packed.Apply
-        |> FakeUnit.toUnit
-
-    let observerValueThrowing (observer: Observer<'a>) : 'a =
-      let t = Observer.incrState observer
-      match t.Status with
-      | Status.Not_stabilizing | Status.Running_on_update_handlers -> Observer.valueThrowing observer
-      | Status.Stabilize_previously_raised exn ->
-        RaisedException.reraiseWithMessage
-          exn
-          "Observer.valueThrowing called after stabilize previously raised"
-      | Status.Stabilizing ->
-        failwith "Observer.valueThrowing called during stabilization"
-
-    let observerValue (observer: Observer<'a>) : Result<'a,exn> =
-      try
-          Ok (observerValueThrowing observer)
-      with
-      | exn -> Error exn
-
-    let nodeOnUpdate<'a> (node : 'a Node) (f: NodeUpdate<'a> -> unit) : unit =
-      let t = node.State
-      Node.onUpdate node (OnUpdateHandler.create f t.StabilizationNum)
-      handleAfterStabilization node
-
-    let observerOnUpdateThrowing observer f =
-      let t = Observer.incrState observer
-      Observer.onUpdateThrowing observer (OnUpdateHandler.create f t.StabilizationNum)
-      handleAfterStabilization (Observer.observing observer)
-
-    let setVarWhileNotStabilizing (var: Var<'a>) (value: 'a) : unit =
-      let t = Var.incrState var
-      t.NumVarSets <- t.NumVarSets + 1
-      var.Value <- value
-      if var.SetAt < t.StabilizationNum then
-        var.SetAt <- t.StabilizationNum
-        let watch = var.Watch
-        if Debug.globalFlag then assert (Node.isStale watch)
-        if NodeHelpers.isNecessary watch && not (Node.isInRecomputeHeap watch) then
-            RecomputeHeap.add t.RecomputeHeap watch
-
-    let setVar (var: Var<'a>) (value: 'a) : unit =
-      let t = Var.incrState var in
-      match t.Status with
-      | Status.Running_on_update_handlers | Status.Not_stabilizing ->
-        setVarWhileNotStabilizing var value
-      | Status.Stabilize_previously_raised exn ->
-        RaisedException.reraiseWithMessage
-          exn
-          "cannot set var -- stabilization previously raised"
-      | Status.Stabilizing ->
-        if var.ValueSetDuringStabilization.IsNone then
-            Stack.push (VarCrate.make var) t.SetDuringStabilization
-        var.ValueSetDuringStabilization <- Some value
-
-    let reclaimSpaceInWeakHashTables t =
-      let reclaim (w : WeakHashTableCrate) =
-        { new WeakHashTableEval<_> with
-            member _.Eval w =
-                WeakHashTable.reclaimSpaceForKeysWithUnusedData w
-                |> FakeUnit.ofUnit
-        }
-        |> w.Apply
-        |> FakeUnit.toUnit
-      Thread_safe_queue.dequeue_until_empty reclaim t.WeakHashTable
-
-    let stabilizeStart (t : State) : unit =
-      t.Status <- Status.Stabilizing;
-      disallowFinalizedObservers t
-      // Just like for binds, we add new observers before removing disallowed observers to
-      // potentially avoid switching the observability of some nodes back and forth.
-      addNewObservers t
-      unlinkDisallowedObservers t
-      if Debug.globalFlag then invariant t
-
-    let stabilizeEnd (t : State) : unit =
-      if Debug.globalFlag then
-        t.OnlyInDebug.CurrentlyRunningNode <- None;
-        t.OnlyInDebug.ExpertNodesCreatedByCurrentNode <- []
-      // We increment [t.stabilization_num] before handling variables set during
-      // stabilization, so that they are treated as set during the new stabilization cycle.
-      // Also, we increment before running on-update handlers, to avoid running on update
-      // handlers created during on update handlers.
-      t.StabilizationNum <- StabilizationNum.add1 t.StabilizationNum
-      while not (Stack.isEmpty t.SetDuringStabilization) do
-        let var =
-            Stack.pop t.SetDuringStabilization
-            |> Option.get
-        { new VarEval<_> with
-            member _.Eval var =
-                let value = var.ValueSetDuringStabilization.Value
-                var.ValueSetDuringStabilization <- None
-                setVarWhileNotStabilizing var value
-                FakeUnit.ofUnit ()
-        }
-        |> var.Apply
-        |> FakeUnit.toUnit
-      while not (Stack.isEmpty t.HandleAfterStabilization) do
-        let node =
-            t.HandleAfterStabilization
-            |> Stack.pop
-            |> Option.get
+        let node = RecomputeHeap.removeMin r
 
         { new NodeEval<_> with
             member _.Eval node =
-                node.IsInHandleAfterStabilization <- false
-                let oldValue = node.OldValueOpt in
-                node.OldValueOpt <- ValueNone
-                let node_update : _ NodeUpdate =
-                  if not (NodeHelpers.isValid node) then
-                      Invalidated
-                  else if not (NodeHelpers.isNecessary node) then
-                      Unnecessary
-                  else
-                    let new_value = node.ValueOpt.Value in
-                    match oldValue with
-                    | ValueNone -> Necessary new_value
-                    | ValueSome oldValue -> Changed (oldValue, new_value)
-                Stack.push (RunOnUpdateHandlers.make node node_update) t.RunOnUpdateHandlers
-                FakeUnit.ofUnit ()
+                if Debug.globalFlag && not (Node.needsToBeComputed node) then
+                    failwith "node unexpectedly does not need to be computed"
+
+                recompute node
         }
         |> node.Apply
-        |> FakeUnit.toUnit
-      t.Status <- Status.Running_on_update_handlers
-      let now = t.StabilizationNum
-      while not (Stack.isEmpty t.RunOnUpdateHandlers) do
-        let rouh =
-            t.RunOnUpdateHandlers
-            |> Stack.pop
-            |> Option.get
-        { new RunOnUpdateHandlersEval<_> with
-            member _.Eval node nodeUpdate =
-                Node.runOnUpdateHandlers node nodeUpdate now
-                |> FakeUnit.ofUnit
-        }
-        |> rouh.Apply
-        |> FakeUnit.toUnit
-      t.Status <- Status.Not_stabilizing
-      reclaimSpaceInWeakHashTables t
 
-    let raiseDuringStabilization (t: State) (exn: exn) : 'a =
-      let raised = RaisedException.create exn in
-      t.Status <- Stabilize_previously_raised raised;
-      RaisedException.reraise raised
+    let unlinkDisallowedObservers (t : State) : unit =
+        while not (Stack.isEmpty t.DisallowedObservers) do
+            let packed = Stack.pop(t.DisallowedObservers).Value
 
-    let stabilize (t: State) : unit =
-      ensureNotStabilizing t "stabilize" false
-      try
-        stabilizeStart t;
-        let r = t.RecomputeHeap
-        while RecomputeHeap.length r > 0 do
-          recomputeFirstNodeThatIsNecessary r
-        stabilizeEnd t
-      with
-      | exn -> raiseDuringStabilization t exn
+            { new InternalObserverEval<_> with
+                member _.Eval internalObserver =
+                    if Debug.globalFlag then
+                        assert internalObserver.State.IsDisallowed
+
+                    internalObserver.State <- InternalObserverState.Unlinked
+
+                    { new InternalObserverEval<_> with
+                        member _.Eval allObservers =
+                            if InternalObserver.same internalObserver allObservers then
+                                t.AllObservers <- internalObserver.NextInAll
+
+                            InternalObserver.unlink internalObserver
+                            checkIfUnnecessary internalObserver.Observing
+                            FakeUnit.ofUnit ()
+                    }
+                    |> t.AllObservers.Value.Apply
+            }
+            |> packed.Apply
+            |> FakeUnit.toUnit
+
+    let disallowFutureUse (internalObserver : InternalObserver<'a>) : unit =
+        let t = InternalObserver.incrState internalObserver in
+
+        match internalObserver.State with
+        | InternalObserverState.Disallowed
+        | InternalObserverState.Unlinked -> ()
+        | InternalObserverState.Created ->
+            t.NumActiveObservers <- t.NumActiveObservers - 1
+            internalObserver.State <- InternalObserverState.Unlinked
+            internalObserver.OnUpdateHandlers <- []
+        | InternalObserverState.InUse ->
+            t.NumActiveObservers <- t.NumActiveObservers - 1
+            internalObserver.State <- InternalObserverState.Disallowed
+            Stack.push (InternalObserverCrate.make internalObserver) t.DisallowedObservers
+
+    let disallowFinalizedObservers (t : State) : unit =
+        let disallowIfFinalized (internalObserver : InternalObserverCrate) =
+            { new InternalObserverEval<_> with
+                member _.Eval internalObserver =
+                    if List.isEmpty internalObserver.OnUpdateHandlers then
+                        disallowFutureUse internalObserver
+
+                    FakeUnit.ofUnit ()
+            }
+            |> internalObserver.Apply
+            |> FakeUnit.toUnit
+
+        t.FinalizedObservers
+        |> ThreadSafeQueue.dequeue_until_empty disallow_if_finalized
+
+    let observerFinalizer (t : State) =
+        Staged.stage (fun observer ->
+            let internalObserver = !observer in
+            t.FinalizedObservers.Enqueue (InternalObserverCrate.make internalObserver)
+        )
+
+    let createObserver (shouldFinalize : bool option) (observing : 'a Node) : InternalObserver<'a> =
+        let shouldFinalize = defaultArg shouldFinalize true
+        let t = observing.State
+
+        let internalObserver : InternalObserver<_> =
+            {
+                State = InternalObserverState.Created
+                Observing = observing
+                OnUpdateHandlers = []
+                PrevInAll = ValueNone
+                NextInAll = ValueNone
+                PrevInObserving = ValueNone
+                NextInObserving = ValueNone
+            }
+
+        Stack.push (InternalObserverCrate.make internalObserver) t.NewObservers
+        let mutable observer = internalObserver in
+
+        if shouldFinalize then
+            Gc.Expert.add_finalizer_ignore observer (Staged.unstage (ovserverFinalizer t))
+
+        t.NumActiveObservers <- t.NumActiveObservers + 1
+        observer
+
+    let addNewObservers (t : State) : unit =
+        while not (Stack.isEmpty t.NewObservers) do
+            let packed = Stack.pop t.NewObservers |> Option.get
+
+            { new InternalObserverEval<_> with
+                member _.Eval internalObserver =
+                    match internalObserver.State with
+                    | InternalObserverState.InUse
+                    | InternalObserverState.Disallowed -> failwith "oh no"
+                    | InternalObserverState.Unlinked -> ()
+                    | InternalObserverState.Created ->
+                        internalObserver.State <- InternalObserverState.InUse
+                        let oldAllObservers = t.AllObservers
+
+                        match oldAllObservers with
+                        | ValueSome oldAllObservers' ->
+                            internalObserver.NextInAll <- oldAllObservers
+                            InternalObserverCrate.setPrevInAll oldAllObservers' (ValueSome packed)
+                        | ValueNone -> ()
+
+                        t.AllObservers <- ValueSome packed
+                        let observing = internalObserver.Observing
+                        let wasNecessary = NodeHelpers.isNecessary observing
+
+                        observing.NumOnUpdateHandlers <-
+                            observing.NumOnUpdateHandlers + List.length internalObserver.OnUpdateHandlers
+
+                        let oldObservers = observing.Observers
+
+                        match oldObservers with
+                        | ValueSome oldObservers' ->
+                            internalObserver.NextInObserving <- oldObservers
+                            oldObservers'.PrevInObserving <- ValueSome internalObserver
+                        | ValueNone -> ()
+
+                        observing.Observers <- ValueSome internalObserver
+                        // By adding [internal_observer] to [observing.observers], we may have added
+                        // on-update handlers to [observing].  We need to handle [observing] after this
+                        // stabilization to give those handlers a chance to run.
+                        handleAfterStabilization observing
+
+                        if Debug.globalFlag then
+                            assert (NodeHelpers.isNecessary observing)
+
+                        if not wasNecessary then
+                            becameNecessary observing
+
+                    FakeUnit.ofUnit ()
+            }
+            |> packed.Apply
+            |> FakeUnit.toUnit
+
+    let observerValueThrowing (observer : Observer<'a>) : 'a =
+        let t = Observer.incrState observer
+
+        match t.Status with
+        | Status.Not_stabilizing
+        | Status.Running_on_update_handlers -> Observer.valueThrowing observer
+        | Status.Stabilize_previously_raised exn ->
+            RaisedException.reraiseWithMessage exn "Observer.valueThrowing called after stabilize previously raised"
+        | Status.Stabilizing -> failwith "Observer.valueThrowing called during stabilization"
+
+    let observerValue (observer : Observer<'a>) : Result<'a, exn> =
+        try
+            Ok (observerValueThrowing observer)
+        with exn ->
+            Error exn
+
+    let nodeOnUpdate<'a> (node : 'a Node) (f : NodeUpdate<'a> -> unit) : unit =
+        let t = node.State
+        Node.onUpdate node (OnUpdateHandler.create f t.StabilizationNum)
+        handleAfterStabilization node
+
+    let observerOnUpdateThrowing observer f =
+        let t = Observer.incrState observer
+        Observer.onUpdateThrowing observer (OnUpdateHandler.create f t.StabilizationNum)
+        handleAfterStabilization (Observer.observing observer)
+
+    let setVarWhileNotStabilizing (var : Var<'a>) (value : 'a) : unit =
+        let t = Var.incrState var
+        t.NumVarSets <- t.NumVarSets + 1
+        var.Value <- value
+
+        if var.SetAt < t.StabilizationNum then
+            var.SetAt <- t.StabilizationNum
+            let watch = var.Watch
+
+            if Debug.globalFlag then
+                assert (Node.isStale watch)
+
+            if NodeHelpers.isNecessary watch && not (Node.isInRecomputeHeap watch) then
+                RecomputeHeap.add t.RecomputeHeap watch
+
+    let setVar (var : Var<'a>) (value : 'a) : unit =
+        let t = Var.incrState var in
+
+        match t.Status with
+        | Status.Running_on_update_handlers
+        | Status.Not_stabilizing -> setVarWhileNotStabilizing var value
+        | Status.Stabilize_previously_raised exn ->
+            RaisedException.reraiseWithMessage exn "cannot set var -- stabilization previously raised"
+        | Status.Stabilizing ->
+            if var.ValueSetDuringStabilization.IsNone then
+                Stack.push (VarCrate.make var) t.SetDuringStabilization
+
+            var.ValueSetDuringStabilization <- Some value
+
+    let reclaimSpaceInWeakHashTables t =
+        let reclaim (w : WeakHashTableCrate) =
+            { new WeakHashTableEval<_> with
+                member _.Eval w =
+                    WeakHashTable.reclaimSpaceForKeysWithUnusedData w |> FakeUnit.ofUnit
+            }
+            |> w.Apply
+            |> FakeUnit.toUnit
+
+        Thread_safe_queue.dequeue_until_empty reclaim t.WeakHashTable
+
+    let stabilizeStart (t : State) : unit =
+        t.Status <- Status.Stabilizing
+        disallowFinalizedObservers t
+        // Just like for binds, we add new observers before removing disallowed observers to
+        // potentially avoid switching the observability of some nodes back and forth.
+        addNewObservers t
+        unlinkDisallowedObservers t
+
+        if Debug.globalFlag then
+            invariant t
+
+    let stabilizeEnd (t : State) : unit =
+        if Debug.globalFlag then
+            t.OnlyInDebug.CurrentlyRunningNode <- None
+            t.OnlyInDebug.ExpertNodesCreatedByCurrentNode <- []
+        // We increment [t.stabilization_num] before handling variables set during
+        // stabilization, so that they are treated as set during the new stabilization cycle.
+        // Also, we increment before running on-update handlers, to avoid running on update
+        // handlers created during on update handlers.
+        t.StabilizationNum <- StabilizationNum.add1 t.StabilizationNum
+
+        while not (Stack.isEmpty t.SetDuringStabilization) do
+            let var = Stack.pop t.SetDuringStabilization |> Option.get
+
+            { new VarEval<_> with
+                member _.Eval var =
+                    let value = var.ValueSetDuringStabilization.Value
+                    var.ValueSetDuringStabilization <- None
+                    setVarWhileNotStabilizing var value
+                    FakeUnit.ofUnit ()
+            }
+            |> var.Apply
+            |> FakeUnit.toUnit
+
+        while not (Stack.isEmpty t.HandleAfterStabilization) do
+            let node = t.HandleAfterStabilization |> Stack.pop |> Option.get
+
+            { new NodeEval<_> with
+                member _.Eval node =
+                    node.IsInHandleAfterStabilization <- false
+                    let oldValue = node.OldValueOpt in
+                    node.OldValueOpt <- ValueNone
+
+                    let node_update : _ NodeUpdate =
+                        if not (NodeHelpers.isValid node) then
+                            Invalidated
+                        else if not (NodeHelpers.isNecessary node) then
+                            Unnecessary
+                        else
+                            let new_value = node.ValueOpt.Value in
+
+                            match oldValue with
+                            | ValueNone -> Necessary new_value
+                            | ValueSome oldValue -> Changed (oldValue, new_value)
+
+                    Stack.push (RunOnUpdateHandlers.make node node_update) t.RunOnUpdateHandlers
+                    FakeUnit.ofUnit ()
+            }
+            |> node.Apply
+            |> FakeUnit.toUnit
+
+        t.Status <- Status.Running_on_update_handlers
+        let now = t.StabilizationNum
+
+        while not (Stack.isEmpty t.RunOnUpdateHandlers) do
+            let rouh = t.RunOnUpdateHandlers |> Stack.pop |> Option.get
+
+            { new RunOnUpdateHandlersEval<_> with
+                member _.Eval node nodeUpdate =
+                    Node.runOnUpdateHandlers node nodeUpdate now |> FakeUnit.ofUnit
+            }
+            |> rouh.Apply
+            |> FakeUnit.toUnit
+
+        t.Status <- Status.Not_stabilizing
+        reclaimSpaceInWeakHashTables t
+
+    let raiseDuringStabilization (t : State) (exn : exn) : 'a =
+        let raised = RaisedException.create exn in
+        t.Status <- Stabilize_previously_raised raised
+        RaisedException.reraise raised
+
+    let stabilize (t : State) : unit =
+        ensureNotStabilizing t "stabilize" false
+
+        try
+            stabilizeStart t
+            let r = t.RecomputeHeap
+
+            while RecomputeHeap.length r > 0 do
+                recomputeFirstNodeThatIsNecessary r
+
+            stabilizeEnd t
+        with exn ->
+            raiseDuringStabilization t exn
 
     type StepResult =
         | KeepGoing
         | Done
 
     let doOneStepOfStabilize (t : State) : StepResult =
-      try
-        match t.Status with
-        | Status.Not_stabilizing ->
-          stabilizeStart t
-          StepResult.KeepGoing
-        | Status.Stabilizing ->
-          let r = t.RecomputeHeap in
-          if RecomputeHeap.length r > 0 then
-            recomputeFirstNodeThatIsNecessary r
-            StepResult.KeepGoing
-          else
-            stabilizeEnd t
-            StepResult.Done
-        | Status.Running_on_update_handlers | Status.Stabilize_previously_raised _ ->
-          ensureNotStabilizing t "step" false
-          failwith "assert false"
-      with
-      | exn ->
-        (match t.Status with
-         | Status.Stabilize_previously_raised _ ->
-           (* If stabilization has already raised, then [exn] is merely a notification of this
+        try
+            match t.Status with
+            | Status.Not_stabilizing ->
+                stabilizeStart t
+                StepResult.KeepGoing
+            | Status.Stabilizing ->
+                let r = t.RecomputeHeap in
+
+                if RecomputeHeap.length r > 0 then
+                    recomputeFirstNodeThatIsNecessary r
+                    StepResult.KeepGoing
+                else
+                    stabilizeEnd t
+                    StepResult.Done
+            | Status.Running_on_update_handlers
+            | Status.Stabilize_previously_raised _ ->
+                ensureNotStabilizing t "step" false
+                failwith "assert false"
+        with exn ->
+            (match t.Status with
+             | Status.Stabilize_previously_raised _ ->
+                 (* If stabilization has already raised, then [exn] is merely a notification of this
               fact, rather than the original exception itself.  We should just propagate [exn]
               forward; calling [raise_during_stabilization] would store [exn] as the exception
               that initially raised during stabilization. *)
-           raise exn
-         | _ -> raiseDuringStabilization t exn)
+                 raise exn
+             | _ -> raiseDuringStabilization t exn)
 
-    let createNodeIn (t: State) (createdIn: Scope) (kind: Kind<'a>) : Node<'a> =
-      t.NumNodesCreated <- t.NumNodesCreated + 1
-      Node.create t createdIn kind
+    let createNodeIn (t : State) (createdIn : Scope) (kind : Kind<'a>) : Node<'a> =
+        t.NumNodesCreated <- t.NumNodesCreated + 1
+        Node.create t createdIn kind
 
-    let createNode (t: State) (kind: Kind<'a>) : Node<'a> = createNodeIn t t.CurrentScope kind
-    let createNodeTop (t: State) (kind: Kind<'a>) : Node<'a> = createNodeIn t Scope.top kind
+    let createNode (t : State) (kind : Kind<'a>) : Node<'a> = createNodeIn t t.CurrentScope kind
+    let createNodeTop (t : State) (kind : Kind<'a>) : Node<'a> = createNodeIn t Scope.top kind
 
-    let createVar (t: State) (useCurrentScope : bool option) (value: 'a) : Var<'a> =
-      let useCurrentScope = defaultArg useCurrentScope false
-      let scope = if useCurrentScope then t.CurrentScope else Scope.top in
-      let watch = createNodeIn t scope Kind.Uninitialized in
-      let var =
-        {
-           Value = value
-           ValueSetDuringStabilization = None
-           SetAt = t.StabilizationNum
-           Watch = watch
-        }
-      Node.setKind watch (Kind.Var var)
-      var
+    let createVar (t : State) (useCurrentScope : bool option) (value : 'a) : Var<'a> =
+        let useCurrentScope = defaultArg useCurrentScope false
+        let scope = if useCurrentScope then t.CurrentScope else Scope.top in
+        let watch = createNodeIn t scope Kind.Uninitialized in
+
+        let var =
+            {
+                Value = value
+                ValueSetDuringStabilization = None
+                SetAt = t.StabilizationNum
+                Watch = watch
+            }
+
+        Node.setKind watch (Kind.Var var)
+        var
 
     // A [const] value could come from the right-hand side of an outer bind.  So, we create a
     // [const] node in the current scope, not in [Scope.top].
     let konst t a = createNode t (Kind.Const a)
-    let map (f: 'a -> 'b) (n : 'a Node) : Node<'b> = createNode n.State (Kind.Map (MapCrate.make f n))
-    let map2 (n1 : _ Node) n2 f = createNode n1.State (Kind.Map2 (Map2Crate.make f n1 n2))
+
+    let map (f : 'a -> 'b) (n : 'a Node) : Node<'b> =
+        createNode n.State (Kind.Map (MapCrate.make f n))
+
+    let map2 (n1 : _ Node) n2 f =
+        createNode n1.State (Kind.Map2 (Map2Crate.make f n1 n2))
 
     let both (n1 : _ Node) (n2 : _ Node) : Node<'a * 'b> =
-      match n1.Kind, n2.Kind with
-      | Kind.Const a, Kind.Const b ->
-          konst n1.State (a, b)
-      | _ -> map2 n1 n2 (fun a b -> (a, b))
+        match n1.Kind, n2.Kind with
+        | Kind.Const a, Kind.Const b -> konst n1.State (a, b)
+        | _ -> map2 n1 n2 (fun a b -> (a, b))
 
-    let preserveCutoff (input : 'a Node) (output: Node<'b>) : unit =
-      Node.setCutoff
+    let preserveCutoff (input : 'a Node) (output : Node<'b>) : unit =
+        Node.setCutoff output (Cutoff.create (fun _ _ -> input.ChangedAt = output.ChangedAt))
+
+    let dependOn (input : Node<'a>) (dependOn : Node<'b>) : Node<'a> =
+        let output = map2 input dependOn (fun a _ -> a) in
+        preserveCutoff input output
         output
-        (Cutoff.create (fun _ _ ->
-           input.ChangedAt = output.ChangedAt))
 
-    let dependOn (input: Node<'a>) (dependOn: Node<'b>) : Node<'a> =
-      let output = map2 input dependOn (fun a _ -> a) in
-      preserveCutoff input output
-      output
+    let necessaryIfAlive (input : Node<'a>) : Node<'a> =
+        // If [output] is alive, then [observer] is alive, then [input] is necessary.  If
+        // [output] is unnecessary, then [output] is not a parent of [input], and thus
+        // [output]'s liveness is dependent solely on user code.  And in particular, if [output]
+        // dies, then [observer] will be finalized, and then upon the next stabilization,
+        // [input] will become unnecessary (at least with respect to [output]).
+        let observer = createObserver None input
 
-    let necessaryIfAlive (input: Node<'a>) : Node<'a> =
-      // If [output] is alive, then [observer] is alive, then [input] is necessary.  If
-      // [output] is unnecessary, then [output] is not a parent of [input], and thus
-      // [output]'s liveness is dependent solely on user code.  And in particular, if [output]
-      // dies, then [observer] will be finalized, and then upon the next stabilization,
-      // [input] will become unnecessary (at least with respect to [output]).
-      let observer = createObserver None input
-      let output =
-        input
-        |> map (fun a ->
-          Gc.keep_alive observer
-          a
-        )
-      preserveCutoff input output
-      output
+        let output =
+            input
+            |> map (fun a ->
+                Gc.keep_alive observer
+                a
+            )
+
+        preserveCutoff input output
+        output
 
     let bind (lhs : 'a Node) f =
-      let t = lhs.State
-      let lhsChange = createNode t Kind.Uninitialized
-      let main = createNode t Kind.Uninitialized
-      let bind =
-        {
-             Main = main
-             F = f
-             Lhs = lhs
-             LhsChange = lhsChange
-             Rhs = ValueNone
-             RhsScope = Scope.top
-             AllNodesCreatedOnRhs = ValueNone
-       }
-      // We set [lhs_change] to never cutoff so that whenever [lhs] changes, [main] is
-      // recomputed.  This is necessary to handle cases where [f] returns an existing stable
-      // node, in which case the [lhs_change] would be the only thing causing [main] to be
-      // stale.
-      Node.setCutoff lhsChange Cutoff.never
-      let bind' = BindCrate.make bind
-      bind.RhsScope <- Scope.Bind bind'
-      Node.setKind lhsChange (Kind.BindLhsChange (bind', Teq.refl))
-      Node.setKind main (Kind.BindMain (BindMainCrate.make bind))
-      main
+        let t = lhs.State
+        let lhsChange = createNode t Kind.Uninitialized
+        let main = createNode t Kind.Uninitialized
 
-    let bind2 (n1: Node<'a>) (n2: Node<'b>) (f: 'a -> 'b -> Node<'a * 'b>) : Node<'a * 'b> =
-      bind (map2 n1 n2 (fun v1 v2 -> v1, v2)) (fun (v1, v2) -> f v1 v2)
+        let bind =
+            {
+                Main = main
+                F = f
+                Lhs = lhs
+                LhsChange = lhsChange
+                Rhs = ValueNone
+                RhsScope = Scope.top
+                AllNodesCreatedOnRhs = ValueNone
+            }
+        // We set [lhs_change] to never cutoff so that whenever [lhs] changes, [main] is
+        // recomputed.  This is necessary to handle cases where [f] returns an existing stable
+        // node, in which case the [lhs_change] would be the only thing causing [main] to be
+        // stale.
+        Node.setCutoff lhsChange Cutoff.never
+        let bind' = BindCrate.make bind
+        bind.RhsScope <- Scope.Bind bind'
+        Node.setKind lhsChange (Kind.BindLhsChange (bind', Teq.refl))
+        Node.setKind main (Kind.BindMain (BindMainCrate.make bind))
+        main
+
+    let bind2 (n1 : Node<'a>) (n2 : Node<'b>) (f : 'a -> 'b -> Node<'a * 'b>) : Node<'a * 'b> =
+        bind (map2 n1 n2 (fun v1 v2 -> v1, v2)) (fun (v1, v2) -> f v1 v2)
 
     let join (lhs : 'a Node Node) =
-      let t = lhs.State
-      let lhsChange = createNode t Kind.Uninitialized
-      let main = createNode t Kind.Uninitialized
-      let join = { Join.Lhs = lhs; LhsChange = lhsChange ; Rhs = ValueNone; Main = main }
-      Node.setCutoff lhsChange Cutoff.never
-      Node.setKind lhsChange (Kind.JoinLhsChange (JoinCrate.make join, Teq.refl))
-      Node.setKind main (Kind.JoinMain join)
-      main
+        let t = lhs.State
+        let lhsChange = createNode t Kind.Uninitialized
+        let main = createNode t Kind.Uninitialized
 
-    let if_ (test : bool Node) (then_: Node<'a>) (else_: Node<'a>) : Node<'a> =
-      let t = test.State
-      let testChange = createNode t Kind.Uninitialized
-      let main = createNode t Kind.Uninitialized
-      let iTE =
-        {
-            IfThenElse.Test = test
-            Then = then_
-            Else = else_
-            TestChange = testChange
-            Main = main
-            CurrentBranch = ValueNone
-        }
-      Node.setCutoff testChange Cutoff.never
-      Node.setKind testChange (Kind.IfTestChange (IfThenElseCrate.make iTE, Teq.refl))
-      Node.setKind main (Kind.IfThenElse iTE)
-      main
+        let join =
+            {
+                Join.Lhs = lhs
+                LhsChange = lhsChange
+                Rhs = ValueNone
+                Main = main
+            }
 
-    let lazyFromFun (t: State) (f: unit -> 'a) : Lazy<'a> =
-      let scope = t.CurrentScope
-      Lazy<_>.Create (fun () -> withinScope t scope f)
+        Node.setCutoff lhsChange Cutoff.never
+        Node.setKind lhsChange (Kind.JoinLhsChange (JoinCrate.make join, Teq.refl))
+        Node.setKind main (Kind.JoinMain join)
+        main
+
+    let if_ (test : bool Node) (then_ : Node<'a>) (else_ : Node<'a>) : Node<'a> =
+        let t = test.State
+        let testChange = createNode t Kind.Uninitialized
+        let main = createNode t Kind.Uninitialized
+
+        let iTE =
+            {
+                IfThenElse.Test = test
+                Then = then_
+                Else = else_
+                TestChange = testChange
+                Main = main
+                CurrentBranch = ValueNone
+            }
+
+        Node.setCutoff testChange Cutoff.never
+        Node.setKind testChange (Kind.IfTestChange (IfThenElseCrate.make iTE, Teq.refl))
+        Node.setKind main (Kind.IfThenElse iTE)
+        main
+
+    let lazyFromFun (t : State) (f : unit -> 'a) : Lazy<'a> =
+        let scope = t.CurrentScope
+        Lazy<_>.Create (fun () -> withinScope t scope f)
 
     [<Literal>]
     let DEFAULT_HASH_TABLE_INITIAL_SIZE = 4
 
-    let memoize_fun_by_key
-      (initialSize : int option)
-      (t : State)
-      (projectKey : 'key -> 'b)
-      (f : 'key -> 'c)
-      =
-      let initialSize = defaultArg initialSize DEFAULT_HASH_TABLE_INITIAL_SIZE
-      (* Here's an explanation of why we get [t.current_scope] here, and then call
+    let memoize_fun_by_key (initialSize : int option) (t : State) (projectKey : 'key -> 'b) (f : 'key -> 'c) =
+        let initialSize = defaultArg initialSize DEFAULT_HASH_TABLE_INITIAL_SIZE
+        (* Here's an explanation of why we get [t.current_scope] here, and then call
          [within_scope] below.  Consider this (impossible) alternate implementation of
          [memoize_fun_by_key]:
 
@@ -1415,467 +1463,568 @@ module State =
          The implementation below uses [within_scope] to call [f a] in the scope that was
          current at the point of the call to [memoize_fun_by_key] so that we can think of the
          [table] as having been created then, when it in reality is created on-demand. *)
-      let scope = t.CurrentScope
-      let table = Dictionary initialSize
-      Staged.stage (fun a ->
-        let key = projectKey a
-        match table.TryGetValue key with
-        | true, v -> v
-        | false, _ ->
-          let b = withinScope t scope (fun () -> f a) in
-          table.Add (key, b)
-          b
-      )
+        let scope = t.CurrentScope
+        let table = Dictionary initialSize
 
-    let arrayFold (t: State) (children: Node<'a> array) (init: 'acc) (f: 'acc -> 'a -> 'acc) : Node<'acc> =
-      if Array.length children = 0 then
-          konst t init
-      else
-          {
-               Init = init
-               Children = children
-               F = f
-          }
-          |> ArrayFoldCrate.make
-          |> Kind.ArrayFold
-          |> createNode t
+        Staged.stage (fun a ->
+            let key = projectKey a
 
-    let all (t: State) (ts: Node<'a> list) : Node<'a list> = arrayFold t (Array.ofList (List.rev ts)) [] (fun ac a -> a :: ac)
+            match table.TryGetValue key with
+            | true, v -> v
+            | false, _ ->
+                let b = withinScope t scope (fun () -> f a) in
+                table.Add (key, b)
+                b
+        )
+
+    let arrayFold (t : State) (children : Node<'a> array) (init : 'acc) (f : 'acc -> 'a -> 'acc) : Node<'acc> =
+        if Array.length children = 0 then
+            konst t init
+        else
+            {
+                Init = init
+                Children = children
+                F = f
+            }
+            |> ArrayFoldCrate.make
+            |> Kind.ArrayFold
+            |> createNode t
+
+    let all (t : State) (ts : Node<'a> list) : Node<'a list> =
+        arrayFold t (Array.ofList (List.rev ts)) [] (fun ac a -> a :: ac)
 
     let unorderedArrayFold
-      (t : State)
-      (fullComputeEveryNChanges : int option)
-      (children : Node<'b> array)
-      (init : 'acc)
-      (f : 'acc -> 'b -> 'acc)
-      (update : Update<'b, 'acc>)
-      : Node<'acc>
-      =
-      let fullComputeEveryNChanges = defaultArg fullComputeEveryNChanges Int32.MaxValue
-      if Array.length children = 0 then
-          konst t init
-      else if fullComputeEveryNChanges <= 0 then
-        invalidArg "fullComputeEveryNChanges" $"unordered_array_fold got non-positive full_compute_every_n_changes %i{fullComputeEveryNChanges}"
-      else
-        let main = createNode t Kind.Uninitialized
+        (t : State)
+        (fullComputeEveryNChanges : int option)
+        (children : Node<'b> array)
+        (init : 'acc)
+        (f : 'acc -> 'b -> 'acc)
+        (update : Update<'b, 'acc>)
+        : Node<'acc>
+        =
+        let fullComputeEveryNChanges = defaultArg fullComputeEveryNChanges Int32.MaxValue
+
+        if Array.length children = 0 then
+            konst t init
+        else if fullComputeEveryNChanges <= 0 then
+            invalidArg
+                "fullComputeEveryNChanges"
+                $"unordered_array_fold got non-positive full_compute_every_n_changes %i{fullComputeEveryNChanges}"
+        else
+            let main = createNode t Kind.Uninitialized
 
 
-        UnorderedArrayFold.create
-            init
-            f
-            update
-            fullComputeEveryNChanges
-            children
+            UnorderedArrayFold.create init f update fullComputeEveryNChanges children main
+            |> UnorderedArrayFoldCrate.make
+            |> Kind.UnorderedArrayFold
+            |> Node.setKind main
+
             main
-        |> UnorderedArrayFoldCrate.make
-        |> Kind.UnorderedArrayFold
-        |> Node.setKind main
-        main
 
-    let optUnorderedArrayFold (t: State) (fullComputeEveryNChanges: int option) (ts: Node<'a option> array) (init: 'b) (f: 'b -> 'a -> 'b) (fInverse: 'b -> 'a -> 'b) : Node<'b option> =
-      let f (accum, num_invalid) x =
-        match x with
-        | None -> accum, num_invalid + 1
-        | Some x -> f accum x, num_invalid
-      let fInverse (accum, num_invalid) x =
-        match x with
-        | None -> accum, num_invalid - 1
-        | Some x -> fInverse accum x, num_invalid
+    let optUnorderedArrayFold
+        (t : State)
+        (fullComputeEveryNChanges : int option)
+        (ts : Node<'a option> array)
+        (init : 'b)
+        (f : 'b -> 'a -> 'b)
+        (fInverse : 'b -> 'a -> 'b)
+        : Node<'b option>
+        =
+        let f (accum, num_invalid) x =
+            match x with
+            | None -> accum, num_invalid + 1
+            | Some x -> f accum x, num_invalid
 
-      unorderedArrayFold
-           t
-           fullComputeEveryNChanges
-           ts
-           (init, 0)
-           f
-           (Update.FInverse fInverse)
-      |> map
-        (fun (accum, numInvalid) -> if numInvalid = 0 then Some accum else None)
+        let fInverse (accum, num_invalid) x =
+            match x with
+            | None -> accum, num_invalid - 1
+            | Some x -> fInverse accum x, num_invalid
 
-    let atLeastKOf (t: State) (nodes: Node<bool> array) (k: int) : Node<bool> =
-      let boolToInt b = if b then 1 else 0
-      unorderedArrayFold
-           t
-           None
-           nodes
-           0
-           (fun numTrue b -> numTrue + boolToInt b)
-           (Update.FInverse (fun numTrue b -> numTrue - boolToInt b))
-      |> map (fun i -> i >= k)
+        unorderedArrayFold t fullComputeEveryNChanges ts (init, 0) f (Update.FInverse fInverse)
+        |> map (fun (accum, numInvalid) -> if numInvalid = 0 then Some accum else None)
 
-    let exists (t: State) (nodes: Node<bool> array) : Node<bool> = atLeastKOf t nodes 1
+    let atLeastKOf (t : State) (nodes : Node<bool> array) (k : int) : Node<bool> =
+        let boolToInt b = if b then 1 else 0
+
+        unorderedArrayFold
+            t
+            None
+            nodes
+            0
+            (fun numTrue b -> numTrue + boolToInt b)
+            (Update.FInverse (fun numTrue b -> numTrue - boolToInt b))
+        |> map (fun i -> i >= k)
+
+    let exists (t : State) (nodes : Node<bool> array) : Node<bool> = atLeastKOf t nodes 1
     let forAll t nodes = atLeastKOf t nodes (Array.length nodes)
 
-    let sum (t: State) (fullComputeEveryNChanges: int option) (nodes: Node<'a> array) (zero: 'b) (add: 'b -> 'a -> 'b) (sub: 'b -> 'a -> 'b) : Node<'b> =
-      unorderedArrayFold
-        t
-        fullComputeEveryNChanges
-        nodes
-        zero
-        add
-        (Update.FInverse sub)
+    let sum
+        (t : State)
+        (fullComputeEveryNChanges : int option)
+        (nodes : Node<'a> array)
+        (zero : 'b)
+        (add : 'b -> 'a -> 'b)
+        (sub : 'b -> 'a -> 'b)
+        : Node<'b>
+        =
+        unorderedArrayFold t fullComputeEveryNChanges nodes zero add (Update.FInverse sub)
 
-    let optSum (t: State) (fullComputeEveryNChanges: int option) (nodes: Node<'a option> array) (zero: 'b) (add: 'b -> 'a -> 'b) (sub: 'b -> 'a -> 'b) : Node<'b option> =
-      optUnorderedArrayFold
-        t
-        fullComputeEveryNChanges
-        nodes
-        zero
-        add
-        sub
+    let optSum
+        (t : State)
+        (fullComputeEveryNChanges : int option)
+        (nodes : Node<'a option> array)
+        (zero : 'b)
+        (add : 'b -> 'a -> 'b)
+        (sub : 'b -> 'a -> 'b)
+        : Node<'b option>
+        =
+        optUnorderedArrayFold t fullComputeEveryNChanges nodes zero add sub
 
-    let inline sum'<'T when 'T: (static member (+) : 'T * 'T -> 'T) and 'T : (static member (-) : 'T * 'T -> 'T) and 'T : (static member Zero : 'T)>
-        (t: State) (nodes: Node<'T> array) : Node<'T> =
+    let inline sum'<'T
+        when 'T : (static member (+) : 'T * 'T -> 'T)
+        and 'T : (static member (-) : 'T * 'T -> 'T)
+        and 'T : (static member Zero : 'T)>
+        (t : State)
+        (nodes : Node<'T> array)
+        : Node<'T>
+        =
         sum t None nodes LanguagePrimitives.GenericZero (+) (-)
 
-    let setFreeze (node : 'a Node) (child: Node<'a>) (onlyFreezeWhen: 'a -> bool) : unit =
-      if Debug.globalFlag then assert node.CreatedIn.IsTop
-      // By making [node.kind] be [Freeze], we are making [Node.is_necessary node].
-      let wasNecessary = NodeHelpers.isNecessary node in
-      Node.setKind node (Kind.Freeze { Main = node; Child = child; OnlyFreezeWhen = onlyFreezeWhen })
-      if wasNecessary then
-          addParent child node Kind.freezeChildIndex
-      else becameNecessary node
+    let setFreeze (node : 'a Node) (child : Node<'a>) (onlyFreezeWhen : 'a -> bool) : unit =
+        if Debug.globalFlag then
+            assert node.CreatedIn.IsTop
+        // By making [node.kind] be [Freeze], we are making [Node.is_necessary node].
+        let wasNecessary = NodeHelpers.isNecessary node in
 
-    let freeze (child : 'a Node) (onlyFreezeWhen: 'a -> bool) : Node<'a> =
-      let t = child.State
-      let node = createNodeTop t Kind.Uninitialized
-      setFreeze node child onlyFreezeWhen
-      node
+        Node.setKind
+            node
+            (Kind.Freeze
+                {
+                    Main = node
+                    Child = child
+                    OnlyFreezeWhen = onlyFreezeWhen
+                })
 
-    let at (clock: Clock) (time: TimeNs) : Node<BeforeOrAfter> =
-      let t = Clock.incrState clock
-      if time <= (Clock.now clock) then
-          konst t BeforeOrAfter.After
-      else
-        let main = createNode t Kind.Uninitialized
-        let at = { At = time; Main = main; Alarm = TimingWheel.Alarm.null'; Clock = clock }
-        Node.setKind main (Kind.At (at, Teq.refl));
-        at.Alarm <- addAlarm clock time (AlarmValue.create (AlarmValueAction.At at))
-        main
+        if wasNecessary then
+            addParent child node Kind.freezeChildIndex
+        else
+            becameNecessary node
 
-    let after (clock: Clock) (span: TimeNs.Span) : Node<BeforeOrAfter> = at clock (TimeNs.add (Clock.now clock) span)
+    let freeze (child : 'a Node) (onlyFreezeWhen : 'a -> bool) : Node<'a> =
+        let t = child.State
+        let node = createNodeTop t Kind.Uninitialized
+        setFreeze node child onlyFreezeWhen
+        node
 
-    let nextIntervalAlarmStrict (clock : Clock) base_ interval =
-      let after = Clock.now clock
-      let at = TimeNs.nextMultiple ~base_ ~after ~interval ~can_equal_after:false ()
-      if Debug.globalFlag then assert (at > after)
-      at
+    let at (clock : Clock) (time : TimeNs) : Node<BeforeOrAfter> =
+        let t = Clock.incrState clock
+
+        if time <= (Clock.now clock) then
+            konst t BeforeOrAfter.After
+        else
+            let main = createNode t Kind.Uninitialized
+
+            let at =
+                {
+                    At = time
+                    Main = main
+                    Alarm = TimingWheel.Alarm.null'
+                    Clock = clock
+                }
+
+            Node.setKind main (Kind.At (at, Teq.refl))
+            at.Alarm <- addAlarm clock time (AlarmValue.create (AlarmValueAction.At at))
+            main
+
+    let after (clock : Clock) (span : TimeNs.Span) : Node<BeforeOrAfter> =
+        at clock (TimeNs.add (Clock.now clock) span)
+
+    let nextIntervalAlarmStrict (clock : Clock) base_ interval : TimeNs =
+        let after = Clock.now clock
+        // let at = TimeNs.nextMultiple ~base_ ~after ~interval ~can_equal_after:false ()
+        failwith "TODO"
+
+        if Debug.globalFlag then
+            assert (at > after)
+
+        at
 
     let at_intervals (clock : Clock) interval =
-      let t = Clock.incrState clock
-      if interval < (TimingWheel.alarmPrecision clock.TimingWheel) then
-          failwith "at_intervals got too small interval" interval
-      let main = createNode t Kind.Uninitialized
-      let base_ = Clock.now clock
-      let atIntervals = { AtIntervals.Main = main; Base = base_; Interval = interval; Alarm = TimingWheel.Alarm.null'; Clock = clock }
-      Node.setKind main (Kind.AtIntervals (atIntervals, Teq.refl))
-      // [main : unit Node.t], so we make it never cutoff so it changes each time it is
-      // recomputed.
-      Node.setCutoff main Cutoff.never
-      atIntervals.Alarm <-
-           addAlarm
-               clock
-               (nextIntervalAlarmStrict clock base_ interval)
-               (AlarmValue.create (AlarmValueAction.AtIntervals atIntervals))
-      main
+        let t = Clock.incrState clock
 
-    let snapshot (clock: Clock) (valueAt: Node<'a>) (at: TimeNs) (before: 'a) : Result<Node<'a>,string> =
-      let t = Clock.incrState clock in
-      if at <= Clock.now clock then
-        if at < Clock.now clock then
-            Error "cannot take snapshot in the past"
+        if interval < (TimingWheel.alarmPrecision clock.TimingWheel) then
+            failwith "at_intervals got too small interval" interval
+
+        let main = createNode t Kind.Uninitialized
+        let base_ = Clock.now clock
+
+        let atIntervals =
+            {
+                AtIntervals.Main = main
+                Base = base_
+                Interval = interval
+                Alarm = TimingWheel.Alarm.null'
+                Clock = clock
+            }
+
+        Node.setKind main (Kind.AtIntervals (atIntervals, Teq.refl))
+        // [main : unit Node.t], so we make it never cutoff so it changes each time it is
+        // recomputed.
+        Node.setCutoff main Cutoff.never
+
+        atIntervals.Alarm <-
+            addAlarm
+                clock
+                (nextIntervalAlarmStrict clock base_ interval)
+                (AlarmValue.create (AlarmValueAction.AtIntervals atIntervals))
+
+        main
+
+    let snapshot (clock : Clock) (valueAt : Node<'a>) (at : TimeNs) (before : 'a) : Result<Node<'a>, string> =
+        let t = Clock.incrState clock in
+
+        if at <= Clock.now clock then
+            if at < Clock.now clock then
+                Error "cannot take snapshot in the past"
+            else
+                Ok (freeze valueAt (fun _ -> true))
         else
-            Ok (freeze valueAt (fun _ -> true))
-      else
-        let main = createNodeTop t Kind.Uninitialized in
-        let snapshot = { Snapshot.Main = main; At = at; Before = before; ValueAt = valueAt; Clock = clock }
-        Node.setKind main (Kind.Snapshot snapshot)
-        // Unlike other time-based incrementals, a snapshot is created in [Scope.top] and
-        // cannot be invalidated by its scope.  Thus, there is no need to keep track of the
-        // alarm that is added, because it will never need to be removed early.
-        addAlarm clock at (AlarmValue.create (AlarmValueAction.Snapshot (SnapshotCrate.make snapshot)))
-        |> ignore<TimingWheel.Alarm>
-        Ok main
+            let main = createNodeTop t Kind.Uninitialized in
+
+            let snapshot =
+                {
+                    Snapshot.Main = main
+                    At = at
+                    Before = before
+                    ValueAt = valueAt
+                    Clock = clock
+                }
+
+            Node.setKind main (Kind.Snapshot snapshot)
+            // Unlike other time-based incrementals, a snapshot is created in [Scope.top] and
+            // cannot be invalidated by its scope.  Thus, there is no need to keep track of the
+            // alarm that is added, because it will never need to be removed early.
+            addAlarm clock at (AlarmValue.create (AlarmValueAction.Snapshot (SnapshotCrate.make snapshot)))
+            |> ignore<TimingWheel.Alarm>
+
+            Ok main
 
     let incremental_step_function clock child =
-      let t = Clock.incrState clock
-      let main = createNode t Kind.Uninitialized
-      let stepFunctionNode =
-        {
-         StepFunctionNode.Main = main
-         Value = ValueNone
-         Child = ValueSome child
-         ExtractedStepFunctionFromChildAt = StabilizationNum.none
-         UpcomingSteps = Seq.empty
-         Alarm = TimingWheel.Alarm.null'
-         AlarmValue = Unchecked.defaultof<_> (* set below *)
-         Clock = clock
-        }
-      stepFunctionNode.AlarmValue <- AlarmValue.create (AlarmValueAction.StepFunction (StepFunctionNodeCrate.make stepFunctionNode))
-      Node.setKind main (Kind.StepFunction stepFunctionNode)
-      main
+        let t = Clock.incrState clock
+        let main = createNode t Kind.Uninitialized
+
+        let stepFunctionNode =
+            {
+                StepFunctionNode.Main = main
+                Value = ValueNone
+                Child = ValueSome child
+                ExtractedStepFunctionFromChildAt = StabilizationNum.none
+                UpcomingSteps = Seq.empty
+                Alarm = TimingWheel.Alarm.null'
+                AlarmValue = Unchecked.defaultof<_> (* set below *)
+                Clock = clock
+            }
+
+        stepFunctionNode.AlarmValue <-
+            AlarmValue.create (AlarmValueAction.StepFunction (StepFunctionNodeCrate.make stepFunctionNode))
+
+        Node.setKind main (Kind.StepFunction stepFunctionNode)
+        main
 
     let makeStale (node : 'a Node) : unit =
-      let t = node.State
-      node.RecomputedAt <- StabilizationNum.none
-      // force the node to be stale
-      if Node.needsToBeComputed node && not (Node.isInRecomputeHeap node)
-      then RecomputeHeap.add t.RecomputeHeap node
+        let t = node.State
+        node.RecomputedAt <- StabilizationNum.none
+        // force the node to be stale
+        if Node.needsToBeComputed node && not (Node.isInRecomputeHeap node) then
+            RecomputeHeap.add t.RecomputeHeap node
 
     let advanceClock (clock : Clock) to_ =
-      let t = Clock.incrState clock
-      ensureNotStabilizing t "advance_clock" true
-      if Debug.globalFlag then invariant t
-      if to_ > (Clock.now clock) then
-        setVarWhileNotStabilizing clock.Now to_
-        TimingWheel.advanceClock clock.TimingWheel to_ clock.HandleFired
-        TimingWheel.firePastAlarms clock.TimingWheel clock.HandleFired
-        while clock.FiredAlarmValues.IsSome do
-          let alarmValue = clock.FiredAlarmValues.Value
-          clock.FiredAlarmValues <- alarmValue.NextFired
-          alarmValue.NextFired <- ValueNone
-          match alarmValue.Action with
-          | AlarmValueAction.At action ->
-            let main = action.Main
-            if NodeHelpers.isValid main then
-              Node.setKind main (Kind.Const BeforeOrAfter.After)
-              makeStale main
-          | AlarmValueAction.AtIntervals atIntervals ->
-            let main = atIntervals.Main
-            let base_ = atIntervals.Base
-            let interval = atIntervals.Interval
-            if NodeHelpers.isValid main then
-              atIntervals.Alarm <- addAlarm clock (nextIntervalAlarmStrict clock base_ interval) alarmValue
-              makeStale main
-          | AlarmValueAction.Snapshot snap ->
-            { new SnapshotEval<_> with
-                member _.Eval snap =
-                    let main = snap.Main
-                    let valueAt = snap.ValueAt
-                    if Debug.globalFlag then assert (NodeHelpers.isValid main);
-                    setFreeze main valueAt (fun _ -> true);
-                    makeStale main
-                   |> FakeUnit.ofUnit
-            }
-            |> snap.Apply
-            |> FakeUnit.toUnit
-          | AlarmValueAction.StepFunction sf ->
-              { new StepFunctionNodeEval<_> with
-                  member _.Eval sf =
-                      let main = sf.Main
-                      if NodeHelpers.isValid main then makeStale main
-                      FakeUnit.ofUnit ()
-              }
-              |> sf.Apply
-              |> FakeUnit.toUnit
-        if Debug.globalFlag then invariant t
+        let t = Clock.incrState clock
+        ensureNotStabilizing t "advance_clock" true
+
+        if Debug.globalFlag then
+            invariant t
+
+        if to_ > (Clock.now clock) then
+            setVarWhileNotStabilizing clock.Now to_
+            TimingWheel.advanceClock clock.TimingWheel to_ clock.HandleFired
+            TimingWheel.firePastAlarms clock.TimingWheel clock.HandleFired
+
+            while clock.FiredAlarmValues.IsSome do
+                let alarmValue = clock.FiredAlarmValues.Value
+                clock.FiredAlarmValues <- alarmValue.NextFired
+                alarmValue.NextFired <- ValueNone
+
+                match alarmValue.Action with
+                | AlarmValueAction.At action ->
+                    let main = action.Main
+
+                    if NodeHelpers.isValid main then
+                        Node.setKind main (Kind.Const BeforeOrAfter.After)
+                        makeStale main
+                | AlarmValueAction.AtIntervals atIntervals ->
+                    let main = atIntervals.Main
+                    let base_ = atIntervals.Base
+                    let interval = atIntervals.Interval
+
+                    if NodeHelpers.isValid main then
+                        atIntervals.Alarm <- addAlarm clock (nextIntervalAlarmStrict clock base_ interval) alarmValue
+                        makeStale main
+                | AlarmValueAction.Snapshot snap ->
+                    { new SnapshotEval<_> with
+                        member _.Eval snap =
+                            let main = snap.Main
+                            let valueAt = snap.ValueAt
+
+                            if Debug.globalFlag then
+                                assert (NodeHelpers.isValid main)
+
+                            setFreeze main valueAt (fun _ -> true)
+                            makeStale main |> FakeUnit.ofUnit
+                    }
+                    |> snap.Apply
+                    |> FakeUnit.toUnit
+                | AlarmValueAction.StepFunction sf ->
+                    { new StepFunctionNodeEval<_> with
+                        member _.Eval sf =
+                            let main = sf.Main
+
+                            if NodeHelpers.isValid main then
+                                makeStale main
+
+                            FakeUnit.ofUnit ()
+                    }
+                    |> sf.Apply
+                    |> FakeUnit.toUnit
+
+            if Debug.globalFlag then
+                invariant t
 
     let createClock t timingWheelConfig start =
-      let timingWheel = TimingWheel.create timingWheelConfig start
-      let now = createVar t None start
-      let mutable clock' = Unchecked.defaultof<_>
+        let timingWheel = TimingWheel.create timingWheelConfig start
+        let now = createVar t None start
+        let mutable clock' = Unchecked.defaultof<_>
 
-      let handleFired (alarm: TimingWheel.Alarm) : unit =
-        let alarmValue = TimingWheel.Alarm.value timingWheel alarm
-        alarmValue.NextFired <- clock'.FiredAlarmValues
-        clock'.FiredAlarmValues <- Some alarmValue
+        let handleFired (alarm : TimingWheel.Alarm) : unit =
+            let alarmValue = TimingWheel.Alarm.value timingWheel alarm
+            alarmValue.NextFired <- clock'.FiredAlarmValues
+            clock'.FiredAlarmValues <- ValueSome alarmValue
 
-      let clock : Clock =
-        {
-          Clock.Now = now
-          HandleFired = handleFired
-          FiredAlarmValues = None
-          TimingWheel = timingWheel
-        }
-      clock' <- clock
+        let clock : Clock =
+            {
+                Clock.Now = now
+                HandleFired = handleFired
+                FiredAlarmValues = ValueNone
+                TimingWheel = timingWheel
+            }
 
-      clock
+        clock' <- clock
 
-    let create (config : IncrementalConfig) (maxHeightAllowed: int) : State =
-      let adjustHeightsHeap = AdjustHeightsHeap.create maxHeightAllowed
-      let recomputeHeap = RecomputeHeap.create maxHeightAllowed
-      let t =
-        {
-          Status = Status.Not_stabilizing
-          BindLhsChangeShouldInvalidateRhs = Config.bind_lhs_change_should_invalidate_rhs
-          StabilizationNum = StabilizationNum.zero
-          CurrentScope = Scope.top
-          AdjustHeightsHeap = adjustHeightsHeap
-          RecomputeHeap = recomputeHeap
-          PropagateInvalidity = Stack.create ()
-          NumActiveObservers = 0
-          AllObservers = ValueNone
-          FinalizedObservers = ConcurrentQueue ()
-          DisallowedObservers = Stack.create ()
-          NewObservers = Stack.create ()
-          SetDuringStabilization = Stack.create ()
-          HandleAfterStabilization = Stack.create ()
-          RunOnUpdateHandlers = Stack.create ()
-          OnlyInDebug = OnlyInDebug.create ()
-          WeakHashTables = ConcurrentQueue ()
-          KeepNodeCreationBacktrace = false
-          NumNodesBecameNecessary = 0
-          NumNodesBecameUnnecessary = 0
-          NumNodesChanged = 0
-          NumNodesInvalidated = 0
-          NumNodesCreated = 0
-          NumNodesRecomputed = 0
-          NumNodesRecomputedDirectlyBecauseOneChild = 0
-          NumNodesRecomputedDirectlyBecauseMinHeight = 0
-          NumVarSets = 0
-        }
-      t
+        clock
 
-    let weakMemoizeFunByKey
-      initialSize
-      t
-      project_key
-      f
-      =
-      let initialSize = defaultArg initialSize DEFAULT_HASH_TABLE_INITIAL_SIZE
-      let scope = t.CurrentScope
-      let table = WeakHashTable.create (Some initialSize)
-      let packed = WeakHashTableCrate.make table
-      WeakHashTable.setRunWhenUnusedData table (fun () ->
-        t.WeakHashTables.Enqueue packed
-      )
-      Staged.stage (fun a ->
-        let key = project_key a in
-        match WeakHashTable.find table key with
-        | Some b -> b
-        | None ->
-          let b = withinScope t scope (fun () -> f a) in
-          WeakHashTable.addThrowing table key b
-          b)
-    ;;
+    let create (maxHeightAllowed : int) : State =
+        let adjustHeightsHeap = AdjustHeightsHeap.create maxHeightAllowed
+        let recomputeHeap = RecomputeHeap.create maxHeightAllowed
 
-    module Expert = struct
+        let t =
+            {
+                Status = Status.Not_stabilizing
+                BindLhsChangeShouldInvalidateRhs = true
+                StabilizationNum = StabilizationNum.zero
+                CurrentScope = Scope.top
+                AdjustHeightsHeap = adjustHeightsHeap
+                RecomputeHeap = recomputeHeap
+                PropagateInvalidity = Stack.create ()
+                NumActiveObservers = 0
+                AllObservers = ValueNone
+                FinalizedObservers = ConcurrentQueue ()
+                DisallowedObservers = Stack.create ()
+                NewObservers = Stack.create ()
+                SetDuringStabilization = Stack.create ()
+                HandleAfterStabilization = Stack.create ()
+                RunOnUpdateHandlers = Stack.create ()
+                OnlyInDebug = OnlyInDebug.create ()
+                WeakHashTables = ConcurrentQueue ()
+                KeepNodeCreationBacktrace = false
+                NumNodesBecameNecessary = 0
+                NumNodesBecameUnnecessary = 0
+                NumNodesChanged = 0
+                NumNodesInvalidated = 0
+                NumNodesCreated = 0
+                NumNodesRecomputed = 0
+                NumNodesRecomputedDirectlyBecauseOneChild = 0
+                NumNodesRecomputedDirectlyBecauseMinHeight = 0
+                NumVarSets = 0
+            }
+
+        t
+
+    let weakMemoizeFunByKey (initialSize : int option) (t : State) project_key f =
+        let initialSize = defaultArg initialSize DEFAULT_HASH_TABLE_INITIAL_SIZE
+        let scope = t.CurrentScope
+        let table = WeakHashTable.create (Some initialSize)
+        let packed = WeakHashTableCrate.make table
+        WeakHashTable.setRunWhenUnusedData table (fun () -> t.WeakHashTables.Enqueue packed)
+
+        Staged.stage (fun a ->
+            let key = project_key a in
+
+            match WeakHashTable.find table key with
+            | Some b -> b
+            | None ->
+                let b = withinScope t scope (fun () -> f a) in
+                WeakHashTable.addThrowing table key b
+                b
+        )
+
+[<RequireQualifiedAccess>]
+module Expert =
     /// Given that invalid node are at attempt at avoiding breaking the entire incremental
     /// computation on problems, let's just ignore any operation on an invalid incremental
     /// rather than raising.
-    let expertKindOfNode (node : 'a Node) =
+    let expertKindOfNode (node : 'a Node) : Expert<'a> option =
         match node.Kind with
         | Kind.Expert e -> Some e
         | Kind.Invalid -> None
         | k -> failwith $"unexpected kind {k} for expert node"
 
-    let create' state onObservabilityChange f =
+    let create' (state : State) onObservabilityChange f =
         let e = Expert.create f onObservabilityChange
-        let node = createNode state (Expert e) in
+        let node = State.createNode state (Expert e) in
+
         if Debug.globalFlag then
-          if Option.isSome state.OnlyInDebug.CurrentlyRunningNode
-          then
-            state.OnlyInDebug.ExpertNodesCreatedByCurrentNode <- T node :: state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
+            if Option.isSome state.OnlyInDebug.CurrentlyRunningNode then
+                state.OnlyInDebug.ExpertNodesCreatedByCurrentNode <-
+                    NodeCrate.make node :: state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
+
         node
 
-  let currentlyRunningNodeThrowing state name =
-    match state.OnlyInDebug.CurrentlyRunningNode with
-    | None -> failwith $"can only call currentlyRunningNode during stabilization"
-    | Some current -> current
+    let currentlyRunningNodeThrowing state name =
+        match state.OnlyInDebug.CurrentlyRunningNode with
+        | None -> failwith "can only call currentlyRunningNode during stabilization"
+        | Some current -> current
 
-  (* Note that the two following functions are not symmetric of one another: in [let y =
-     map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
-     only a parent of [x] if y is necessary. *)
-  let assert_currently_running_node_is_child state node name =
-    let (T current) = currently_running_node_exn state name in
-    if not (Node.has_child node ~child:current)
-    then
-      raise_s
-        [%sexp
-          ("can only call " ^ name ^ " on parent nodes" : string)
-          , ~~(node.kind : _ Kind.t)
-          , ~~(current.kind : _ Kind.t)]
-  ;;
+    (* Note that the two following functions are not symmetric of one another: in [let y =
+         map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
+         only a parent of [x] if y is necessary. *)
 
-  let assert_currently_running_node_is_parent state node name =
-    let (T current) = currently_running_node_exn state name in
-    if not (Node.has_parent ~parent:current node)
-    then
-      raise_s
-        [%sexp
-          ("can only call " ^ name ^ " on children nodes" : string)
-          , ~~(node.kind : _ Kind.t)
-          , ~~(current.kind : _ Kind.t)]
-  ;;
+    let assertCurrentlyRunningNodeIsChild (state : State) (node : Node<'a>) (name : string) : unit =
+        let current = currentlyRunningNodeThrowing state name
 
-  let makeStale (node : 'a Node) =
-    let state = node.State
-    let e_opt = expert_kind_of_node node in
-    if Uopt.is_some e_opt
-    then (
-      if debug then assert_currently_running_node_is_child state node "make_stale";
-      let e = Uopt.unsafe_value e_opt in
-      match Expert.make_stale e with
-      | `Already_stale -> ()
-      | `Ok ->
-        if Node.is_necessary node && not (Node.is_in_recompute_heap node)
-        then Recompute_heap.add state.recompute_heap node)
-  ;;
+        { new NodeEval<_> with
+            member _.Eval current =
+                if not (Node.hasChild node current) then
+                    failwith $"can only call %s{name} on parent nodes"
 
-  let invalidate (node : _ Node.t) =
-    let state = node.state in
-    if debug then assert_currently_running_node_is_child state node "invalidate";
-    invalidate_node node;
-    propagate_invalidity state
-  ;;
+                FakeUnit.ofUnit ()
+        }
+        |> current.Apply
+        |> FakeUnit.toUnit
 
-  let add_dependency (node : _ Node.t) (dep : _ Expert.edge) =
-    let state = node.state in
-    let e_opt = expert_kind_of_node node in
-    if Uopt.is_some e_opt
-    then (
-      if debug
-      then
-        if am_stabilizing state
-           && not
-                (List.mem
-                   ~equal:phys_equal
-                   state.only_in_debug.expert_nodes_created_by_current_node
-                   (T node))
-        then assert_currently_running_node_is_child state node "add_dependency";
-      let e = Uopt.unsafe_value e_opt in
-      let new_child_index = Expert.add_child_edge e (E dep) in
-      (* [node] is not guaranteed to be necessary, even if we are running in a child of
-         [node], because we could be running due to a parent other than [node] making us
-         necessary. *)
-      if Node.is_necessary node
-      then (
-        add_parent ~child:dep.child ~parent:node ~child_index:new_child_index;
-        if debug then assert (Node.needs_to_be_computed node);
-        if not (Node.is_in_recompute_heap node)
-        then Recompute_heap.add state.recompute_heap node))
-  ;;
+    let assertCurrentlyRunningNodeIsParent state node name =
+        let current = currentlyRunningNodeThrowing state name
 
-  let remove_dependency (node : _ Node.t) (edge : _ Expert.edge) =
-    let state = node.state in
-    let e_opt = expert_kind_of_node node in
-    if Uopt.is_some e_opt
-    then (
-      if debug then assert_currently_running_node_is_child state node "remove_dependency";
-      let e = Uopt.unsafe_value e_opt in
-      (* [node] is not guaranteed to be necessary, for the reason stated in
-         [add_dependency] *)
-      let edge_index = Uopt.value_exn edge.index in
-      let (E last_edge) = Expert.last_child_edge_exn e in
-      let last_edge_index = Uopt.value_exn last_edge.index in
-      if edge_index <> last_edge_index
-      then (
-        if Node.is_necessary node
-        then
-          Node.swap_children_except_in_kind
-            node
-            ~child1:edge.child
-            ~child_index1:edge_index
-            ~child2:last_edge.child
-            ~child_index2:last_edge_index;
-        Expert.swap_children e ~child_index1:edge_index ~child_index2:last_edge_index;
-        if debug then Node.invariant ignore node);
-      Expert.remove_last_child_edge_exn e;
-      if debug then assert (Node.is_stale node);
-      if Node.is_necessary node
-      then (
-        remove_child ~child:edge.child ~parent:node ~child_index:last_edge_index;
-        if not (Node.is_in_recompute_heap node)
-        then Recompute_heap.add state.recompute_heap node;
-        if not (Node.is_valid edge.child) then Expert.decr_invalid_children e))
+        { new NodeEval<_> with
+            member _.Eval current =
+                if not (Node.hasParent node current) then
+                    failwith $"can only call %s{name} on children nodes"
+
+                FakeUnit.ofUnit ()
+        }
+        |> current.Apply
+        |> FakeUnit.toUnit
+
+    let makeStale (node : 'a Node) : unit =
+        let state = node.State
+
+        match expertKindOfNode node with
+        | None -> ()
+        | Some e ->
+            if Debug.globalFlag then
+                assertCurrentlyRunningNodeIsChild state node "makeStale"
+
+            match Expert.makeStale e with
+            | StaleResult.AlreadyStale -> ()
+            | StaleResult.Ok ->
+                if NodeHelpers.isNecessary node && not (Node.isInRecomputeHeap node) then
+                    RecomputeHeap.add state.RecomputeHeap node
+
+    let invalidate (node : 'a Node) : unit =
+        let state = node.State
+
+        if Debug.globalFlag then
+            assertCurrentlyRunningNodeIsChild state node "invalidate"
+
+        State.invalidateNode node
+        State.propagateInvalidity state
+
+    let addDependency (node : 'a Node) (dep : 'b ExpertEdge) : unit =
+        let state = node.State
+
+        match expertKindOfNode node with
+        | None -> ()
+        | Some e ->
+            if Debug.globalFlag then
+                if
+                    State.amStabilizing state
+                    && not (List.mem phys_equal state.only_in_debug.expert_nodes_created_by_current_node (T node))
+                then
+                    assertCurrentlyRunningNodeIsChild state node "add_dependency"
+
+            let newChildIndex = Expert.addChildEdge e (ExpertEdgeCrate.make dep)
+            // [node] is not guaranteed to be necessary, even if we are running in a child of
+            // [node], because we could be running due to a parent other than [node] making us
+            // necessary.
+            if NodeHelpers.isNecessary node then
+                State.addParent dep.Child node newChildIndex
+
+                if Debug.globalFlag then
+                    assert (Node.needsToBeComputed node)
+
+                if not (Node.isInRecomputeHeap node) then
+                    RecomputeHeap.add state.RecomputeHeap node
+
+    let remove_dependency (node : 'a Node) (edge : 'b ExpertEdge) : unit =
+        let state = node.State
+
+        match expertKindOfNode node with
+        | None -> ()
+        | Some e ->
+            if Debug.globalFlag then
+                assertCurrentlyRunningNodeIsChild state node "remove_dependency"
+            // [node] is not guaranteed to be necessary, for the reason stated in
+            // [add_dependency]
+            let edgeIndex = edge.Index.Value
+            let lastEdge = Expert.lastChildEdgeThrowing e
+
+            { new ExpertEdgeEval<_> with
+                member _.Eval lastEdge =
+                    let lastEdgeIndex = lastEdge.Index.Value
+
+                    if edgeIndex <> lastEdgeIndex then
+                        if NodeHelpers.isNecessary node then
+                            Node.swapChildrenExceptInKind node edge.Child edgeIndex lastEdge.Child lastEdgeIndex
+
+                        Expert.swapChildren e edgeIndex lastEdgeIndex
+
+                        if Debug.globalFlag then
+                            Node.invariant ignore node
+
+                    Expert.removeLastChildEdgeThrowing e
+
+                    if Debug.globalFlag then
+                        assert (Node.isStale node)
+
+                    if NodeHelpers.isNecessary node then
+                        State.removeChild edge.Child node lastEdgeIndex
+
+                        if not (Node.isInRecomputeHeap node) then
+                            RecomputeHeap.add state.RecomputeHeap node
+
+                        if not (NodeHelpers.isValid edge.Child) then
+                            Expert.decrInvalidChildren e
+
+                    FakeUnit.ofUnit ()
+            }
+            |> lastEdge.Apply
+            |> FakeUnit.toUnit

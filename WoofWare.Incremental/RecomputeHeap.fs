@@ -6,20 +6,25 @@ open System
 //     let next (Node.Packed.T node) = node.next_in_recompute_heap
 //   end)
 
-type NodesByHeight = AsRecomputeList[]
-
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module RecomputeHeap =
+    let asList : NodeCrate.AsList =
+        {
+            Next = NodeCrate.nextInRecomputeHeap
+        }
+
     let maxHeightAllowed (t : RecomputeHeap) : int = t.NodesByHeight.Length - 1
     let isEmpty (t : RecomputeHeap) : bool = t.Length = 0
+
+    let length (t : RecomputeHeap) : int = t.Length
 
     let invariant (t : RecomputeHeap) : unit =
         do
             let mutable actualLength = 0
 
             t.NodesByHeight
-            |> Array.iter (fun node -> actualLength <- actualLength + AsRecomputeList.length node)
+            |> Array.iter (fun node -> actualLength <- actualLength + NodeCrate.AsList.length asList node)
 
             if t.Length <> actualLength then
                 failwith "incorrect length"
