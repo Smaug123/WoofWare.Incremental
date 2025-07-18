@@ -2,6 +2,7 @@
 // [Incremental.Make].
 namespace WoofWare.Incremental
 
+open System.Collections.Generic
 open TypeEquality
 open System
 open WoofWare.TimingWheel
@@ -1288,7 +1289,7 @@ module State =
     // A [const] value could come from the right-hand side of an outer bind.  So, we create a
     // [const] node in the current scope, not in [Scope.top].
     let konst t a = createNode t (Kind.Const a)
-    let map (n : _ Node) f = createNode n.State (Kind.Map (MapCrate.make f n))
+    let map (f: 'a -> 'b) (n : 'a Node) : Node<'b> = createNode n.State (Kind.Map (MapCrate.make f n))
     let map2 (n1 : _ Node) n2 f = createNode n1.State (Kind.Map2 (Map2Crate.make f n1 n2))
 
     let both (n1 : _ Node) (n2 : _ Node) : Node<'a * 'b> =
@@ -1316,7 +1317,8 @@ module State =
       // [input] will become unnecessary (at least with respect to [output]).
       let observer = createObserver None input
       let output =
-        map input (fun a ->
+        input
+        |> map (fun a ->
           Gc.keep_alive observer
           a
         )
@@ -1361,31 +1363,38 @@ module State =
       Node.setKind main (Kind.JoinMain join)
       main
 
-    let if_ (test : _ Node.t) ~then_ ~else_ =
-      let t = test.state in
-      let test_change = create_node t Uninitialized in
-      let main = create_node t Uninitialized in
-      let if_then_else =
-        { If_then_else.test; then_; else_; test_change; main; current_branch = Uopt.none }
-      in
-      Node.set_cutoff test_change Cutoff.never;
-      Node.set_kind test_change (If_test_change if_then_else);
-      Node.set_kind main (If_then_else if_then_else);
+    let if_ (test : bool Node) (then_: Node<'a>) (else_: Node<'a>) : Node<'a> =
+      let t = test.State
+      let testChange = createNode t Kind.Uninitialized
+      let main = createNode t Kind.Uninitialized
+      let iTE =
+        {
+            IfThenElse.Test = test
+            Then = then_
+            Else = else_
+            TestChange = testChange
+            Main = main
+            CurrentBranch = ValueNone
+        }
+      Node.setCutoff testChange Cutoff.never
+      Node.setKind testChange (Kind.IfTestChange (IfThenElseCrate.make iTE, Teq.refl))
+      Node.setKind main (Kind.IfThenElse iTE)
       main
 
-    let lazy_from_fun t ~f =
-      let scope = t.current_scope in
-      Lazy.from_fun (fun () -> within_scope t scope ~f)
+    let lazyFromFun (t: State) (f: unit -> 'a) : Lazy<'a> =
+      let scope = t.CurrentScope
+      Lazy<_>.Create (fun () -> withinScope t scope f)
 
-    let default_hash_table_initial_size = 4
+    [<Literal>]
+    let DEFAULT_HASH_TABLE_INITIAL_SIZE = 4
 
     let memoize_fun_by_key
-      ?(initial_size = default_hash_table_initial_size)
-      t
-      hashable
-      project_key
-      f
+      (initialSize : int option)
+      (t : State)
+      (projectKey : 'key -> 'b)
+      (f : 'key -> 'c)
       =
+      let initialSize = defaultArg initialSize DEFAULT_HASH_TABLE_INITIAL_SIZE
       (* Here's an explanation of why we get [t.current_scope] here, and then call
          [within_scope] below.  Consider this (impossible) alternate implementation of
          [memoize_fun_by_key]:
@@ -1405,220 +1414,213 @@ module State =
          The implementation below uses [within_scope] to call [f a] in the scope that was
          current at the point of the call to [memoize_fun_by_key] so that we can think of the
          [table] as having been created then, when it in reality is created on-demand. *)
-      let scope = t.current_scope in
-      let table = Hashtbl.create hashable ~size:initial_size in
-      stage (fun a ->
-        let key = project_key a in
-        match Hashtbl.find table key with
-        | Some b -> b
-        | None ->
-          let b = within_scope t scope ~f:(fun () -> f a) in
-          Hashtbl.add_exn table ~key ~data:b;
-          b)
+      let scope = t.CurrentScope
+      let table = Dictionary initialSize
+      Staged.stage (fun a ->
+        let key = projectKey a
+        match table.TryGetValue key with
+        | true, v -> v
+        | false, _ ->
+          let b = withinScope t scope (fun () -> f a) in
+          table.Add (key, b)
+          b
+      )
 
-    let array_fold t children ~init ~f =
-      if Array.length children = 0
-      then const t init
-      else create_node t (Array_fold { init; f; children })
+    let arrayFold (t: State) (children: Node<'a> array) (init: 'acc) (f: 'acc -> 'a -> 'acc) : Node<'acc> =
+      if Array.length children = 0 then
+          konst t init
+      else
+          {
+               Init = init
+               Children = children
+               F = f
+          }
+          |> ArrayFoldCrate.make
+          |> Kind.ArrayFold
+          |> createNode t
 
-    let all t ts = array_fold t (Array.of_list_rev ts) ~init:[] ~f:(fun ac a -> a :: ac)
+    let all (t: State) (ts: Node<'a> list) : Node<'a list> = arrayFold t (Array.ofList (List.rev ts)) [] (fun ac a -> a :: ac)
 
-    module Unordered_array_fold_update = Unordered_array_fold.Update
-
-    let unordered_array_fold
-      t
-      ?(full_compute_every_n_changes = Int.max_value)
-      children
-      ~init
-      ~f
-      ~update
+    let unorderedArrayFold
+      (t : State)
+      (fullComputeEveryNChanges : int option)
+      (children : Node<'b> array)
+      (init : 'acc)
+      (f : 'acc -> 'b -> 'acc)
+      (update : Update<'b, 'acc>)
+      : Node<'acc>
       =
-      if Array.length children = 0
-      then const t init
-      else if full_compute_every_n_changes <= 0
-      then
-        failwiths
-          "unordered_array_fold got non-positive full_compute_every_n_changes"
-          full_compute_every_n_changes
-          [%sexp_of: int]
-      else (
-        let main = create_node t Uninitialized in
-        Node.set_kind
-          main
-          (Unordered_array_fold
-             (Unordered_array_fold.create
-                ~init
-                ~f
-                ~update
-                ~full_compute_every_n_changes
-                ~children
-                ~main));
-        main)
+      let fullComputeEveryNChanges = defaultArg fullComputeEveryNChanges Int32.MaxValue
+      if Array.length children = 0 then
+          konst t init
+      else if fullComputeEveryNChanges <= 0 then
+        invalidArg "fullComputeEveryNChanges" $"unordered_array_fold got non-positive full_compute_every_n_changes %i{fullComputeEveryNChanges}"
+      else
+        let main = createNode t Kind.Uninitialized
 
-    let opt_unordered_array_fold t ?full_compute_every_n_changes ts ~init ~f ~f_inverse =
+
+        UnorderedArrayFold.create
+            init
+            f
+            update
+            fullComputeEveryNChanges
+            children
+            main
+        |> UnorderedArrayFoldCrate.make
+        |> Kind.UnorderedArrayFold
+        |> Node.setKind main
+        main
+
+    let optUnorderedArrayFold (t: State) (fullComputeEveryNChanges: int option) (ts: Node<'a option> array) (init: 'b) (f: 'b -> 'a -> 'b) (fInverse: 'b -> 'a -> 'b) : Node<'b option> =
       let f (accum, num_invalid) x =
         match x with
         | None -> accum, num_invalid + 1
         | Some x -> f accum x, num_invalid
-      in
-      let f_inverse (accum, num_invalid) x =
+      let fInverse (accum, num_invalid) x =
         match x with
         | None -> accum, num_invalid - 1
-        | Some x -> f_inverse accum x, num_invalid
-      in
-      map
-        (unordered_array_fold
+        | Some x -> fInverse accum x, num_invalid
+
+      unorderedArrayFold
            t
+           fullComputeEveryNChanges
            ts
-           ~init:(init, 0)
-           ~f
-           ~update:(F_inverse f_inverse)
-           ?full_compute_every_n_changes)
-        ~f:(fun (accum, num_invalid) -> if num_invalid = 0 then Some accum else None)
+           (init, 0)
+           f
+           (Update.FInverse fInverse)
+      |> map
+        (fun (accum, numInvalid) -> if numInvalid = 0 then Some accum else None)
 
-    let at_least_k_of t nodes ~k =
-      let bool_to_int b = if b then 1 else 0 in
-      map
-        ~f:(fun i -> i >= k)
-        (unordered_array_fold
+    let atLeastKOf (t: State) (nodes: Node<bool> array) (k: int) : Node<bool> =
+      let boolToInt b = if b then 1 else 0
+      unorderedArrayFold
            t
+           None
            nodes
-           ~init:0
-           ~f:(fun num_true b -> num_true + bool_to_int b)
-           ~update:(F_inverse (fun num_true b -> num_true - bool_to_int b)))
+           0
+           (fun numTrue b -> numTrue + boolToInt b)
+           (Update.FInverse (fun numTrue b -> numTrue - boolToInt b))
+      |> map (fun i -> i >= k)
 
-    let exists t nodes = at_least_k_of t nodes ~k:1
-    let for_all t nodes = at_least_k_of t nodes ~k:(Array.length nodes)
+    let exists (t: State) (nodes: Node<bool> array) : Node<bool> = atLeastKOf t nodes 1
+    let forAll t nodes = atLeastKOf t nodes (Array.length nodes)
 
-    let sum t ?full_compute_every_n_changes nodes ~zero ~add ~sub =
-      unordered_array_fold
+    let sum (t: State) (fullComputeEveryNChanges: int option) (nodes: Node<'a> array) (zero: 'b) (add: 'b -> 'a -> 'b) (sub: 'b -> 'a -> 'b) : Node<'b> =
+      unorderedArrayFold
         t
+        fullComputeEveryNChanges
         nodes
-        ~init:zero
-        ~f:add
-        ~update:(F_inverse sub)
-        ?full_compute_every_n_changes
+        zero
+        add
+        (Update.FInverse sub)
 
-    let opt_sum t ?full_compute_every_n_changes nodes ~zero ~add ~sub =
-      opt_unordered_array_fold
+    let optSum (t: State) (fullComputeEveryNChanges: int option) (nodes: Node<'a option> array) (zero: 'b) (add: 'b -> 'a -> 'b) (sub: 'b -> 'a -> 'b) : Node<'b option> =
+      optUnorderedArrayFold
         t
+        fullComputeEveryNChanges
         nodes
-        ~init:zero
-        ~f:add
-        ~f_inverse:sub
-        ?full_compute_every_n_changes
+        zero
+        add
+        sub
 
-    let sum_int t nodes = sum t nodes ~zero:0 ~add:( + ) ~sub:( - )
+    let inline sum'<'T when 'T: (static member (+) : 'T * 'T -> 'T) and 'T : (static member (-) : 'T * 'T -> 'T) and 'T : (static member Zero : 'T)>
+        (t: State) (nodes: Node<'T> array) : Node<'T> =
+        sum t None nodes LanguagePrimitives.GenericZero (+) (-)
 
-    let sum_float t nodes =
-      sum
-        t
-        nodes
-        ~zero:0.
-        ~add:( +. )
-        ~sub:( -. )
-        ~full_compute_every_n_changes:(Array.length nodes)
+    let setFreeze (node : 'a Node) (child: Node<'a>) (onlyFreezeWhen: 'a -> bool) : unit =
+      if Debug.globalFlag then assert node.CreatedIn.IsTop
+      // By making [node.kind] be [Freeze], we are making [Node.is_necessary node].
+      let wasNecessary = NodeHelpers.isNecessary node in
+      Node.setKind node (Kind.Freeze { Main = node; Child = child; OnlyFreezeWhen = onlyFreezeWhen })
+      if wasNecessary then
+          addParent child node Kind.freezeChildIndex
+      else becameNecessary node
 
-    let set_freeze (node : _ Node.t) ~child ~only_freeze_when =
-      if debug then assert (Scope.is_top node.created_in);
-      (* By making [node.kind] be [Freeze], we are making [Node.is_necessary node]. *)
-      let was_necessary = Node.is_necessary node in
-      Node.set_kind node (Freeze { main = node; child; only_freeze_when });
-      if was_necessary
-      then add_parent ~child ~parent:node ~child_index:Kind.freeze_child_index
-      else became_necessary node
-
-    let freeze (child : _ Node.t) ~only_freeze_when =
-      let t = child.state in
-      let node = create_node_top t Uninitialized in
-      set_freeze node ~child ~only_freeze_when;
+    let freeze (child : 'a Node) (onlyFreezeWhen: 'a -> bool) : Node<'a> =
+      let t = child.State
+      let node = createNodeTop t Kind.Uninitialized
+      setFreeze node child onlyFreezeWhen
       node
-    ;;
 
-    let at clock time =
-      let t = Clock.incr_state clock in
-      if Time_ns.( <= ) time (now clock)
-      then const t Before_or_after.After
-      else (
-        let main = create_node t Uninitialized in
-        let at = { At.at = time; main; alarm = Alarm.null; clock } in
-        Node.set_kind main (At at);
-        at.alarm <- add_alarm clock ~at:time (Alarm_value.create (At at));
-        main)
-    ;;
+    let at (clock: Clock) (time: TimeNs) : Node<BeforeOrAfter> =
+      let t = Clock.incrState clock
+      if time <= (Clock.now clock) then
+          konst t BeforeOrAfter.After
+      else
+        let main = createNode t Kind.Uninitialized
+        let at = { At = time; Main = main; Alarm = TimingWheel.Alarm.null'; Clock = clock }
+        Node.setKind main (Kind.At (at, Teq.refl));
+        at.Alarm <- addAlarm clock time (AlarmValue.create (AlarmValueAction.At at))
+        main
 
-    let after clock span = at clock (Time_ns.add (now clock) span)
+    let after (clock: Clock) (span: TimeNs.Span) : Node<BeforeOrAfter> = at clock (TimeNs.add (Clock.now clock) span)
 
-    let next_interval_alarm_strict (clock : Clock.t) ~base ~interval =
-      let after = now clock in
-      let at = Time_ns.next_multiple ~base ~after ~interval ~can_equal_after:false () in
-      if debug then assert (Time_ns.( > ) at after);
+    let nextIntervalAlarmStrict (clock : Clock) base_ interval =
+      let after = Clock.now clock
+      let at = TimeNs.nextMultiple ~base_ ~after ~interval ~can_equal_after:false ()
+      if Debug.globalFlag then assert (at > after)
       at
-    ;;
 
-    let at_intervals (clock : Clock.t) interval =
-      let t = Clock.incr_state clock in
-      if Time_ns.Span.( < ) interval (Timing_wheel.alarm_precision clock.timing_wheel)
-      then failwiths "at_intervals got too small interval" interval [%sexp_of: Time_ns.Span.t];
-      let main = create_node t Uninitialized in
-      let base = now clock in
-      let at_intervals = { At_intervals.main; base; interval; alarm = Alarm.null; clock } in
-      Node.set_kind main (At_intervals at_intervals);
-      (* [main : unit Node.t], so we make it never cutoff so it changes each time it is
-         recomputed. *)
-      Node.set_cutoff main Cutoff.never;
-      at_intervals.alarm
-      <- add_alarm
-           clock
-           ~at:(next_interval_alarm_strict clock ~base ~interval)
-           (Alarm_value.create (At_intervals at_intervals));
+    let at_intervals (clock : Clock) interval =
+      let t = Clock.incrState clock
+      if interval < (TimingWheel.alarmPrecision clock.TimingWheel) then
+          failwith "at_intervals got too small interval" interval
+      let main = createNode t Kind.Uninitialized
+      let base_ = Clock.now clock
+      let atIntervals = { AtIntervals.Main = main; Base = base_; Interval = interval; Alarm = TimingWheel.Alarm.null'; Clock = clock }
+      Node.setKind main (Kind.AtIntervals (atIntervals, Teq.refl))
+      // [main : unit Node.t], so we make it never cutoff so it changes each time it is
+      // recomputed.
+      Node.setCutoff main Cutoff.never
+      atIntervals.Alarm <-
+           addAlarm
+               clock
+               (nextIntervalAlarmStrict clock base_ interval)
+               (AlarmValue.create (AlarmValueAction.AtIntervals atIntervals))
       main
-    ;;
 
-    let snapshot clock value_at ~at ~before =
-      let t = Clock.incr_state clock in
-      if Time_ns.( <= ) at (now clock)
-      then
-        if Time_ns.( < ) at (now clock)
-        then Or_error.error "cannot take snapshot in the past" at [%sexp_of: Time_ns.t]
-        else Ok (freeze value_at ~only_freeze_when:(Fn.const true))
-      else (
-        let main = create_node_top t Uninitialized in
-        let snapshot = { Snapshot.main; at; before; value_at; clock } in
-        Node.set_kind main (Snapshot snapshot);
-        (* Unlike other time-based incrementals, a snapshot is created in [Scope.top] and
-           cannot be invalidated by its scope.  Thus, there is no need to keep track of the
-           alarm that is added, because it will never need to be removed early. *)
-        ignore (add_alarm clock ~at (Alarm_value.create (Snapshot snapshot)) : Alarm.t);
-        Ok main)
-    ;;
+    let snapshot (clock: Clock) (valueAt: Node<'a>) (at: TimeNs) (before: 'a) : Result<Node<'a>,string> =
+      let t = Clock.incrState clock in
+      if at <= Clock.now clock then
+        if at < Clock.now clock then
+            Error "cannot take snapshot in the past"
+        else
+            Ok (freeze valueAt (fun _ -> true))
+      else
+        let main = createNodeTop t Kind.Uninitialized in
+        let snapshot = { Snapshot.Main = main; At = at; Before = before; ValueAt = valueAt; Clock = clock }
+        Node.setKind main (Kind.Snapshot snapshot)
+        // Unlike other time-based incrementals, a snapshot is created in [Scope.top] and
+        // cannot be invalidated by its scope.  Thus, there is no need to keep track of the
+        // alarm that is added, because it will never need to be removed early.
+        addAlarm clock at (AlarmValue.create (AlarmValueAction.Snapshot (SnapshotCrate.make snapshot)))
+        |> ignore<TimingWheel.Alarm>
+        Ok main
 
     let incremental_step_function clock child =
-      let t = Clock.incr_state clock in
-      let main = create_node t Uninitialized in
-      let step_function_node =
-        { Step_function_node.main
-        ; value = Uopt.none
-        ; child = Uopt.some child
-        ; extracted_step_function_from_child_at = Stabilization_num.none
-        ; upcoming_steps = Sequence.empty
-        ; alarm = Alarm.null
-        ; alarm_value = Obj.magic None (* set below *)
-        ; clock
+      let t = Clock.incrState clock
+      let main = createNode t Kind.Uninitialized
+      let stepFunctionNode =
+        {
+         StepFunctionNode.Main = main
+         Value = ValueNone
+         Child = ValueSome child
+         ExtractedStepFunctionFromChildAt = StabilizationNum.none
+         UpcomingSteps = Seq.empty
+         Alarm = TimingWheel.Alarm.null'
+         AlarmValue = Unchecked.defaultof<_> (* set below *)
+         Clock = clock
         }
-      in
-      step_function_node.alarm_value <- Alarm_value.create (Step_function step_function_node);
-      Node.set_kind main (Step_function step_function_node);
+      stepFunctionNode.AlarmValue <- AlarmValue.create (AlarmValueAction.StepFunction (StepFunctionNodeCrate.make stepFunctionNode))
+      Node.setKind main (Kind.StepFunction stepFunctionNode)
       main
-    ;;
 
-    let make_stale (node : _ Node.t) =
-      let t = node.state in
-      node.recomputed_at <- Stabilization_num.none;
-      (* force the node to be stale *)
-      if Node.needs_to_be_computed node && not (Node.is_in_recompute_heap node)
-      then Recompute_heap.add t.recompute_heap node
-    ;;
+    let makeStale (node : 'a Node) : unit =
+      let t = node.State
+      node.RecomputedAt <- StabilizationNum.none
+      // force the node to be stale
+      if Node.needsToBeComputed node && not (Node.isInRecomputeHeap node)
+      then RecomputeHeap.add t.RecomputeHeap node
 
     let advance_clock (clock : Clock.t) ~to_ =
       let t = Clock.incr_state clock in

@@ -26,7 +26,7 @@ type AdjustHeightsHeap =
         mutable NodesByHeight : NodeCrate voption array
     }
 
-and AlarmValueAction =
+and [<RequireQualifiedAccess>] AlarmValueAction =
     | At of At
     | AtIntervals of AtIntervals
     | Snapshot of SnapshotCrate
@@ -553,3 +553,28 @@ module JoinCrate =
         { new JoinCrate with
             member _.Apply e = e.Eval f
         }
+
+[<RequireQualifiedAccess>]
+module IfThenElseCrate =
+    let make (f: IfThenElse<'a>) : IfThenElseCrate =
+        { new IfThenElseCrate with member _.Apply e = e.Eval f }
+
+[<RequireQualifiedAccess>]
+module ArrayFoldCrate =
+    let make (f: ArrayFold<'a,'b>) : ArrayFoldCrate<'b> =
+        { new ArrayFoldCrate<_> with member _.Apply e = e.Eval f }
+
+[<RequireQualifiedAccess>]
+module UnorderedArrayFoldCrate =
+    let make (f: UnorderedArrayFold<'a,'b>) : UnorderedArrayFoldCrate<'b> =
+        { new UnorderedArrayFoldCrate<_> with member _.Apply e = e.Eval f }
+
+[<RequireQualifiedAccess>]
+module SnapshotCrate =
+    let make (f: Snapshot<'a>) : SnapshotCrate =
+        { new SnapshotCrate with member _.Apply e = e.Eval f }
+
+[<RequireQualifiedAccess>]
+module StepFunctionNodeCrate =
+    let make (f: StepFunctionNode<'a>) : StepFunctionNodeCrate =
+        { new StepFunctionNodeCrate with member _.Apply e = e.Eval f }
