@@ -9,6 +9,7 @@ open System
 type NodesByHeight = AsRecomputeList[]
 
 [<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module RecomputeHeap =
     let maxHeightAllowed (t: RecomputeHeap) : int = t.NodesByHeight.Length - 1
     let isEmpty (t: RecomputeHeap) : bool = t.Length = 0

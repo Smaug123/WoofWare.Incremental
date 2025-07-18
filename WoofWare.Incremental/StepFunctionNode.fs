@@ -33,8 +33,6 @@ module internal StepFunctionNode =
         | Kind.StepFunction t' -> if not (Object.ReferenceEquals (t, t')) then failwith "invariant failed"
         | k -> failwith $"invariant failed: {k}"
 
-        Alarm.invariant t.Alarm
-
         t.Value |> ValueOption.iter invA
         match t.AlarmValue.Action with
         | AlarmValueAction.StepFunction t2 ->

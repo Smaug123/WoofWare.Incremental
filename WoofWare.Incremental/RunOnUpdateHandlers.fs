@@ -1,6 +1,7 @@
 namespace WoofWare.Incremental
 
 [<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal RunOnUpdateHandlers =
 
     /// rOUHs? I don't think they exist.

@@ -24,7 +24,7 @@ module internal Cutoff =
     let always<'a> : 'a Cutoff = Cutoff.Always
     let polyEqual<'a when 'a : equality> : 'a Cutoff = Cutoff.Equal (fun a b -> a = b)
 
-    let shouldCutoff t old newValue =
+    let shouldCutoff (t: 'a Cutoff) (old: 'a) (newValue: 'a) : bool =
         match t with
         | Cutoff.PhysEqual -> Object.ReferenceEquals (old, newValue)
         | Cutoff.Never -> false

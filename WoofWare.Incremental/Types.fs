@@ -2,7 +2,6 @@ namespace WoofWare.Incremental
 
 open System.Collections.Concurrent
 open System.Collections.Generic
-open System.Runtime.ExceptionServices
 open TypeEquality
 open WoofWare.TimingWheel
 open WoofWare.WeakHashTable
@@ -26,8 +25,6 @@ type AdjustHeightsHeap =
         mutable MaxHeightSeen : int
         mutable NodesByHeight : NodeCrate voption array
     }
-
-and Alarm = TimingWheel<AlarmValue>
 
 and AlarmValueAction =
     | At of At
@@ -95,7 +92,7 @@ and Clock =
         /// After TimingWheel.advanceClock returns, it then walks through the linked list and actually fires them.
         /// This two-pass approach is necessary because one is not allowed to call TimingWheel functions from the
         /// HandleFired that one passes to TimingWheel.advanceClock.
-        HandleFired : Alarm -> unit
+        HandleFired : TimingWheel.Alarm -> unit
         mutable FiredAlarmValues : AlarmValue option
     }
 
@@ -335,7 +332,8 @@ and Node<'a> =
             mutable MyChildIndexInParentAtIndex : int array
             mutable ForceNecessary : bool
             mutable UserInfo : DotUserInfo option
-            mutable CreationBacktrace : ExceptionDispatchInfo option
+            /// A human-readable stack trace.
+            mutable CreationBacktrace : string option
         }
 
 and NodeEval<'ret> =
@@ -506,15 +504,17 @@ and VarCrate =
     abstract Apply<'ret> : VarEval<'ret> -> 'ret
 
 [<RequireQualifiedAccess>]
-module NodeCrate =
-    let make (node : Node<'a>) =
-        { new NodeCrate with
-            member _.Apply e = e.Eval node
-        }
-
-[<RequireQualifiedAccess>]
 module BindCrate =
     let make (bind : Bind<'a, 'b>) =
         { new BindCrate with
             member _.Apply e = e.Eval bind
         }
+
+[<AutoOpen>]
+module NodeExtensions =
+    type NodeCrate with
+        static member make (node : Node<'a>) : NodeCrate =
+            { new NodeCrate with
+                member _.Apply e = e.Eval node
+            }
+

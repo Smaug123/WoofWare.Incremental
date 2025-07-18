@@ -1,6 +1,7 @@
 namespace WoofWare.Incremental
 
 [<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal RecomputeHeap =
     val create : max_height_allowed:int -> RecomputeHeap
     val length : RecomputeHeap -> int

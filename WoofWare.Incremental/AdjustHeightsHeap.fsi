@@ -1,6 +1,7 @@
 namespace WoofWare.Incremental
 
 [<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal AdjustHeightsHeap =
     val create : maxHeightAllowed:int -> AdjustHeightsHeap
     val length : AdjustHeightsHeap -> int
@@ -55,6 +56,6 @@ module internal AdjustHeightsHeap =
 
     /// [adjust_heights] raises if a node's height needs to be increased beyond
     /// [max_height_allowed t]. *)
-    val adjust_heights : AdjustHeightsHeap -> RecomputeHeap -> child: 'a Node -> parent: 'b Node -> unit
+    val adjustHeights : AdjustHeightsHeap -> RecomputeHeap -> child: 'a Node -> parent: 'b Node -> unit
 
     val invariant : AdjustHeightsHeap -> unit

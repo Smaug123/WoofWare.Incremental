@@ -54,7 +54,7 @@ module Bind =
                 member _.Eval node =
                     if not (Object.ReferenceEquals (node.CreatedIn, t.RhsScope)) then
                         failwith "invariant failed"
-                    if Node.isNecessary node then
+                    if NodeHelpers.isNecessary node then
                         if t.LhsChange.Height >= node.Height then
                             failwith "invariant failed"
                     FakeUnit.ofUnit ()

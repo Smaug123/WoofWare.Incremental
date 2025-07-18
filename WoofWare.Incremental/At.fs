@@ -7,7 +7,6 @@ open System
 module internal At =
 
     let invariant (t : At) : unit =
-        Alarm.invariant t.Alarm
         match t.Main.Kind with
         | Kind.Invalid -> ()
         | Kind.Const BeforeOrAfter.After ->

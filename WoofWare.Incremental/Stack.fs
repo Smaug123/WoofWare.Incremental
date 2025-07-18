@@ -10,6 +10,11 @@ module internal Stack =
     let push<'a> (a : 'a) (s : Stack<'a>) : unit =
         s.Push a
 
-    let invariant (invA : 'a -> unit) (s : Stack<'a>) : unit =
+    let invariant<'a> (invA : 'a -> unit) (s : Stack<'a>) : unit =
         for i in s do
             invA i
+
+    let pop<'a> (s : Stack<'a>) : 'a option =
+        match s.TryPop () with
+        | false, _ -> None
+        | true, v -> Some v

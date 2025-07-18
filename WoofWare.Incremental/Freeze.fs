@@ -8,7 +8,6 @@ open System
 module internal AtIntervals =
 
     let invariant (t : AtIntervals) : unit =
-        Alarm.invariant t.Alarm
         if not (TimeNs.Span.isPositive t.Interval) then
             failwith "invariant failed"
 

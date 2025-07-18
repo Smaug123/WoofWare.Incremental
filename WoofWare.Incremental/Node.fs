@@ -27,7 +27,7 @@ module Node =
         match t.UserInfo with
         | None -> None
         | Some (DotUserInfo.Info i) -> Some i
-        | Some other -> Some (DotUserInfo.createS (DotUserInfo.sexpOfT other))
+        | Some other -> Some (failwith "TODO: this was Info.create_s (Dot_user_info.sexp_of_t other)")
 
     let setUserInfo (t: Node<'a>) (info: string option) : unit =
         let desired =
@@ -229,8 +229,8 @@ module Node =
         | ValueNone -> failwith "attempt to get value of an invalid node"
         | ValueSome v -> v
 
-    let getCutoff (t: Node<'a>) : Cutoff<'a> = t.Cutoff
-    let setCutoff (t: Node<'a>) (cutoff: Cutoff<'a>) : unit = t.Cutoff <- cutoff
+    let internal getCutoff (t: Node<'a>) : Cutoff<'a> = t.Cutoff
+    let internal setCutoff (t: Node<'a>) (cutoff: Cutoff<'a>) : unit = t.Cutoff <- cutoff
 
     let isConst (t : Node<'a>) : bool =
         match t.Kind with
@@ -597,13 +597,14 @@ module Node =
         ; ForceNecessary = false
         ; UserInfo = None
         ; CreationBacktrace =
-            (if state.KeepNodeCreationBacktrace then Some (Backtrace.get ()) else None)
+            (if state.KeepNodeCreationBacktrace then Some Environment.StackTrace else None)
         }
       Scope.addNode createdIn t
       // [invariant] does not yet hold here because many uses of [Node.create] use [kind = Uninitialized], and then mutate [t.kind] later.
       t
 
 [<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module NodeCrate =
     open System.Collections.Generic
 

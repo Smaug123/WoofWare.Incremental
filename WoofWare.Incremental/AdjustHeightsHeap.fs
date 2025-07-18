@@ -33,6 +33,7 @@ module NodesByHeight =
         r
 
 [<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal AdjustHeightsHeap =
     let isEmpty (t : AdjustHeightsHeap) = t.Length = 0
     let maxHeightAllowed (t : AdjustHeightsHeap) = t.NodesByHeight.Length - 1
