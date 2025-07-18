@@ -4,7 +4,14 @@ namespace WoofWare.Incremental
 // cut off at a node based on the old value and the (possible) new value of the node.
 
 [<NoEquality ; NoComparison>]
-type internal Cutoff<'a>
+type internal Cutoff<'a> =
+    | Always
+    | Never
+    | PhysEqual
+    | Compare of ('a -> 'a -> int)
+    | Equal of ('a -> 'a -> bool)
+    /// old -> new -> bool
+    | F of ('a -> 'a -> bool)
 
 [<RequireQualifiedAccess>]
 module internal Cutoff =

@@ -1,28 +1,35 @@
 namespace WoofWare.Incremental
 
-open System
-open TypeEquality
-
 [<RequireQualifiedAccess>]
 module NodesByHeight =
-    let invariant (t : NodesByHeight) =
-    Invariant.invariant t [%sexp_of: t] (fun () ->
-      Uniform_array.iteri t ~f:(fun height nodes ->
-        As_adjust_heights_list.invariant nodes;
-        As_adjust_heights_list.iter nodes ~f:(fun (T node) ->
-          assert (node.height_in_adjust_heights_heap = height);
-          assert (node.height > node.height_in_adjust_heights_heap);
-          if Node.is_in_recompute_heap node
-          then assert (node.height_in_recompute_heap = node.height_in_adjust_heights_heap))))
-  ;;
+    let private asAdjustHeightsList : NodeCrate.AsList =
+        {
+            Next = NodeCrate.nextInAdjustHeightsHeap
+        }
 
-    let create maxHeightAllowed =
+    let invariant (t : NodeCrate voption []) =
+        t
+        |> Array.iteri (fun height nodes ->
+            NodeCrate.AsList.invariant asAdjustHeightsList nodes
+            NodeCrate.AsList.iter asAdjustHeightsList nodes (fun node ->
+                let heightInAdjustHeap = NodeCrate.heightInAdjustHeightsHeap node
+                if height <> heightInAdjustHeap then
+                    failwith "invariant failed"
+                if NodeCrate.height node <= heightInAdjustHeap then
+                    failwith "invariant failed"
+                if NodeCrate.isInRecomputeHeap node then
+                    if heightInAdjustHeap <> NodeCrate.heightInRecomputeHeap node then
+                        failwith "invariant failed"
+            )
+        )
+
+    let create (maxHeightAllowed : int) : NodeCrate voption [] =
         Array.zeroCreate (maxHeightAllowed + 1)
 
-    let length t =
+    let length (t: NodeCrate voption []) : int =
         let mutable r = 0
         for node in t do
-            r <- r + AsAdjustHeightsList.length node
+            r <- r + NodeCrate.AsList.length asAdjustHeightsList node
         r
 
 [<RequireQualifiedAccess>]
@@ -31,156 +38,151 @@ module internal AdjustHeightsHeap =
     let maxHeightAllowed (t : AdjustHeightsHeap) = t.NodesByHeight.Length - 1
 
     let invariant (t : AdjustHeightsHeap) : unit =
-        if t.Length <> NodesByHeight.length t.NodesByHeight
+        if t.Length <> NodesByHeight.length t.NodesByHeight then
+            failwith "invariant failed"
+        do
+            if t.HeightLowerBound < 0 then failwith "invariant failed"
+            if t.HeightLowerBound > t.NodesByHeight.Length then failwith "invariant failed"
+            for height = 0 to t.HeightLowerBound - 1 do
+                if t.NodesByHeight.[height].IsSome then
+                    failwith "invariant failed"
 
-let invariant t =
-  Invariant.invariant t [%sexp_of: t] (fun () ->
-    let check f = Invariant.check_field t f in
-    Fields.iter
-      ~length:
-        (check (fun length -> assert (length = Nodes_by_height.length t.nodes_by_height)))
-      ~height_lower_bound:
-        (check (fun height_lower_bound ->
-           assert (height_lower_bound >= 0);
-           assert (height_lower_bound <= Uniform_array.length t.nodes_by_height);
-           for height = 0 to height_lower_bound - 1 do
-             assert (Uopt.is_none (Uniform_array.get t.nodes_by_height height))
-           done))
-      ~max_height_seen:
-        (check (fun max_height_seen ->
-           assert (max_height_seen >= 0);
-           assert (max_height_seen <= max_height_allowed t)))
-      ~nodes_by_height:(check Nodes_by_height.invariant))
-;;
+        do
+            if t.MaxHeightSeen < 0 then failwith "invariant failed"
+            if t.MaxHeightSeen > maxHeightAllowed t then failwith "invariant failed"
 
-let create ~max_height_allowed =
-  { length = 0
-  ; height_lower_bound = max_height_allowed + 1
-  ; max_height_seen = 0
-  ; nodes_by_height = Nodes_by_height.create ~max_height_allowed
-  }
-;;
+        NodesByHeight.invariant t.NodesByHeight
 
-let set_max_height_allowed t max_height_allowed =
-  if max_height_allowed < t.max_height_seen
-  then
-    failwiths
-      "cannot set_max_height_allowed less than the max height already seen"
-      (max_height_allowed, `max_height_seen t.max_height_seen)
-      [%sexp_of: int * [ `max_height_seen of int ]];
-  if debug then assert (is_empty t);
-  t.nodes_by_height <- Nodes_by_height.create ~max_height_allowed
-;;
+    let create (maxHeightAllowed : int) : AdjustHeightsHeap =
+        {
+            Length = 0
+            HeightLowerBound = maxHeightAllowed + 1
+            MaxHeightSeen = 0
+            NodesByHeight = NodesByHeight.create maxHeightAllowed
+        }
 
-let add_unless_mem (type a) t (node : a Node.t) =
-  if node.height_in_adjust_heights_heap = -1
-  then (
-    let height = node.height in
-    (* We process nodes in increasing order of pre-adjusted height, so it is a bug if we
-       ever try to add a node that would violate that. *)
-    if debug then assert (height >= t.height_lower_bound);
-    (* Whenever we set a node's height, we use [set_height], which enforces this. *)
-    if debug then assert (height <= max_height_allowed t);
-    node.height_in_adjust_heights_heap <- height;
-    t.length <- t.length + 1;
-    node.next_in_adjust_heights_heap <- Uniform_array.get t.nodes_by_height height;
-    Uniform_array.unsafe_set t.nodes_by_height height (Uopt.some (Node.Packed.T node)))
-;;
+    let setMaxHeightAllowed (t : AdjustHeightsHeap) (maxHeightAllowed : int) : unit =
+        if maxHeightAllowed < t.MaxHeightSeen then
+            failwith "cannot set_max_height_allowed less than the max height already seen"
+        if Debug.globalFlag then
+            if not (isEmpty t) then failwith "setMaxHeightAllowed expected empty heap"
+        t.NodesByHeight <- NodesByHeight.create maxHeightAllowed
 
-let remove_min_exn t : Node.Packed.t =
-  if debug && is_empty t
-  then failwiths "Adjust_heights_heap.remove_min of empty heap" t [%sexp_of: t];
-  let r = ref t.height_lower_bound in
-  while Uopt.is_none (Uniform_array.get t.nodes_by_height !r) do
-    incr r
-  done;
-  let height = !r in
-  t.height_lower_bound <- height;
-  let (T node) = Uopt.unsafe_value (Uniform_array.unsafe_get t.nodes_by_height height) in
-  node.height_in_adjust_heights_heap <- -1;
-  t.length <- t.length - 1;
-  Uniform_array.unsafe_set t.nodes_by_height height node.next_in_adjust_heights_heap;
-  node.next_in_adjust_heights_heap <- Uopt.none;
-  T node
-;;
+    let addUnlessMem<'a> (t : AdjustHeightsHeap) (node : 'a Node) : unit =
+        if node.HeightInAdjustHeightsHeap = -1 then
+            let height = node.Height
+            if Debug.globalFlag then
+                // We process nodes in increasing order of pre-adjusted height, so it is a bug if we
+                // ever try to add a node that would violate that.
+                if height < t.HeightLowerBound then failwith "nodes should be processed in increasing pre-adjust height order"
+                // Whenever we set a node's height, we use [set_height], which enforces this.
+                if height > maxHeightAllowed t then failwith "processing node with higher height than allowed"
+                node.HeightInAdjustHeightsHeap <- height
+                t.Length <- t.Length + 1
+                node.NextInAdjustHeightsHeap <- t.NodesByHeight.[height]
+                t.NodesByHeight.[height] <- ValueSome (NodeCrate.make node)
 
-let set_height t (node : _ Node.t) height =
-  if height > t.max_height_seen
-  then (
-    t.max_height_seen <- height;
-    if height > max_height_allowed t
-    then
-      failwiths
-        "node with too large height"
-        (`Height height, `Max (max_height_allowed t))
-        [%sexp_of: [ `Height of int ] * [ `Max of int ]]);
-  node.height <- height
-;;
+    let removeMinThrowing (t : AdjustHeightsHeap) : NodeCrate =
+        if Debug.globalFlag && isEmpty t then
+            failwith "removeMin of empty heap"
+        let mutable r = t.HeightLowerBound
+        while t.NodesByHeight.[r].IsNone do
+            r <- r + 1
+        let height = r
+        t.HeightLowerBound <- height
+        let node = t.NodesByHeight.[height].Value
+        t.Length <- t.Length - 1
+        { new NodeEval<_> with
+            member _.Eval node =
+                node.HeightInAdjustHeightsHeap <- -1
+                t.NodesByHeight.[height] <- node.NextInAdjustHeightsHeap
+                node.NextInAdjustHeightsHeap <- ValueNone
+                FakeUnit.ofUnit ()
+         }
+        |> node.Apply
+        |> FakeUnit.toUnit
 
-let ensure_height_requirement t ~original_child ~original_parent ~child ~parent =
-  if debug then assert (Node.is_necessary child);
-  if debug then assert (Node.is_necessary parent);
-  if Node.same parent original_child
-  then
-    failwiths
-      "adding edge made graph cyclic"
-      (`child original_child, `parent original_parent)
-      [%sexp_of: [ `child of _ Node.t ] * [ `parent of _ Node.t ]];
-  if child.height >= parent.height
-  then (
-    add_unless_mem t parent;
-    (* We set [parent.height] after adding [parent] to the heap, so that [parent] goes
-       in the heap with its pre-adjusted height. *)
-    set_height t parent (child.height + 1))
-;;
+        node
 
-let adjust_heights
-  (type a b)
-  t
-  recompute_heap
-  ~child:(original_child : a Node.t)
-  ~parent:(original_parent : b Node.t)
-  =
-  if debug then assert (is_empty t);
-  if debug then assert (original_child.height >= original_parent.height);
-  t.height_lower_bound <- original_parent.height;
-  ensure_height_requirement
-    t
-    ~original_child
-    ~original_parent
-    ~child:original_child
-    ~parent:original_parent;
-  while length t > 0 do
-    let (T child) = remove_min_exn t in
-    if Node.is_in_recompute_heap child
-    then Recompute_heap.increase_height recompute_heap child;
-    if child.num_parents > 0
-    then (
-      let (T parent) = Uopt.value_exn child.parent0 in
-      ensure_height_requirement t ~original_child ~original_parent ~child ~parent;
-      for parent_index = 1 to child.num_parents - 1 do
-        let (T parent) =
-          Uopt.value_exn (Uniform_array.get child.parent1_and_beyond (parent_index - 1))
-        in
-        ensure_height_requirement t ~original_child ~original_parent ~child ~parent
-      done);
-    match child.kind with
-    | Bind_lhs_change { all_nodes_created_on_rhs; _ } ->
-      let r = ref all_nodes_created_on_rhs in
-      while Uopt.is_some !r do
-        let (T node_on_rhs) = Uopt.unsafe_value !r in
-        r := node_on_rhs.next_node_in_same_scope;
-        if Node.is_necessary node_on_rhs
-        then
-          ensure_height_requirement
-            t
-            ~original_child
-            ~original_parent
-            ~child
-            ~parent:node_on_rhs
-      done
-    | _ -> ()
-  done;
-  if debug then assert (is_empty t);
-  if debug then assert (original_child.height < original_parent.height)
-;;
+    let setHeight (t : AdjustHeightsHeap) (node : 'a Node) height =
+        if height > t.MaxHeightSeen then
+            t.MaxHeightSeen <- height
+            if height > maxHeightAllowed t then
+                failwith "node too large height"
+
+        node.Height <- height
+
+    let ensureHeightRequirement t originalChild originalParent child parent =
+        if Debug.globalFlag then
+            if not (NodeHelpers.isNecessary child) then failwith "expected child to be necessary"
+            if not (NodeHelpers.isNecessary parent) then failwith "expected parent to be necessary"
+        if Node.same parent originalChild then
+            failwith "adding edge made graph cyclic"
+        if child.Height >= parent.Height then
+            addUnlessMem t parent
+
+            // We set [parent.height] after adding [parent] to the heap, so that [parent] goes
+            // in the heap with its pre-adjusted height.
+            setHeight t parent (child.Height + 1)
+
+    let adjustHeights<'a, 'b> (t : AdjustHeightsHeap) (recomputeHeap : RecomputeHeap) (child : 'a Node) (parent : 'b Node) =
+        if Debug.globalFlag then
+            if not (isEmpty t) then failwith "expected empty heap in adjustHeights"
+            if child.Height < parent.Height then failwith "expected child at least as high as parent"
+
+        t.HeightLowerBound <- parent.Height
+        ensureHeightRequirement t child parent child parent
+
+        let originalChild = child
+        let originalParent = parent
+        while t.Length > 0 do
+            let child = removeMinThrowing t
+            { new NodeEval<FakeUnit> with
+                member _.Eval child =
+                    if Node.isInRecomputeHeap child then
+                        RecomputeHeap.increaseHeight recomputeHeap child
+                    if child.NumParents > 0 then
+                        let parent = child.Parent0.Value
+                        { new NodeEval<_> with
+                            member _.Eval parent =
+                                ensureHeightRequirement t originalChild originalParent child parent
+                                for parentIndex = 1 to child.NumParents - 1 do
+                                    let parent = child.Parent1AndBeyond.[parentIndex - 1].Value
+                                    { new NodeEval<_> with
+                                        member _.Eval parent =
+                                            ensureHeightRequirement t originalChild originalParent child parent
+                                            |> FakeUnit.ofUnit
+                                    }
+                                    |> parent.Apply
+                                    |> FakeUnit.toUnit
+                                FakeUnit.ofUnit ()
+                        }
+                        |> parent.Apply
+                        |> FakeUnit.toUnit
+                    match child.Kind with
+                    | Kind.BindLhsChange (bind, _) ->
+                        { new BindEval<_> with
+                            member _.Eval bind =
+                                let mutable r = bind.AllNodesCreatedOnRhs
+                                while r.IsSome do
+                                    let nodeOnRhs = r.Value
+                                    { new NodeEval<_> with
+                                        member _.Eval nodeOnRhs =
+                                            r <- nodeOnRhs.NextNodeInSameScope
+                                            if NodeHelpers.isNecessary nodeOnRhs then
+                                                ensureHeightRequirement t originalChild originalParent child nodeOnRhs
+                                            FakeUnit.ofUnit ()
+                                    }
+                                    |> nodeOnRhs.Apply
+                                    |> FakeUnit.toUnit
+                                FakeUnit.ofUnit ()
+                        }
+                        |> bind.Apply
+                    | _ -> FakeUnit.ofUnit ()
+            }
+            |> child.Apply
+            |> FakeUnit.toUnit
+
+        if Debug.globalFlag then
+            if not (isEmpty t) then failwith "expected empty heap in adjustHeights"
+            if originalChild.Height >= originalParent.Height then failwith "expected child lower than parent"

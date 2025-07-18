@@ -8,7 +8,8 @@ type internal Dot =
         Attributes : Map<string, string>
     }
 
-type internal DotUserInfo =
+type DotUserInfo =
+    internal
     | Dot of Dot
     | Info of string
     | Append of prior : DotUserInfo * next : DotUserInfo

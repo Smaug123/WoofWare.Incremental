@@ -667,9 +667,81 @@ module NodeCrate =
         |> nodeCrate.Apply
         |> FakeUnit.toUnit
 
-    let private numParentsEval =
+    let private numParentsEval : NodeEval<int> =
         { new NodeEval<_> with
             member _.Eval n = n.NumParents
          }
 
     let numParents (c : NodeCrate) = c.Apply numParentsEval
+
+    let private recomputedAtEval : NodeEval<StabilizationNum> =
+        { new NodeEval<_> with
+            member _.Eval n = n.RecomputedAt
+         }
+
+    let recomputedAt (c : NodeCrate) = c.Apply recomputedAtEval
+
+    let private changedAtEval : NodeEval<StabilizationNum> =
+        { new NodeEval<_> with
+            member _.Eval n = n.ChangedAt
+         }
+
+    let changedAt (c : NodeCrate) = c.Apply changedAtEval
+
+    let private heightEval : NodeEval<int> =
+        { new NodeEval<_> with member _.Eval n = n.Height }
+
+    let height (c : NodeCrate) = c.Apply heightEval
+
+    let iteriChildren (c : NodeCrate) (f: int -> NodeCrate -> unit) : unit =
+        { new NodeEval<_> with
+            member _.Eval node =
+                Node.iteriChildren node f
+                |> FakeUnit.ofUnit
+        }
+        |> c.Apply
+        |> FakeUnit.toUnit
+
+    let private userInfoEval =
+        { new NodeEval<_> with
+            member _.Eval n = n.UserInfo
+        }
+
+    let userInfo (c : NodeCrate) : DotUserInfo option =
+        c.Apply userInfoEval
+
+    let private nodeIdEval =
+        { new NodeEval<_> with
+            member _.Eval n = n.Id
+        }
+
+    let nodeId (c : NodeCrate) : NodeId =
+        c.Apply nodeIdEval
+
+    let private nextInAdjustHeightsHeapEval =
+        { new NodeEval<_> with
+            member _.Eval n = n.NextInAdjustHeightsHeap
+        }
+
+    let nextInAdjustHeightsHeap (n : NodeCrate) : NodeCrate voption = n.Apply nextInAdjustHeightsHeapEval
+
+    let private heightInAdjustHeightsHeapEval =
+        { new NodeEval<_> with
+            member _.Eval n = n.HeightInAdjustHeightsHeap
+        }
+
+    let heightInAdjustHeightsHeap (n : NodeCrate) : int = n.Apply heightInAdjustHeightsHeapEval
+
+    let private heightInRecomputeHeapEval =
+        { new NodeEval<_> with
+            member _.Eval n = n.HeightInRecomputeHeap
+        }
+
+    let heightInRecomputeHeap (n : NodeCrate) : int = n.Apply heightInRecomputeHeapEval
+
+    let private isInRecomputeHeapEval =
+        { new NodeEval<_> with
+            member _.Eval n = Node.isInRecomputeHeap n
+        }
+
+    let isInRecomputeHeap (n : NodeCrate) : bool = n.Apply isInRecomputeHeapEval

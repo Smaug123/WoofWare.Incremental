@@ -24,8 +24,9 @@ module NodeToDot =
             yield "digraph G {\n"
             yield "  rankdir = BT\n"
 
-            let seen = For_analyzer.Node_id.Hash_set.create ()
-            let bind_edges = ref [] in
+            let seen = HashSet<NodeId> ()
+            let bindEdges = ResizeArray ()
+
             For_analyzer.traverse
               ts
               ~add_node:

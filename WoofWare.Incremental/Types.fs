@@ -13,12 +13,18 @@ type Status =
     | Not_stabilizing
     | Stabilize_previously_raised of RaisedException
 
+/// The adjust-heights heap is used after an edge is added to the graph from a child node
+/// to a parent node. If the child's height is greater than or equal to the parent's
+/// height, then [Adjust_heights_heap.adjust_heights] increases the height of the parent
+/// and its ancestors as necessary in order to restore the height invariant. This is done
+/// by visiting ancestors in topological order, using the adjust-heights heap to visit
+/// them in increasing order of pre-adjusted height.
 type AdjustHeightsHeap =
     {
         mutable Length : int
         mutable HeightLowerBound : int
         mutable MaxHeightSeen : int
-        mutable NodesByHeight : NodeCrate option array
+        mutable NodesByHeight : NodeCrate voption array
     }
 
 and Alarm = TimingWheel<AlarmValue>
