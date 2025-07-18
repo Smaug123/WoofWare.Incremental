@@ -515,3 +515,41 @@ module NodeExtensions =
             { new NodeCrate with
                 member _.Apply e = e.Eval node
             }
+
+[<RequireQualifiedAccess>]
+module InternalObserverCrate =
+    let make (i: InternalObserver<'a>) : InternalObserverCrate =
+        { new InternalObserverCrate with member _.Apply e = e.Eval i }
+
+[<RequireQualifiedAccess>]
+module VarCrate =
+    let make (v: Var<'a>) : VarCrate =
+        { new VarCrate with member _.Apply e = e.Eval v }
+
+[<RequireQualifiedAccess>]
+module MapCrate =
+    let make (f: 'a -> 'b) (n: Node<'a>) : MapCrate<'b> =
+        { new MapCrate<_> with
+            member _.Apply e = e.Eval (f, n)
+        }
+
+[<RequireQualifiedAccess>]
+module Map2Crate =
+    let make (f: 'a -> 'b -> 'c) (n1: Node<'a>) (n2: Node<'b>) : Map2Crate<'c> =
+        { new Map2Crate<_> with
+            member _.Apply e = e.Eval (f, n1, n2)
+        }
+
+[<RequireQualifiedAccess>]
+module BindMainCrate =
+    let make (f: Bind<'a,'b>) : BindMainCrate<'a> =
+        { new BindMainCrate<_> with
+            member _.Apply e = e.Eval f
+        }
+
+[<RequireQualifiedAccess>]
+module JoinCrate =
+    let make (f: Join<'a>) : JoinCrate =
+        { new JoinCrate with
+            member _.Apply e = e.Eval f
+        }

@@ -12,3 +12,8 @@ module internal RunOnUpdateHandlers =
         }
         |> t.Apply
         |> FakeUnit.toUnit
+
+    let make<'a> (node: Node<'a>) (update: NodeUpdate<'a>) : RunOnUpdateHandlers =
+        { new RunOnUpdateHandlers with
+            member _.Apply e = e.Eval node update
+        }

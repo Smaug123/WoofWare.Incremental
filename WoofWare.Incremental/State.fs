@@ -5,6 +5,7 @@ namespace WoofWare.Incremental
 open TypeEquality
 open System
 open WoofWare.TimingWheel
+open WoofWare.WeakHashTable
 
 type internal StateStats =
     {
@@ -957,459 +958,408 @@ module State =
         if Debug.globalFlag then
             invariant t
 
-    let[@inline always] recompute_first_node_that_is_necessary r =
-      let (T node) = Recompute_heap.remove_min r in
-      if debug && not (Node.needs_to_be_computed node)
-      then
-        failwiths "node unexpectedly does not need to be computed" node [%sexp_of: _ Node.t];
-      recompute node
-    ;;
+    let inline recomputeFirstNodeThatIsNecessary r =
+      let node = RecomputeHeap.removeMin r
+      { new NodeEval<_> with
+          member _.Eval node =
+              if Debug.globalFlag && not (Node.needsToBeComputed node) then
+                failwith "node unexpectedly does not need to be computed"
+              recompute node
+      }
+      |> node.Apply
 
-    let unlink_disallowed_observers t =
-      while Stack.length t.disallowed_observers > 0 do
-        let packed = Stack.pop_exn t.disallowed_observers in
-        let (T internal_observer) = packed in
-        if debug
-        then
-          assert (
-            match internal_observer.state with
-            | Disallowed -> true
-            | _ -> false);
-        internal_observer.state <- Unlinked;
-        let (T all_observers) = Uopt.value_exn t.all_observers in
-        if Internal_observer.same internal_observer all_observers
-        then t.all_observers <- internal_observer.next_in_all;
-        Internal_observer.unlink internal_observer;
-        check_if_unnecessary internal_observer.observing
-      done
-    ;;
+    let unlinkDisallowedObservers (t: State) : unit =
+      while not (Stack.isEmpty t.DisallowedObservers) do
+        let packed = Stack.pop(t.DisallowedObservers).Value
+        { new InternalObserverEval<_> with
+            member _.Eval internalObserver =
+                if Debug.globalFlag then
+                    assert internalObserver.State.IsDisallowed
+                internalObserver.State <- InternalObserverState.Unlinked
 
-    let disallow_future_use internal_observer =
-      let t = Internal_observer.incr_state internal_observer in
-      match internal_observer.state with
-      | Disallowed | Unlinked -> ()
-      | Created ->
-        t.num_active_observers <- t.num_active_observers - 1;
-        internal_observer.state <- Unlinked;
-        internal_observer.on_update_handlers <- []
-      | In_use ->
-        t.num_active_observers <- t.num_active_observers - 1;
-        internal_observer.state <- Disallowed;
-        Stack.push t.disallowed_observers (T internal_observer)
-    ;;
-
-    let disallow_finalized_observers t =
-      let disallow_if_finalized (Internal_observer.Packed.T internal_observer) =
-        if List.is_empty internal_observer.on_update_handlers
-        then disallow_future_use internal_observer
-      in
-      Thread_safe_queue.dequeue_until_empty
-        ~f:disallow_if_finalized
-        t.finalized_observers [@nontail]
-    ;;
-
-    let observer_finalizer t =
-      stage (fun observer ->
-        let internal_observer = !observer in
-        Thread_safe_queue.enqueue t.finalized_observers (T internal_observer))
-    ;;
-
-    let create_observer ?(should_finalize = true) (observing : _ Node.t) =
-      let t = observing.state in
-      let internal_observer : _ Internal_observer.t =
-        { state = Created
-        ; observing
-        ; on_update_handlers = []
-        ; prev_in_all = Uopt.none
-        ; next_in_all = Uopt.none
-        ; prev_in_observing = Uopt.none
-        ; next_in_observing = Uopt.none
+                { new InternalObserverEval<_> with
+                    member _.Eval allObservers =
+                        if InternalObserver.same internalObserver allObservers then
+                            t.AllObservers <- internalObserver.NextInAll
+                        InternalObserver.unlink internalObserver
+                        checkIfUnnecessary internalObserver.Observing
+                        FakeUnit.ofUnit ()
+                }
+                |> t.AllObservers.Value.Apply
         }
-      in
-      Stack.push t.new_observers (T internal_observer);
-      let observer = ref internal_observer in
-      if should_finalize
-      then Gc.Expert.add_finalizer_ignore observer (unstage (observer_finalizer t));
-      t.num_active_observers <- t.num_active_observers + 1;
+        |> packed.Apply
+        |> FakeUnit.toUnit
+
+    let disallowFutureUse (internalObserver: InternalObserver<'a>) : unit =
+      let t = InternalObserver.incrState internalObserver in
+      match internalObserver.State with
+      | InternalObserverState.Disallowed | InternalObserverState.Unlinked -> ()
+      | InternalObserverState.Created ->
+        t.NumActiveObservers <- t.NumActiveObservers - 1
+        internalObserver.State <- InternalObserverState.Unlinked
+        internalObserver.OnUpdateHandlers <- []
+      | InternalObserverState.InUse ->
+        t.NumActiveObservers <- t.NumActiveObservers - 1
+        internalObserver.State <- InternalObserverState.Disallowed
+        Stack.push (InternalObserverCrate.make internalObserver) t.DisallowedObservers
+
+    let disallowFinalizedObservers (t: State) : unit =
+      let disallowIfFinalized (internalObserver : InternalObserverCrate) =
+        { new InternalObserverEval<_> with
+            member _.Eval internalObserver =
+                if List.isEmpty internalObserver.OnUpdateHandlers then disallowFutureUse internalObserver
+                FakeUnit.ofUnit ()
+        }
+        |> internalObserver.Apply
+        |> FakeUnit.toUnit
+      t.FinalizedObservers
+      |> ThreadSafeQueue.dequeue_until_empty disallow_if_finalized
+
+    let observerFinalizer (t : State) =
+      Staged.stage (fun observer ->
+        let internalObserver = !observer in
+        ThreadSafeQueue.enqueue t.FinalizedObservers (InternalObserverCrate.make internalObserver))
+
+    let createObserver (shouldFinalize : bool option) (observing : 'a Node) : InternalObserver<'a> =
+      let shouldFinalize = defaultArg shouldFinalize true
+      let t = observing.State
+      let internalObserver : InternalObserver<_> =
+        {
+         State = InternalObserverState.Created
+         Observing = observing
+         OnUpdateHandlers = []
+         PrevInAll = ValueNone
+         NextInAll = ValueNone
+         PrevInObserving = ValueNone
+         NextInObserving = ValueNone
+        }
+      Stack.push (InternalObserverCrate.make internalObserver) t.NewObservers
+      let mutable observer = internalObserver in
+      if shouldFinalize then
+          Gc.Expert.add_finalizer_ignore observer (Staged.unstage (ovserverFinalizer t))
+      t.NumActiveObservers <- t.NumActiveObservers + 1
       observer
-    ;;
 
-    let add_new_observers t =
-      while Stack.length t.new_observers > 0 do
-        let packed = Stack.pop_exn t.new_observers in
-        let module Packed = Internal_observer.Packed in
-        let (T internal_observer) = packed in
-        match internal_observer.state with
-        | In_use | Disallowed -> assert false
-        | Unlinked -> ()
-        | Created ->
-          internal_observer.state <- In_use;
-          let old_all_observers = t.all_observers in
-          if Uopt.is_some old_all_observers
-          then (
-            internal_observer.next_in_all <- old_all_observers;
-            Packed.set_prev_in_all (Uopt.unsafe_value old_all_observers) (Uopt.some packed));
-          t.all_observers <- Uopt.some packed;
-          let observing = internal_observer.observing in
-          let was_necessary = Node.is_necessary observing in
-          observing.num_on_update_handlers
-          <- observing.num_on_update_handlers
-             + List.length internal_observer.on_update_handlers;
-          let old_observers = observing.observers in
-          if Uopt.is_some old_observers
-          then (
-            internal_observer.next_in_observing <- old_observers;
-            (Uopt.unsafe_value old_observers).prev_in_observing <- Uopt.some internal_observer);
-          observing.observers <- Uopt.some internal_observer;
-          (* By adding [internal_observer] to [observing.observers], we may have added
-             on-update handlers to [observing].  We need to handle [observing] after this
-             stabilization to give those handlers a chance to run. *)
-          handle_after_stabilization observing;
-          if debug then assert (Node.is_necessary observing);
-          if not was_necessary then became_necessary observing
-      done
-    ;;
+    let addNewObservers (t : State) : unit =
+      while not (Stack.isEmpty t.NewObservers) do
+        let packed = Stack.pop t.NewObservers |> Option.get
 
-    let observer_value_exn observer =
-      let t = Observer.incr_state observer in
-      match t.status with
-      | Not_stabilizing | Running_on_update_handlers -> Observer.value_exn observer
-      | Stabilize_previously_raised raised_exn ->
-        Raised_exn.reraise_with_message
-          raised_exn
-          "Observer.value_exn called after stabilize previously raised"
-      | Stabilizing ->
-        failwiths
-          "Observer.value_exn called during stabilization"
-          observer
-          [%sexp_of: _ Observer.t]
-    ;;
+        { new InternalObserverEval<_> with
+            member _.Eval internalObserver =
+                match internalObserver.State with
+                | InternalObserverState.InUse | InternalObserverState.Disallowed -> failwith "oh no"
+                | InternalObserverState.Unlinked -> ()
+                | InternalObserverState.Created ->
+                  internalObserver.State <- InternalObserverState.InUse;
+                  let oldAllObservers = t.AllObservers
+                  match oldAllObservers with
+                  | ValueSome oldAllObservers' ->
+                    internalObserver.NextInAll <- oldAllObservers;
+                    Packed.set_prev_in_all oldAllObservers' (ValueSome packed)
+                  | ValueNone -> ()
+                  t.AllObservers <- ValueSome packed
+                  let observing = internalObserver.Observing
+                  let wasNecessary = NodeHelpers.isNecessary observing
+                  observing.NumOnUpdateHandlers <- observing.NumOnUpdateHandlers + List.length internalObserver.OnUpdateHandlers
+                  let oldObservers = observing.Observers
+                  match oldObservers with
+                  | ValueSome oldObservers' ->
+                    internalObserver.NextInObserving <- oldObservers
+                    oldObservers'.PrevInObserving <- ValueSome internalObserver
+                  | ValueNone -> ()
+                  observing.Observers <- ValueSome internalObserver
+                  // By adding [internal_observer] to [observing.observers], we may have added
+                  // on-update handlers to [observing].  We need to handle [observing] after this
+                  // stabilization to give those handlers a chance to run.
+                  handleAfterStabilization observing
+                  if Debug.globalFlag then assert (NodeHelpers.isNecessary observing)
+                  if not wasNecessary then becameNecessary observing
+                FakeUnit.ofUnit ()
+        }
+        |> packed.Apply
+        |> FakeUnit.toUnit
 
-    let observer_value observer =
-      try Ok (observer_value_exn observer) with
-      | exn -> Error (Error.of_exn exn)
-    ;;
+    let observerValueThrowing (observer: Observer<'a>) : 'a =
+      let t = Observer.incrState observer
+      match t.Status with
+      | Status.Not_stabilizing | Status.Running_on_update_handlers -> Observer.valueThrowing observer
+      | Status.Stabilize_previously_raised exn ->
+        RaisedException.reraiseWithMessage
+          exn
+          "Observer.valueThrowing called after stabilize previously raised"
+      | Status.Stabilizing ->
+        failwith "Observer.valueThrowing called during stabilization"
 
-    let node_on_update (type a) (node : a Node.t) ~f =
-      let t = node.state in
-      Node.on_update node (On_update_handler.create f ~at:t.stabilization_num);
-      handle_after_stabilization node
-    ;;
-
-    let observer_on_update_exn observer ~f =
-      let t = Observer.incr_state observer in
-      Observer.on_update_exn observer (On_update_handler.create f ~at:t.stabilization_num);
-      handle_after_stabilization (Observer.observing observer)
-    ;;
-
-    let set_var_while_not_stabilizing var value =
-      let t = Var.incr_state var in
-      t.num_var_sets <- t.num_var_sets + 1;
-      var.value <- value;
-      if Stabilization_num.compare var.set_at t.stabilization_num < 0
-      then (
-        var.set_at <- t.stabilization_num;
-        let watch = var.watch in
-        if debug then assert (Node.is_stale watch);
-        if Node.is_necessary watch && not (Node.is_in_recompute_heap watch)
-        then Recompute_heap.add t.recompute_heap watch)
-    ;;
-
-    let set_var var value =
-      let t = Var.incr_state var in
-      match t.status with
-      | Running_on_update_handlers | Not_stabilizing ->
-        set_var_while_not_stabilizing var value
-      | Stabilize_previously_raised raised_exn ->
-        Raised_exn.reraise_with_message
-          raised_exn
-          "cannot set var -- stabilization previously raised"
-      | Stabilizing ->
-        if Uopt.is_none var.value_set_during_stabilization
-        then Stack.push t.set_during_stabilization (T var);
-        var.value_set_during_stabilization <- Uopt.some value
-    ;;
-
-    let reclaim_space_in_weak_hashtbls t =
-      let reclaim (Packed_weak_hashtbl.T weak_hashtbl) =
-        Weak_hashtbl.reclaim_space_for_keys_with_unused_data weak_hashtbl
-      in
-      Thread_safe_queue.dequeue_until_empty ~f:reclaim t.weak_hashtbls [@nontail]
-    ;;
-
-    let stabilize_start t =
-      t.status <- Stabilizing;
-      disallow_finalized_observers t;
-      (* Just like for binds, we add new observers before removing disallowed observers to
-         potentially avoid switching the observability of some nodes back and forth. *)
-      add_new_observers t;
-      unlink_disallowed_observers t;
-      if debug then invariant t
-    ;;
-
-    let stabilize_end t =
-      if debug
-      then (
-        t.only_in_debug.currently_running_node <- None;
-        t.only_in_debug.expert_nodes_created_by_current_node <- []);
-      (* We increment [t.stabilization_num] before handling variables set during
-         stabilization, so that they are treated as set during the new stabilization cycle.
-         Also, we increment before running on-update handlers, to avoid running on update
-         handlers created during on update handlers. *)
-      t.stabilization_num <- Stabilization_num.add1 t.stabilization_num;
-      while not (Stack.is_empty t.set_during_stabilization) do
-        let (T var) = Stack.pop_exn t.set_during_stabilization in
-        let value = Uopt.value_exn var.value_set_during_stabilization in
-        var.value_set_during_stabilization <- Uopt.none;
-        set_var_while_not_stabilizing var value
-      done;
-      while not (Stack.is_empty t.handle_after_stabilization) do
-        let (T node) = Stack.pop_exn t.handle_after_stabilization in
-        node.is_in_handle_after_stabilization <- false;
-        let old_value = node.old_value_opt in
-        node.old_value_opt <- Uopt.none;
-        let node_update : _ Node_update.t =
-          if not (Node.is_valid node)
-          then Invalidated
-          else if not (Node.is_necessary node)
-          then Unnecessary
-          else (
-            let new_value = Uopt.value_exn node.value_opt in
-            if Uopt.is_none old_value
-            then Necessary new_value
-            else Changed (Uopt.unsafe_value old_value, new_value))
-        in
-        Stack.push t.run_on_update_handlers (T (node, node_update))
-      done;
-      t.status <- Running_on_update_handlers;
-      let now = t.stabilization_num in
-      while not (Stack.is_empty t.run_on_update_handlers) do
-        let (T (node, node_update)) = Stack.pop_exn t.run_on_update_handlers in
-        Node.run_on_update_handlers node node_update ~now
-      done;
-      t.status <- Not_stabilizing;
-      reclaim_space_in_weak_hashtbls t
-    ;;
-
-    let raise_during_stabilization t exn =
-      let raised = Raised_exn.create exn in
-      t.status <- Stabilize_previously_raised raised;
-      Raised_exn.reraise raised
-    ;;
-
-    let stabilize t =
-      ensure_not_stabilizing t ~name:"stabilize" ~allow_in_update_handler:false;
+    let observerValue (observer: Observer<'a>) : Result<'a,exn> =
       try
-        stabilize_start t;
-        let r = t.recompute_heap in
-        while Recompute_heap.length r > 0 do
-          recompute_first_node_that_is_necessary r
-        done;
-        stabilize_end t
+          Ok (observerValueThrowing observer)
       with
-      | exn -> raise_during_stabilization t exn
-    ;;
+      | exn -> Error exn
 
-    module Step_result = struct
-      type t =
-        | Keep_going
-        | Done
-      [@@deriving sexp_of]
-    end
+    let nodeOnUpdate<'a> (node : 'a Node) (f: NodeUpdate<'a> -> unit) : unit =
+      let t = node.State
+      Node.onUpdate node (OnUpdateHandler.create f t.StabilizationNum)
+      handleAfterStabilization node
 
-    let do_one_step_of_stabilize t : Step_result.t =
+    let observerOnUpdateThrowing observer f =
+      let t = Observer.incrState observer
+      Observer.onUpdateThrowing observer (OnUpdateHandler.create f t.StabilizationNum)
+      handleAfterStabilization (Observer.observing observer)
+
+    let setVarWhileNotStabilizing (var: Var<'a>) (value: 'a) : unit =
+      let t = Var.incrState var
+      t.NumVarSets <- t.NumVarSets + 1
+      var.Value <- value
+      if var.SetAt < t.StabilizationNum then
+        var.SetAt <- t.StabilizationNum
+        let watch = var.Watch
+        if Debug.globalFlag then assert (Node.isStale watch)
+        if NodeHelpers.isNecessary watch && not (Node.isInRecomputeHeap watch) then
+            RecomputeHeap.add t.RecomputeHeap watch
+
+    let setVar (var: Var<'a>) (value: 'a) : unit =
+      let t = Var.incrState var in
+      match t.Status with
+      | Status.Running_on_update_handlers | Status.Not_stabilizing ->
+        setVarWhileNotStabilizing var value
+      | Status.Stabilize_previously_raised exn ->
+        RaisedException.reraiseWithMessage
+          exn
+          "cannot set var -- stabilization previously raised"
+      | Status.Stabilizing ->
+        if var.ValueSetDuringStabilization.IsNone then
+            Stack.push (VarCrate.make var) t.SetDuringStabilization
+        var.ValueSetDuringStabilization <- Some value
+
+    let reclaimSpaceInWeakHashTables t =
+      let reclaim (w : WeakHashTableCrate) =
+        { new WeakHashTableEval<_> with
+            member _.Eval w =
+                WeakHashTable.reclaimSpaceForKeysWithUnusedData w
+                |> FakeUnit.ofUnit
+        }
+        |> w.Apply
+        |> FakeUnit.toUnit
+      Thread_safe_queue.dequeue_until_empty reclaim t.WeakHashTable
+
+    let stabilizeStart (t : State) : unit =
+      t.Status <- Status.Stabilizing;
+      disallowFinalizedObservers t
+      // Just like for binds, we add new observers before removing disallowed observers to
+      // potentially avoid switching the observability of some nodes back and forth.
+      addNewObservers t
+      unlinkDisallowedObservers t
+      if Debug.globalFlag then invariant t
+
+    let stabilizeEnd (t : State) : unit =
+      if Debug.globalFlag then
+        t.OnlyInDebug.CurrentlyRunningNode <- None;
+        t.OnlyInDebug.ExpertNodesCreatedByCurrentNode <- []
+      // We increment [t.stabilization_num] before handling variables set during
+      // stabilization, so that they are treated as set during the new stabilization cycle.
+      // Also, we increment before running on-update handlers, to avoid running on update
+      // handlers created during on update handlers.
+      t.StabilizationNum <- StabilizationNum.add1 t.StabilizationNum
+      while not (Stack.isEmpty t.SetDuringStabilization) do
+        let var =
+            Stack.pop t.SetDuringStabilization
+            |> Option.get
+        { new VarEval<_> with
+            member _.Eval var =
+                let value = var.ValueSetDuringStabilization.Value
+                var.ValueSetDuringStabilization <- None
+                setVarWhileNotStabilizing var value
+                FakeUnit.ofUnit ()
+        }
+        |> var.Apply
+        |> FakeUnit.toUnit
+      while not (Stack.isEmpty t.HandleAfterStabilization) do
+        let node =
+            t.HandleAfterStabilization
+            |> Stack.pop
+            |> Option.get
+
+        { new NodeEval<_> with
+            member _.Eval node =
+                node.IsInHandleAfterStabilization <- false
+                let oldValue = node.OldValueOpt in
+                node.OldValueOpt <- ValueNone
+                let node_update : _ NodeUpdate =
+                  if not (NodeHelpers.isValid node) then
+                      Invalidated
+                  else if not (NodeHelpers.isNecessary node) then
+                      Unnecessary
+                  else
+                    let new_value = node.ValueOpt.Value in
+                    match oldValue with
+                    | ValueNone -> Necessary new_value
+                    | ValueSome oldValue -> Changed (oldValue, new_value)
+                Stack.push (RunOnUpdateHandlers.make node node_update) t.RunOnUpdateHandlers
+                FakeUnit.ofUnit ()
+        }
+        |> node.Apply
+        |> FakeUnit.toUnit
+      t.Status <- Status.Running_on_update_handlers
+      let now = t.StabilizationNum
+      while not (Stack.isEmpty t.RunOnUpdateHandlers) do
+        let rouh =
+            t.RunOnUpdateHandlers
+            |> Stack.pop
+            |> Option.get
+        { new RunOnUpdateHandlersEval<_> with
+            member _.Eval node nodeUpdate =
+                Node.runOnUpdateHandlers node nodeUpdate now
+                |> FakeUnit.ofUnit
+        }
+        |> rouh.Apply
+        |> FakeUnit.toUnit
+      t.Status <- Status.Not_stabilizing
+      reclaimSpaceInWeakHashTables t
+
+    let raiseDuringStabilization (t: State) (exn: exn) : 'a =
+      let raised = RaisedException.create exn in
+      t.Status <- Stabilize_previously_raised raised;
+      RaisedException.reraise raised
+
+    let stabilize (t: State) : unit =
+      ensureNotStabilizing t "stabilize" false
       try
-        match t.status with
-        | Not_stabilizing ->
-          stabilize_start t;
-          Keep_going
-        | Stabilizing ->
-          let r = t.recompute_heap in
-          if Recompute_heap.length r > 0
-          then (
-            recompute_first_node_that_is_necessary r;
-            Keep_going)
-          else (
-            stabilize_end t;
-            Done)
-        | Running_on_update_handlers | Stabilize_previously_raised _ ->
-          ensure_not_stabilizing t ~name:"step" ~allow_in_update_handler:false;
-          assert false
+        stabilizeStart t;
+        let r = t.RecomputeHeap
+        while RecomputeHeap.length r > 0 do
+          recomputeFirstNodeThatIsNecessary r
+        stabilizeEnd t
+      with
+      | exn -> raiseDuringStabilization t exn
+
+    type StepResult =
+        | KeepGoing
+        | Done
+
+    let doOneStepOfStabilize (t : State) : StepResult =
+      try
+        match t.Status with
+        | Status.Not_stabilizing ->
+          stabilizeStart t
+          StepResult.KeepGoing
+        | Status.Stabilizing ->
+          let r = t.RecomputeHeap in
+          if RecomputeHeap.length r > 0 then
+            recomputeFirstNodeThatIsNecessary r
+            StepResult.KeepGoing
+          else
+            stabilizeEnd t
+            StepResult.Done
+        | Status.Running_on_update_handlers | Status.Stabilize_previously_raised _ ->
+          ensureNotStabilizing t "step" false
+          failwith "assert false"
       with
       | exn ->
-        (match t.status with
-         | Stabilize_previously_raised _ ->
+        (match t.Status with
+         | Status.Stabilize_previously_raised _ ->
            (* If stabilization has already raised, then [exn] is merely a notification of this
               fact, rather than the original exception itself.  We should just propagate [exn]
               forward; calling [raise_during_stabilization] would store [exn] as the exception
               that initially raised during stabilization. *)
            raise exn
-         | _ -> raise_during_stabilization t exn)
-    ;;
+         | _ -> raiseDuringStabilization t exn)
 
-    let create_node_in t created_in kind =
-      t.num_nodes_created <- t.num_nodes_created + 1;
-      Node.create t created_in kind
-    ;;
+    let createNodeIn (t: State) (createdIn: Scope) (kind: Kind<'a>) : Node<'a> =
+      t.NumNodesCreated <- t.NumNodesCreated + 1
+      Node.create t createdIn kind
 
-    let create_node t kind = create_node_in t t.current_scope kind
-    let create_node_top t kind = create_node_in t Scope.top kind
+    let createNode (t: State) (kind: Kind<'a>) : Node<'a> = createNodeIn t t.CurrentScope kind
+    let createNodeTop (t: State) (kind: Kind<'a>) : Node<'a> = createNodeIn t Scope.top kind
 
-    let create_var t ?(use_current_scope = false) value =
-      let scope = if use_current_scope then t.current_scope else Scope.top in
-      let watch = create_node_in t scope Uninitialized in
+    let createVar (t: State) (useCurrentScope : bool option) (value: 'a) : Var<'a> =
+      let useCurrentScope = defaultArg useCurrentScope false
+      let scope = if useCurrentScope then t.CurrentScope else Scope.top in
+      let watch = createNodeIn t scope Kind.Uninitialized in
       let var =
-        { Var.value
-        ; value_set_during_stabilization = Uopt.none
-        ; set_at = t.stabilization_num
-        ; watch
+        {
+           Value = value
+           ValueSetDuringStabilization = None
+           SetAt = t.StabilizationNum
+           Watch = watch
         }
-      in
-      Node.set_kind watch (Var var);
+      Node.setKind watch (Kind.Var var)
       var
-    ;;
 
-    (* A [const] value could come from the right-hand side of an outer bind.  So, we create a
-       [const] node in the current scope, not in [Scope.top]. *)
-    let const t a = create_node t (Const a)
-    let map (n : _ Node.t) ~f = create_node n.state (Map (f, n))
-    let map2 (n1 : _ Node.t) n2 ~f = create_node n1.state (Map2 (f, n1, n2))
+    // A [const] value could come from the right-hand side of an outer bind.  So, we create a
+    // [const] node in the current scope, not in [Scope.top].
+    let konst t a = createNode t (Kind.Const a)
+    let map (n : _ Node) f = createNode n.State (Kind.Map (MapCrate.make f n))
+    let map2 (n1 : _ Node) n2 f = createNode n1.State (Kind.Map2 (Map2Crate.make f n1 n2))
 
-    let both (n1 : _ Node.t) (n2 : _ Node.t) =
-      match n1, n2 with
-      | { kind = Const a; _ }, { kind = Const b; _ } -> const n1.state (a, b)
-      | _ -> map2 n1 n2 ~f:Tuple2.create
-    ;;
+    let both (n1 : _ Node) (n2 : _ Node) : Node<'a * 'b> =
+      match n1.Kind, n2.Kind with
+      | Kind.Const a, Kind.Const b ->
+          konst n1.State (a, b)
+      | _ -> map2 n1 n2 (fun a b -> (a, b))
 
-    let map3 (n1 : _ Node.t) n2 n3 ~f = create_node n1.state (Map3 (f, n1, n2, n3))
-    let map4 (n1 : _ Node.t) n2 n3 n4 ~f = create_node n1.state (Map4 (f, n1, n2, n3, n4))
-
-    let map5 (n1 : _ Node.t) n2 n3 n4 n5 ~f =
-      create_node n1.state (Map5 (f, n1, n2, n3, n4, n5))
-    ;;
-
-    let map6 (n1 : _ Node.t) n2 n3 n4 n5 n6 ~f =
-      create_node n1.state (Map6 (f, n1, n2, n3, n4, n5, n6))
-    ;;
-
-    let map7 (n1 : _ Node.t) n2 n3 n4 n5 n6 n7 ~f =
-      create_node n1.state (Map7 (f, n1, n2, n3, n4, n5, n6, n7))
-    ;;
-
-    let map8 (n1 : _ Node.t) n2 n3 n4 n5 n6 n7 n8 ~f =
-      create_node n1.state (Map8 (f, n1, n2, n3, n4, n5, n6, n7, n8))
-    ;;
-
-    let map9 (n1 : _ Node.t) n2 n3 n4 n5 n6 n7 n8 n9 ~f =
-      create_node n1.state (Map9 (f, n1, n2, n3, n4, n5, n6, n7, n8, n9))
-    ;;
-
-    let map10 (n1 : _ Node.t) n2 n3 n4 n5 n6 n7 n8 n9 n10 ~f =
-      create_node n1.state (Map10 (f, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10))
-    ;;
-
-    let map11 (n1 : _ Node.t) n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 ~f =
-      create_node n1.state (Map11 (f, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11))
-    ;;
-
-    let map12 (n1 : _ Node.t) n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 ~f =
-      create_node n1.state (Map12 (f, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12))
-    ;;
-
-    let map13 (n1 : _ Node.t) n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 ~f =
-      create_node n1.state (Map13 (f, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13))
-    ;;
-
-    let map14 (n1 : _ Node.t) n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 ~f =
-      create_node
-        n1.state
-        (Map14 (f, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14))
-    ;;
-
-    let map15 (n1 : _ Node.t) n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 ~f =
-      create_node
-        n1.state
-        (Map15 (f, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14, n15))
-    ;;
-
-    let preserve_cutoff ~(input : _ Node.t) ~output =
-      Node.set_cutoff
+    let preserveCutoff (input : 'a Node) (output: Node<'b>) : unit =
+      Node.setCutoff
         output
-        (Cutoff.create (fun ~old_value:_ ~new_value:_ ->
-           Stabilization_num.equal input.changed_at output.changed_at))
-    ;;
+        (Cutoff.create (fun _ _ ->
+           input.ChangedAt = output.ChangedAt))
 
-    let depend_on input ~depend_on =
-      let output = map2 input depend_on ~f:(fun a _ -> a) in
-      preserve_cutoff ~input ~output;
+    let dependOn (input: Node<'a>) (dependOn: Node<'b>) : Node<'a> =
+      let output = map2 input dependOn (fun a _ -> a) in
+      preserveCutoff input output
       output
-    ;;
 
-    let necessary_if_alive input =
-      (* If [output] is alive, then [observer] is alive, then [input] is necessary.  If
-         [output] is unnecessary, then [output] is not a parent of [input], and thus
-         [output]'s liveness is dependent solely on user code.  And in particular, if [output]
-         dies, then [observer] will be finalized, and then upon the next stabilization,
-         [input] will become unnecessary (at least with respect to [output]). *)
-      let observer = create_observer input in
+    let necessaryIfAlive (input: Node<'a>) : Node<'a> =
+      // If [output] is alive, then [observer] is alive, then [input] is necessary.  If
+      // [output] is unnecessary, then [output] is not a parent of [input], and thus
+      // [output]'s liveness is dependent solely on user code.  And in particular, if [output]
+      // dies, then [observer] will be finalized, and then upon the next stabilization,
+      // [input] will become unnecessary (at least with respect to [output]).
+      let observer = createObserver None input
       let output =
-        map input ~f:(fun a ->
-          Gc.keep_alive observer;
-          a)
-      in
-      preserve_cutoff ~input ~output;
+        map input (fun a ->
+          Gc.keep_alive observer
+          a
+        )
+      preserveCutoff input output
       output
-    ;;
 
-    let bind (lhs : _ Node.t) ~f =
-      let t = lhs.state in
-      let lhs_change = create_node t Uninitialized in
-      let main = create_node t Uninitialized in
+    let bind (lhs : 'a Node) f =
+      let t = lhs.State
+      let lhsChange = createNode t Kind.Uninitialized
+      let main = createNode t Kind.Uninitialized
       let bind =
-        { Bind.main
-        ; f
-        ; lhs
-        ; lhs_change
-        ; rhs = Uopt.none
-        ; rhs_scope = Scope.top
-        ; all_nodes_created_on_rhs = Uopt.none
-        }
-      in
-      (* We set [lhs_change] to never cutoff so that whenever [lhs] changes, [main] is
-         recomputed.  This is necessary to handle cases where [f] returns an existing stable
-         node, in which case the [lhs_change] would be the only thing causing [main] to be
-         stale. *)
-      Node.set_cutoff lhs_change Cutoff.never;
-      bind.rhs_scope <- Bind bind;
-      Node.set_kind lhs_change (Bind_lhs_change bind);
-      Node.set_kind main (Bind_main bind);
+        {
+             Main = main
+             F = f
+             Lhs = lhs
+             LhsChange = lhsChange
+             Rhs = ValueNone
+             RhsScope = Scope.top
+             AllNodesCreatedOnRhs = ValueNone
+       }
+      // We set [lhs_change] to never cutoff so that whenever [lhs] changes, [main] is
+      // recomputed.  This is necessary to handle cases where [f] returns an existing stable
+      // node, in which case the [lhs_change] would be the only thing causing [main] to be
+      // stale.
+      Node.setCutoff lhsChange Cutoff.never
+      let bind' = BindCrate.make bind
+      bind.RhsScope <- Scope.Bind bind'
+      Node.setKind lhsChange (Kind.BindLhsChange (bind', Teq.refl))
+      Node.setKind main (Kind.BindMain (BindMainCrate.make bind))
       main
-    ;;
 
-    let bind2 n1 n2 ~f =
-      bind (map2 n1 n2 ~f:(fun v1 v2 -> v1, v2)) ~f:(fun (v1, v2) -> f v1 v2)
-    ;;
+    let bind2 (n1: Node<'a>) (n2: Node<'b>) (f: 'a -> 'b -> Node<'a * 'b>) : Node<'a * 'b> =
+      bind (map2 n1 n2 (fun v1 v2 -> v1, v2)) (fun (v1, v2) -> f v1 v2)
 
-    let bind3 n1 n2 n3 ~f =
-      bind (map3 n1 n2 n3 ~f:(fun v1 v2 v3 -> v1, v2, v3)) ~f:(fun (v1, v2, v3) -> f v1 v2 v3)
-    ;;
-
-    let bind4 n1 n2 n3 n4 ~f =
-      bind
-        (map4 n1 n2 n3 n4 ~f:(fun v1 v2 v3 v4 -> v1, v2, v3, v4))
-        ~f:(fun (v1, v2, v3, v4) -> f v1 v2 v3 v4)
-    ;;
-
-    let join (lhs : _ Node.t) =
-      let t = lhs.state in
-      let lhs_change = create_node t Uninitialized in
-      let main = create_node t Uninitialized in
-      let join = { Join.lhs; lhs_change; rhs = Uopt.none; main } in
-      Node.set_cutoff lhs_change Cutoff.never;
-      Node.set_kind lhs_change (Join_lhs_change join);
-      Node.set_kind main (Join_main join);
+    let join (lhs : 'a Node Node) =
+      let t = lhs.State
+      let lhsChange = createNode t Kind.Uninitialized
+      let main = createNode t Kind.Uninitialized
+      let join = { Join.Lhs = lhs; LhsChange = lhsChange ; Rhs = ValueNone; Main = main }
+      Node.setCutoff lhsChange Cutoff.never
+      Node.setKind lhsChange (Kind.JoinLhsChange (JoinCrate.make join, Teq.refl))
+      Node.setKind main (Kind.JoinMain join)
       main
-    ;;
 
     let if_ (test : _ Node.t) ~then_ ~else_ =
       let t = test.state in
@@ -1422,12 +1372,10 @@ module State =
       Node.set_kind test_change (If_test_change if_then_else);
       Node.set_kind main (If_then_else if_then_else);
       main
-    ;;
 
     let lazy_from_fun t ~f =
       let scope = t.current_scope in
       Lazy.from_fun (fun () -> within_scope t scope ~f)
-    ;;
 
     let default_hash_table_initial_size = 4
 
@@ -1467,13 +1415,11 @@ module State =
           let b = within_scope t scope ~f:(fun () -> f a) in
           Hashtbl.add_exn table ~key ~data:b;
           b)
-    ;;
 
     let array_fold t children ~init ~f =
       if Array.length children = 0
       then const t init
       else create_node t (Array_fold { init; f; children })
-    ;;
 
     let all t ts = array_fold t (Array.of_list_rev ts) ~init:[] ~f:(fun ac a -> a :: ac)
 
@@ -1508,7 +1454,6 @@ module State =
                 ~children
                 ~main));
         main)
-    ;;
 
     let opt_unordered_array_fold t ?full_compute_every_n_changes ts ~init ~f ~f_inverse =
       let f (accum, num_invalid) x =
@@ -1530,7 +1475,6 @@ module State =
            ~update:(F_inverse f_inverse)
            ?full_compute_every_n_changes)
         ~f:(fun (accum, num_invalid) -> if num_invalid = 0 then Some accum else None)
-    ;;
 
     let at_least_k_of t nodes ~k =
       let bool_to_int b = if b then 1 else 0 in
@@ -1542,7 +1486,6 @@ module State =
            ~init:0
            ~f:(fun num_true b -> num_true + bool_to_int b)
            ~update:(F_inverse (fun num_true b -> num_true - bool_to_int b)))
-    ;;
 
     let exists t nodes = at_least_k_of t nodes ~k:1
     let for_all t nodes = at_least_k_of t nodes ~k:(Array.length nodes)
@@ -1555,7 +1498,6 @@ module State =
         ~f:add
         ~update:(F_inverse sub)
         ?full_compute_every_n_changes
-    ;;
 
     let opt_sum t ?full_compute_every_n_changes nodes ~zero ~add ~sub =
       opt_unordered_array_fold
@@ -1565,7 +1507,6 @@ module State =
         ~f:add
         ~f_inverse:sub
         ?full_compute_every_n_changes
-    ;;
 
     let sum_int t nodes = sum t nodes ~zero:0 ~add:( + ) ~sub:( - )
 
@@ -1577,7 +1518,6 @@ module State =
         ~add:( +. )
         ~sub:( -. )
         ~full_compute_every_n_changes:(Array.length nodes)
-    ;;
 
     let set_freeze (node : _ Node.t) ~child ~only_freeze_when =
       if debug then assert (Scope.is_top node.created_in);
@@ -1587,7 +1527,6 @@ module State =
       if was_necessary
       then add_parent ~child ~parent:node ~child_index:Kind.freeze_child_index
       else became_necessary node
-    ;;
 
     let freeze (child : _ Node.t) ~only_freeze_when =
       let t = child.state in
