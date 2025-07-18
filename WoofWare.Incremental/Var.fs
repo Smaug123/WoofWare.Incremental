@@ -2,12 +2,6 @@
 
 open System
 
-type VarEval<'ret> =
-    abstract Eval<'a> : Var<'a> -> 'ret
-
-type VarCrate =
-    abstract Apply<'ret> : VarEval<'ret> -> 'ret
-
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Var =

@@ -2,6 +2,9 @@
 // [Incremental.Make].
 namespace WoofWare.Incremental
 
+open System
+open WoofWare.TimingWheel
+
 type internal StateStats =
     {
         MaxNumParents : int
@@ -109,132 +112,140 @@ module State =
         if AdjustHeightsHeap.maxHeightAllowed t.AdjustHeightsHeap <> RecomputeHeap.maxHeightAllowed t.RecomputeHeap then
           failwith "invariant failed"
 
-          Fields.iter
-            ~bind_lhs_change_should_invalidate_rhs:ignore
-            ~stabilization_num:(check Stabilization_num.invariant)
-            ~current_scope:
-              (check (fun current_scope -> assert (phys_equal current_scope Scope.top)))
-            ~recompute_heap:(check Recompute_heap.invariant)
-            ~adjust_heights_heap:
-              (check (fun adjust_heights_heap ->
-                 assert (Adjust_heights_heap.length adjust_heights_heap = 0);
-                 Adjust_heights_heap.invariant adjust_heights_heap))
-            ~propagate_invalidity:
-              (check (fun propagate_invalidity ->
-                 assert (Stack.is_empty propagate_invalidity)))
-            ~num_active_observers:
-              (check (fun num_active_observers -> assert (num_active_observers >= 0)))
-            ~new_observers:
-              (check
-                 (Stack.invariant (fun packed ->
-                    Internal_observer.Packed.invariant packed;
-                    let (T internal_observer) = packed in
-                    (* When an observer is added to [new_observers], it has [state = Created].
-                       The only possible transitions from there are to [Unlinked] or to
-                       [In_use], which also removes it from [new_observers], never to be added
-                       again.  Thus it is impossible for an observer in [new_observers] to be
-                       [In_use] or [Disallowed]. *)
-                    match internal_observer.state with
-                    | Created | Unlinked -> ()
-                    | In_use | Disallowed -> assert false)))
-            ~disallowed_observers:
-              (check
-                 (Stack.invariant (fun packed ->
-                    Internal_observer.Packed.invariant packed;
-                    let (T internal_observer) = packed in
-                    match internal_observer.state with
-                    | Disallowed -> ()
-                    | Created | In_use | Unlinked -> assert false)))
-            ~set_during_stabilization:
-              (check (fun set_during_stabilization ->
-                 match t.status with
-                 | Stabilize_previously_raised _ -> assert false
-                 | Running_on_update_handlers | Not_stabilizing ->
-                   assert (Stack.is_empty set_during_stabilization)
-                 | Stabilizing ->
-                   Stack.invariant
-                     (fun (Var.Packed.T var) ->
-                       assert (Uopt.is_some var.value_set_during_stabilization))
-                     set_during_stabilization))
-            ~handle_after_stabilization:(check (Stack.invariant Node.Packed.invariant))
-            ~run_on_update_handlers:(check (Stack.invariant Run_on_update_handlers.invariant))
-            ~only_in_debug:(check Only_in_debug.invariant)
+        StabilizationNum.invariant t.StabilizationNum
 
-    let ensure_not_stabilizing t ~name ~allow_in_update_handler =
-      match t.status with
-      | Not_stabilizing -> ()
-      | Running_on_update_handlers ->
-        if not allow_in_update_handler
-        then (
-          let backtrace = Backtrace.get () in
-          failwiths
-            (sprintf "cannot %s during on-update handlers" name)
-            backtrace
-            [%sexp_of: Backtrace.t])
-      | Stabilize_previously_raised raised_exn ->
-        Raised_exn.reraise_with_message
-          raised_exn
-          (sprintf "cannot %s -- stabilize previously raised" name)
-      | Stabilizing ->
-        let backtrace = Backtrace.get () in
-        failwiths
-          (sprintf "cannot %s during stabilization" name)
-          backtrace
-          [%sexp_of: Backtrace.t]
-    ;;
+        if not (Object.ReferenceEquals (t.CurrentScope, Scope.top)) then
+            failwith "invariant failed"
 
-    let set_height (node : _ Node.t) height =
-      let t = node.state in
-      Adjust_heights_heap.set_height t.adjust_heights_heap node height
-    ;;
+        RecomputeHeap.invariant t.RecomputeHeap
 
-    let set_max_height_allowed t height =
-      ensure_not_stabilizing t ~name:"set_max_height_allowed" ~allow_in_update_handler:true;
-      Adjust_heights_heap.set_max_height_allowed t.adjust_heights_heap height;
-      Recompute_heap.set_max_height_allowed t.recompute_heap height
-    ;;
+        do
+            if AdjustHeightsHeap.length t.AdjustHeightsHeap <> 0 then failwith "invariant failed"
+            AdjustHeightsHeap.invariant t.AdjustHeightsHeap
 
-    let handle_after_stabilization : type a. a Node.t -> unit =
-      fun node ->
-      if not node.is_in_handle_after_stabilization
-      then (
-        let t = node.state in
-        node.is_in_handle_after_stabilization <- true;
-        Stack.push t.handle_after_stabilization (T node))
-    ;;
+        if not (Stack.isEmpty t.PropagateInvalidity) then
+            failwith "invariant failed"
 
-    let rec remove_children : type a. a Node.t -> unit =
-      fun parent ->
-      Node.iteri_children parent ~f:(fun child_index (T child) ->
-        remove_child ~child ~parent ~child_index)
+        if t.NumActiveObservers < 0 then
+            failwith "invariant failed"
 
-    and remove_child : type a b. child:b Node.t -> parent:a Node.t -> child_index:int -> unit =
-      fun ~child ~parent ~child_index ->
-      Node.remove_parent ~child ~parent ~child_index;
-      check_if_unnecessary child
+        do
+            t.NewObservers
+            |> Stack.invariant
+                (fun packed ->
+                    InternalObserverCrate.invariant packed
+                    match InternalObserverCrate.state packed with
+                    | InternalObserverState.InUse
+                    | InternalObserverState.Disallowed ->
+                       // When an observer is added to [new_observers], it has [state = Created].
+                       // The only possible transitions from there are to [Unlinked] or to
+                       // [In_use], which also removes it from [new_observers], never to be added
+                       // again.  Thus it is impossible for an observer in [new_observers] to be
+                       // [In_use] or [Disallowed].
+                        failwith "invariant failed"
+                    | InternalObserverState.Created | InternalObserverState.Unlinked -> ()
+                )
 
-    and check_if_unnecessary : type a. a Node.t -> unit =
-      fun node -> if not (Node.is_necessary node) then became_unnecessary node
+        do
+            t.DisallowedObservers
+            |> Stack.invariant (fun packed ->
+                InternalObserverCrate.invariant packed
+                match InternalObserverCrate.state packed with
+                | InternalObserverState.Disallowed -> ()
+                | _ -> failwith "invariant failed"
+            )
 
-    and became_unnecessary : type a. a Node.t -> unit =
-      fun node ->
-      let t = node.state in
-      t.num_nodes_became_unnecessary <- t.num_nodes_became_unnecessary + 1;
-      if node.num_on_update_handlers > 0 then handle_after_stabilization node;
-      node.height <- -1;
-      remove_children node;
-      (match node.kind with
-       | Unordered_array_fold u -> Unordered_array_fold.force_full_compute u
-       | Expert p -> Expert.observability_change p ~is_now_observable:false
-       | _ -> ());
-      if debug then assert (not (Node.needs_to_be_computed node));
-      if Node.is_in_recompute_heap node then Recompute_heap.remove t.recompute_heap node
-    ;;
+        do
+            match t.Status with
+            | Status.Stabilize_previously_raised _ -> failwith "invariant failed"
+            | Status.Running_on_update_handlers | Status.Not_stabilizing ->
+                if not (Stack.isEmpty t.SetDuringStabilization) then
+                    failwith "invariant failed"
+            | Status.Stabilizing ->
+                t.SetDuringStabilization
+                |> Stack.invariant
+                    (fun v ->
+                        { new VarEval<_> with
+                            member _.Eval var =
+                                if var.ValueSetDuringStabilization.IsNone then
+                                    failwith "invariant failed"
+                                FakeUnit.ofUnit ()
+                        }
+                        |> v.Apply
+                        |> FakeUnit.toUnit
+                    )
 
-    let remove_alarm (clock : Clock.t) alarm =
-      if Timing_wheel.mem clock.timing_wheel alarm
-      then Timing_wheel.remove clock.timing_wheel alarm
-    ;;
+        Stack.invariant NodeCrate.invariant t.HandleAfterStabilization
+        Stack.invariant RunOnUpdateHandlers.invariant t.RunOnUpdateHandlers
+        OnlyInDebug.invariant t.OnlyInDebug
+
+    let ensureNotStabilizing t name allowInUpdateHandler =
+        match t.Status with
+        | Status.Not_stabilizing -> ()
+        | Status.Running_on_update_handlers ->
+            if not allowInUpdateHandler then
+              failwith $"cannot %s{name} during on-update handlers"
+        | Status.Stabilize_previously_raised raised ->
+            RaisedException.reraiseWithMessage raised $"cannot %s{name} -- stabilize previously raised"
+        | Status.Stabilizing ->
+            failwith $"cannot %s{name} during stabilization"
+
+    let setHeight (node : 'a Node) (height: int) : unit =
+      let t = node.State
+      AdjustHeightsHeap.setHeight t.AdjustHeightsHeap node height
+
+    let setMaxHeightAllowed (t: State) (height: int) : unit =
+      ensureNotStabilizing t "set_max_height_allowed" true
+      AdjustHeightsHeap.setMaxHeightAllowed t.AdjustHeightsHeap height;
+      RecomputeHeap.setMaxHeightAllowed t.RecomputeHeap height
+
+    let handleAfterStabilization<'a> (node : 'a Node) : unit =
+      if not node.IsInHandleAfterStabilization then
+        let t = node.State
+        node.IsInHandleAfterStabilization <- true
+        Stack.push (NodeCrate.make node) t.HandleAfterStabilization
+
+    let rec removeChildren<'a> (parent : 'a Node) : unit =
+      Node.iteriChildren parent (fun childIndex child ->
+        { new NodeEval<_> with
+            member _.Eval child =
+                removeChild child parent childIndex
+                |> FakeUnit.ofUnit
+        }
+        |> child.Apply
+        |> FakeUnit.toUnit
+     )
+
+    and removeChild<'a, 'b> (child : 'b Node) (parent : 'a Node) (childIndex : int): unit =
+      Node.removeParent child parent childIndex
+      checkIfUnnecessary child
+
+    and checkIfUnnecessary<'a> (node : 'a Node) : unit =
+      if not (NodeHelpers.isNecessary node) then becameUnnecessary node
+
+    and becameUnnecessary<'a> (node : 'a Node) : unit =
+      let t = node.State
+      t.NumNodesBecameUnnecessary <- t.NumNodesBecameUnnecessary + 1
+      if node.NumOnUpdateHandlers > 0 then handleAfterStabilization node
+      node.Height <- -1
+      removeChildren node
+      match node.Kind with
+       | Kind.UnorderedArrayFold u ->
+           { new UnorderedArrayFoldEval<_, _> with
+               member _.Eval u =
+                   UnorderedArrayFold.forceFullCompute u
+                   |> FakeUnit.ofUnit
+           }
+           |> u.Apply
+           |> FakeUnit.toUnit
+       | Kind.Expert p -> Expert.observabilityChange p false
+       | _ -> ()
+      if Debug.globalFlag then
+          assert (not (Node.needsToBeComputed node))
+      if Node.isInRecomputeHeap node then RecomputeHeap.remove t.RecomputeHeap node
+
+    let removeAlarm (clock : Clock) (alarm : TimingWheel.Alarm) : unit =
+      if TimingWheel.mem clock.TimingWheel alarm then TimingWheel.remove clock.TimingWheel alarm
 
     (* An invalid node is node whose kind is [Invalid].  A node's kind is set to [Invalid]
        when the lhs of its scope changes, or one if its children propagate the invalidity
@@ -261,58 +272,66 @@ module State =
        are unnecessary (nodes can be made necessary without going through their containing
        binds). *)
 
-    let rec invalidate_node : type a. a Node.t -> unit =
-      fun node ->
-      if Node.is_valid node
-      then (
-        let t = node.state in
-        if node.num_on_update_handlers > 0 then handle_after_stabilization node;
-        node.value_opt <- Uopt.none;
-        if debug then assert (Uopt.is_none node.old_value_opt);
-        node.changed_at <- t.stabilization_num;
-        node.recomputed_at <- t.stabilization_num;
-        t.num_nodes_invalidated <- t.num_nodes_invalidated + 1;
-        if Node.is_necessary node
-        then (
-          remove_children node;
-          (* The node doesn't have children anymore, so we can lower its height as much as
-             possible, to one greater than the scope it was created in.  Also, because we
-             are lowering the height, we don't need to adjust any of its ancestors' heights.
-             We could leave the height alone, but we may as well lower it as much as
-             possible to avoid making the heights of any future ancestors unnecessarily
-             large. *)
-          node.height <- Scope.height node.created_in + 1);
-        (* We don't set [node.created_in] or [node.next_node_in_same_scope]; we leave [node]
-           in the scope it was created in.  If that scope is ever invalidated, then that
-           will clear [node.next_node_in_same_scope] *)
-        (match node.kind with
-         | At at -> remove_alarm at.clock at.alarm
-         | At_intervals at_intervals -> remove_alarm at_intervals.clock at_intervals.alarm
-         | Bind_main bind -> invalidate_nodes_created_on_rhs bind.all_nodes_created_on_rhs
-         | Step_function { alarm; clock; _ } -> remove_alarm clock alarm
-         | _ -> ());
-        Node.set_kind node Invalid;
+    let rec invalidateNode<'a> (node : 'a Node) : unit =
+      if not (NodeHelpers.isValid node) then
+            ()
+      else
+        let t = node.State
+        if node.NumOnUpdateHandlers > 0 then handleAfterStabilization node
+        node.ValueOpt <- ValueNone
+        if Debug.globalFlag then assert node.OldValueOpt.IsNone
+        node.ChangedAt <- t.StabilizationNum
+        node.RecomputedAt <- t.StabilizationNum
+        t.NumNodesInvalidated <- t.NumNodesInvalidated + 1
+        if NodeHelpers.isNecessary node then
+          removeChildren node
+          // The node doesn't have children any more, so we can lower its height as much as
+          // possible, to one greater than the scope it was created in.  Also, because we
+          // are lowering the height, we don't need to adjust any of its ancestors' heights.
+          // We could leave the height alone, but we may as well lower it as much as
+          // possible to avoid making the heights of any future ancestors unnecessarily
+          // large.
+          node.Height <- Scope.height node.CreatedIn + 1
+        // We don't set [node.created_in] or [node.next_node_in_same_scope]; we leave [node]
+        // in the scope it was created in.  If that scope is ever invalidated, then that
+        // will clear [node.next_node_in_same_scope]
+        match node.Kind with
+         | Kind.At (at, _) -> removeAlarm at.Clock at.Alarm
+         | Kind.AtIntervals (atIntervals, _) -> removeAlarm atIntervals.Clock atIntervals.Alarm
+         | Kind.BindMain bind ->
+             { new BindMainEval<_, _> with
+                 member _.Eval bind =
+                     invalidateNodesCreatedOnRhs bind.AllNodesCreatedOnRhs
+                     |> FakeUnit.ofUnit
+              }
+             |> bind.Apply
+             |> FakeUnit.toUnit
+         | Kind.StepFunction sf -> removeAlarm sf.Clock sf.Alarm
+         | _ -> ()
+        Node.setKind node Kind.Invalid
         (* If we called [propagate_invalidity] right away on the parents, we would get into
            trouble.  The parent would disconnect itself from the current node, thus
            modifying the list of parents we iterate on.  Even if we made a special case, it
            still wouldn't be enough to handle other cases where the list of parents is
            modified (e.g. when [lhs] is invalidated in the example in the comment about
            [can_recompute_now] far below). *)
-        for index = 0 to node.num_parents - 1 do
-          Stack.push t.propagate_invalidity (Node.get_parent node ~index)
-        done;
-        if debug then assert (not (Node.needs_to_be_computed node));
-        if Node.is_in_recompute_heap node then Recompute_heap.remove t.recompute_heap node)
+        for index = 0 to node.NumParents - 1 do
+          Stack.push (Node.getParent node index) t.PropagateInvalidity
+        if Debug.globalFlag then assert (not (Node.needsToBeComputed node))
+        if Node.isInRecomputeHeap node then RecomputeHeap.remove t.RecomputeHeap node
 
-    and invalidate_nodes_created_on_rhs node =
-      let r = ref node in
-      while Uopt.is_some !r do
-        let (T node_on_rhs) = Uopt.unsafe_value !r in
-        r := node_on_rhs.next_node_in_same_scope;
-        node_on_rhs.next_node_in_same_scope <- Uopt.none;
-        invalidate_node node_on_rhs
-      done
-    ;;
+    and invalidateNodesCreatedOnRhs (node : NodeCrate voption) : unit =
+      let mutable r = node
+      while r.IsSome do
+        { new NodeEval<_> with
+            member _.Eval nodeOnRhs =
+                r <- nodeOnRhs.NextNodeInSameScope
+                nodeOnRhs.NextNodeInSameScope <- ValueNone
+                invalidateNode nodeOnRhs
+                FakeUnit.ofUnit ()
+        }
+        |> r.Value.Apply
+        |> FakeUnit.toUnit
 
     (* When [not t.bind_lhs_change_should_invalidate_rhs] and a bind's lhs changes, we move
        nodes created on the bind's rhs up to its parent bind, as opposed to [Scope.Top].  This

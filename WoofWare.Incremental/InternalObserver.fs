@@ -179,3 +179,10 @@ module internal InternalObserverCrate =
 
     let nextInAll = InternalObserver.nextInAll'
     let setPrevInAll = InternalObserver.setPrevInAll'
+
+    let internalObserverStateEval =
+        { new InternalObserverEval<_> with
+            member _.Eval s = s.State
+        }
+
+    let state (c : InternalObserverCrate) = c.Apply internalObserverStateEval

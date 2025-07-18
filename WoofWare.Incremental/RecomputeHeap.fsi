@@ -47,3 +47,5 @@ module internal RecomputeHeap =
         It changes [node.height_in_recompute_heap] to equal [node.height] and adjusts [node]'s
         position in [t]. *)
     val increaseHeight : RecomputeHeap -> 'a Node -> unit
+
+    val invariant : RecomputeHeap -> unit

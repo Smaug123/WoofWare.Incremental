@@ -18,3 +18,4 @@ module internal InternalObserverCrate =
     val invariant : InternalObserverCrate -> unit
     val nextInAll : InternalObserverCrate -> InternalObserverCrate voption
     val setPrevInAll : InternalObserverCrate -> InternalObserverCrate voption -> unit
+    val state : InternalObserverCrate -> InternalObserverState

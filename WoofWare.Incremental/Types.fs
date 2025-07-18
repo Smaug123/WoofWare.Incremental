@@ -1,7 +1,7 @@
 namespace WoofWare.Incremental
 
-open System
 open System.Collections.Concurrent
+open System.Collections.Generic
 open System.Runtime.ExceptionServices
 open TypeEquality
 open WoofWare.TimingWheel
@@ -52,7 +52,7 @@ and At =
     {
         Main : Node<BeforeOrAfter>
         At : TimeNs
-        mutable Alarm : Alarm
+        mutable Alarm : TimingWheel.Alarm
         Clock : Clock
     }
 
@@ -61,7 +61,7 @@ and AtIntervals =
         Main : Node<unit>
         Base : TimeNs
         Interval : TimeNs.Span
-        Alarm : Alarm
+        Alarm : TimingWheel.Alarm
         Clock : Clock
     }
 
@@ -87,7 +87,7 @@ and Bind<'a, 'b> =
 and Clock =
     {
         /// We use [timing_wheel] for time-based incrementals.
-        TimingWheel : TimingWheel<AlarmValue>
+        TimingWheel : TimingWheel<ExternalEltValue<AlarmValue>>
         /// A variable holding the current time.
         Now : Var<TimeNs>
         /// The closure passed to TimingWheel.advanceClock. It links all the fired alarm values into
@@ -467,7 +467,7 @@ and StepFunctionNode<'a> =
         mutable ExtractedStepFunctionFromChildAt : StabilizationNum
         mutable Value : 'a voption
         mutable UpcomingSteps : (TimeNs * 'a) seq
-        mutable Alarm : Alarm
+        mutable Alarm : TimingWheel.Alarm
         mutable AlarmValue : AlarmValue
         Clock : Clock
     }
