@@ -14,3 +14,5 @@ module NodeId =
         NodeId result
 
     let invariant (NodeId i) = if i < 1 then failwith "invariant failure"
+
+    let toString (NodeId n) = $"%i{n}"

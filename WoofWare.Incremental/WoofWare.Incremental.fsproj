@@ -54,8 +54,6 @@
         <Compile Include="Var.fs" />
         <Compile Include="Kind.fsi" />
         <Compile Include="Kind.fs" />
-        <Compile Include="NodeToDot.fsi" />
-        <Compile Include="NodeToDot.fs" />
         <Compile Include="Observer.fsi" />
         <Compile Include="Observer.fs" />
         <Compile Include="ReduceBalanced.fsi" />
@@ -65,6 +63,8 @@
         <Compile Include="AdjustHeightsHeap.fs" />
         <Compile Include="ForAnalyzer.fsi" />
         <Compile Include="ForAnalyzer.fs" />
+        <Compile Include="NodeToDot.fsi" />
+        <Compile Include="NodeToDot.fs" />
         <Compile Include="RunOnUpdateHandlers.fs" />
         <Compile Include="OnlyInDebug.fs" />
         <Compile Include="Clock.fs" />

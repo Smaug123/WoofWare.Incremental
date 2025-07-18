@@ -1,67 +1,62 @@
 namespace WoofWare.Incremental
 
+open System.Collections.Generic
+open System.IO
+
 [<RequireQualifiedAccess>]
 module NodeToDot =
     let forAnalyzer name kind height =
         let label =
-          [ name; string<Kind<_>> kind; $"height=%d{height}" ]
+          [ name; ForAnalyzer.Kind.toString kind; $"height=%d{height}" ]
         DotUserInfo.dot label Map.empty
 
-    let printNode (name: string) (kind: Kind<'a>) (height: int) (user_info: DotUserInfo option) : string =
+    let printNode (name: string) (kind: ForAnalyzer.Kind) (height: int) (userInfo: DotUserInfo option) : string =
       let default' = forAnalyzer name kind height
       let info =
-        match user_info with
+        match userInfo with
         | None -> default'
         | Some user_info -> DotUserInfo.append default' user_info
       sprintf
         "%s\n"
         (DotUserInfo.toString "Mrecord" name (DotUserInfo.toDot info))
 
-    let renderDot emitBindEdges out ts =
-        seq {
-            let node_name id =
-                "n" ^ NodeId.toString id
-            yield "digraph G {\n"
-            yield "  rankdir = BT\n"
+    let renderDot (emitBindEdges : bool) (writeOutput : string -> unit) ts =
+        let nodeName id =
+            "n" + NodeId.toString id
+        writeOutput "digraph G {\n"
+        writeOutput "  rankdir = BT\n"
 
-            let seen = HashSet<NodeId> ()
-            let bindEdges = ResizeArray ()
+        let seen = HashSet<NodeId> ()
+        let bindEdges = ResizeArray ()
 
-            For_analyzer.traverse
-              ts
-              ~add_node:
-                (fun
-                  ~id
-                  ~kind
-                  ~cutoff:_
-                  ~children
-                  ~bind_children
-                  ~user_info
-                  ~recomputed_at:_
-                  ~changed_at:_
-                  ~height
-                ->
-                let name = node_name id in
-                Hash_set.add seen id;
-                print_node out ~name ~kind ~height ~user_info;
-                List.iter children ~f:(fun child_id ->
-                  Format.fprintf out "  %s -> %s\n" (node_name child_id) name);
-                List.iter bind_children ~f:(fun bind_child_id ->
-                  bind_edges := (bind_child_id, id) :: !bind_edges));
-            if emit_bind_edges
-            then
-              List.iter !bind_edges ~f:(fun (bind_child_id, id) ->
-                if Hash_set.mem seen bind_child_id
-                then
-                  Format.fprintf
-                    out
-                    "  %s -> %s [style=dashed]\n"
-                    (node_name id)
-                    (node_name bind_child_id));
-            Format.fprintf out "}\n%!"
-      }
+        ForAnalyzer.traverse ts
+            (fun
+              id
+              kind
+              cutoff
+              children
+              bindChildren
+              userInfo
+              _
+              _
+              height ->
+                let name = nodeName id
+                seen.Add id |> ignore<bool>
+                printNode name kind height userInfo
+                |> writeOutput
+                for childId in children do
+                    writeOutput $"  %s{nodeName childId} -> %s{name}\n"
+                for bindChildId in bindChildren do
+                    bindEdges.Add (bindChildId, id)
+        )
+        if emitBindEdges then
+          for bindChildId, id in bindEdges do
+            if seen.Contains bindChildId then
+              $"  %s{nodeName id} -> %s{nodeName bindChildId} [style=dashed]\n"
+              |> writeOutput
+        writeOutput "}\n"
 
-    let saveDotToFile emitBindEdges file ts =
-      Out_channel.with_file file ~f:(fun out ->
-        let formatter = Format.formatter_of_out_channel out in
-        save_dot ~emit_bind_edges formatter ts)
+    let saveDotToFile (emitBindEdges : bool) (filePath : string) ts =
+      use f = File.Open (filePath, FileMode.OpenOrCreate)
+      use writer = new StreamWriter (f)
+      renderDot emitBindEdges writer.Write ts
