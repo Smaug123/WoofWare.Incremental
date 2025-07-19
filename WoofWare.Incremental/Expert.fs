@@ -13,11 +13,12 @@ type internal BeforeMainComputationResult =
 [<RequireQualifiedAccess>]
 module internal Expert =
     let invariant
-        invariantA
-        {
+        (_invariantA : 'a -> unit)
+        ({
             Expert.Children = children
             NumChildren = numChildren
-        }
+        } : Expert<'a>)
+        : unit
         =
         assert (numChildren <= children.Length)
         (* invariant is below, because we need some context *)
@@ -109,6 +110,7 @@ module internal Expert =
                 // parent.  Same thing for running the [on_change] callbacks.
                 newChildIndex
         }
+        |> packedEdge.Apply
 
     let swapChildren (t : Expert<_>) childIndex1 childIndex2 =
         { new ExpertEdgeEval<_> with
@@ -147,7 +149,7 @@ module internal Expert =
         |> packedEdgeOpt.Value.Apply
         |> FakeUnit.toUnit
 
-    let before_main_computation (t : Expert<'a>) : BeforeMainComputationResult =
+    let beforeMainComputation (t : Expert<'a>) : BeforeMainComputationResult =
         if t.NumInvalidChildren > 0 then
             BeforeMainComputationResult.Invalid
         else

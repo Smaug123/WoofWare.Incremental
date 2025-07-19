@@ -31,7 +31,7 @@ module Expert1Node =
         State.Expert.create state onObservabilityChange f
 
     let make_stale = State.Expert.make_stale
-    let watch = Fn.id
+    let watch (Expert1Node n) = n
     let invalidate = State.Expert.invalidate
     let add_dependency = State.Expert.add_dependency
     let remove_dependency = State.Expert.remove_dependency

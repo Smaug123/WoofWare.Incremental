@@ -942,8 +942,7 @@ module State =
                          ]} *)
                                 | Kind.BindMain b ->
                                     { new BindMainEval<_, _> with
-                                        member _.Eval b =
-                                            node.Height > b.LhsChange.Height
+                                        member _.Eval b = node.Height > b.LhsChange.Height
                                     }
                                     |> b.Apply
                                 | Kind.IfThenElse i -> node.Height > i.TestChange.Height
@@ -986,8 +985,7 @@ module State =
                 if Debug.globalFlag && not (Node.needsToBeComputed node) then
                     failwith "node unexpectedly does not need to be computed"
 
-                recompute node
-                |> FakeUnit.ofUnit
+                recompute node |> FakeUnit.ofUnit
         }
         |> node.Apply
         |> FakeUnit.toUnit
@@ -1044,13 +1042,15 @@ module State =
             |> internalObserver.Apply
             |> FakeUnit.toUnit
 
-        t.FinalizedObservers
-        |> ThreadSafeQueue.dequeueUntilEmpty disallowIfFinalized
+        t.FinalizedObservers |> ThreadSafeQueue.dequeueUntilEmpty disallowIfFinalized
 
-    let observerFinalizer (t : State) =
+    // This gets called within a finalizer.
+    let private observerFinalizer (t : State) =
         Staged.stage (fun observer ->
-            let internalObserver = !observer in
-            t.FinalizedObservers |> ThreadSafeQueue.enqueue (InternalObserverCrate.make internalObserver)
+            let internalObserver = !observer
+
+            t.FinalizedObservers
+            |> ThreadSafeQueue.enqueue (InternalObserverCrate.make internalObserver)
         )
 
     let createObserver (shouldFinalize : bool option) (observing : 'a Node) : InternalObserver<'a> =
@@ -1072,7 +1072,7 @@ module State =
         let mutable observer = internalObserver in
 
         if shouldFinalize then
-            Gc.Expert.add_finalizer_ignore observer (Staged.unstage (ovserverFinalizer t))
+            Gc.Expert.add_finalizer_ignore observer (Staged.unstage (observerFinalizer t))
 
         t.NumActiveObservers <- t.NumActiveObservers + 1
         observer
@@ -1381,7 +1381,7 @@ module State =
         let output =
             input
             |> map (fun a ->
-                Gc.keep_alive observer
+                GC.KeepAlive observer
                 a
             )
 
@@ -1739,7 +1739,7 @@ module State =
                 Value = ValueNone
                 Child = ValueSome child
                 ExtractedStepFunctionFromChildAt = StabilizationNum.none
-                UpcomingSteps = Seq.empty
+                UpcomingSteps = Sequence.empty ()
                 Alarm = TimingWheel.Alarm.null'
                 AlarmValue = Unchecked.defaultof<_> (* set below *)
                 Clock = clock

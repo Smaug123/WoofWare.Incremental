@@ -7,16 +7,9 @@ open WoofWare.TimingWheel
 module internal StepFunctionNode =
     let physSame (t1 : StepFunctionNode<'a>) (t2 : StepFunctionNode<'b>) = Object.ReferenceEquals (t1, t2)
 
-    let rec advanceInternal
-        (t : StepFunctionNode<'a>)
-        (to_ : TimeNs)
-        (a1 : 'a)
-        (steps : Sequence<TimeNs * 'a>)
-        : unit
-        =
+    let rec advanceInternal (t : StepFunctionNode<'a>) (to_ : TimeNs) (a1 : 'a) (steps : Sequence<TimeNs * 'a>) : unit =
         match Sequence.next steps with
-        | Some ((stepAt, a2), steps2) when to_ >= stepAt ->
-            advanceInternal t to_ a2 steps2
+        | Some ((stepAt, a2), steps2) when to_ >= stepAt -> advanceInternal t to_ a2 steps2
         | _ ->
             t.Value <- ValueSome a1
             t.UpcomingSteps <- steps

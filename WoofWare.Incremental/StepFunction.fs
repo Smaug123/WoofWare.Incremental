@@ -19,8 +19,7 @@ module StepFunction =
     let rec valueInternal (init : 'a) (steps : (TimeNs * 'a) Sequence) (at : TimeNs) : 'a =
         match Sequence.next steps with
         | None -> init
-        | Some ((t, a), steps) ->
-            if at < t then init else valueInternal a steps at
+        | Some ((t, a), steps) -> if at < t then init else valueInternal a steps at
 
     let value (sf : 'a StepFunction) (at : TimeNs) : 'a = valueInternal sf.Init sf.Steps at
 
@@ -39,7 +38,7 @@ module StepFunction =
             Steps = Sequence.ofList steps
         }
 
-    let createFromSequence<'a> (init: 'a) (s: Sequence<TimeNs * 'a>) : StepFunction<'a> =
+    let createFromSequence<'a> (init : 'a) (s : Sequence<TimeNs * 'a>) : StepFunction<'a> =
         {
             Init = init
             Steps = s

@@ -18,23 +18,23 @@ type internal BeforeMainComputationResult =
 
 [<RequireQualifiedAccess>]
 module internal Expert =
-    val invariantAboutNumInvalidChildren : 'a Expert -> is_necessary : bool -> unit
+    val invariantAboutNumInvalidChildren : 'a Expert -> isNecessary : bool -> unit
 
     /// onObservabilityChange : isNowAvailable -> unit
     val create : f : (unit -> 'a) -> onObservabilityChange : (bool -> unit) -> 'a Expert
 
-    val make_stale : _ Expert -> StaleResult
+    val makeStale : _ Expert -> StaleResult
     val incrInvalidChildren : _ Expert -> unit
     val decrInvalidChildren : _ Expert -> unit
 
     /// Returns the index of this new edge.
     val addChildEdge : _ Expert -> ExpertEdgeCrate -> int
 
-    val swapChildren : _ Expert -> child_index1 : int -> child_index2 : int -> unit
+    val swapChildren : _ Expert -> childIndex1 : int -> childIndex2 : int -> unit
     val lastChildEdgeThrowing : _ Expert -> ExpertEdgeCrate
     val removeLastChildEdgeThrowing : _ Expert -> unit
     val beforeMainComputation : _ Expert -> BeforeMainComputationResult
-    val observabilityChange : _ Expert -> isNowOservable : bool -> unit
+    val observabilityChange : _ Expert -> isNowObservable : bool -> unit
     val runEdgeCallback : _ Expert -> childIndex : int -> unit
 
     val invariant<'a> : ('a -> unit) -> Expert<'a> -> unit

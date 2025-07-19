@@ -11,6 +11,7 @@ type ThreadSafeQueue<'v> = ConcurrentQueue<'v>
 module ThreadSafeQueue =
     let dequeueUntilEmpty<'a> (f : 'a -> unit) (queue : ThreadSafeQueue<'a>) : unit =
         let mutable cont = true
+
         while cont do
             match queue.TryDequeue () with
             | false, _ -> cont <- false

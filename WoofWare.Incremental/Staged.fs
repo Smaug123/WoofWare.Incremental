@@ -1,10 +1,10 @@
 namespace WoofWare.Incremental
 
-type Staged<'a> = | Staged of (unit -> 'a)
+type Staged<'a, 'b> = | Staged of ('a -> 'b)
 
 [<RequireQualifiedAccess>]
 module internal Staged =
 
-    let stage<'a> (f : unit -> 'a) : Staged<'a> = Staged.Staged f
+    let stage<'a, 'b> (f : 'a -> 'b) : Staged<'a, 'b> = Staged.Staged f
 
-    let unstage<'a> (Staged f) : 'a = f ()
+    let unstage<'a, 'b> (Staged f) (a : 'a) : 'b = f a
