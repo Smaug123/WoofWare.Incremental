@@ -1,7 +1,6 @@
 namespace WoofWare.Incremental
 
 open System
-open System.Collections.Generic
 open WoofWare.TimingWheel
 
 [<RequireQualifiedAccess>]
@@ -12,24 +11,18 @@ module internal StepFunctionNode =
         (t : StepFunctionNode<'a>)
         (to_ : TimeNs)
         (a1 : 'a)
-        (steps : IEnumerator<TimeNs * 'a>)
+        (steps : Sequence<TimeNs * 'a>)
         : unit
         =
-        if steps.MoveNext () then
-            let step_at, a2 = steps.Current
-
-            if to_ >= step_at then
-                advanceInternal t to_ a2 steps
-            else
-                t.Value <- ValueSome a1
-                t.UpcomingSteps <- stepsOld
-        else
+        match Sequence.next steps with
+        | Some ((stepAt, a2), steps2) when to_ >= stepAt ->
+            advanceInternal t to_ a2 steps2
+        | _ ->
             t.Value <- ValueSome a1
-            t.UpcomingSteps <- stepsOld
+            t.UpcomingSteps <- steps
 
     let advance (t : StepFunctionNode<'a>) to_ =
-        use s = t.UpcomingSteps.GetEnumerator ()
-        advanceInternal t to_ (ValueOption.get t.Value) s
+        advanceInternal t to_ t.Value.Value t.UpcomingSteps
 
     let invariant<'a> (invA : 'a -> unit) (t : StepFunctionNode<'a>) : unit =
         match t.Main.Kind with
@@ -48,7 +41,7 @@ module internal StepFunctionNode =
         | AlarmValueAction.StepFunction t2 ->
             { new StepFunctionNodeEval<_> with
                 member _.Eval t2 =
-                    if not (Object.ReferenceEquals (t, t2)) then
+                    if not (physSame t t2) then
                         failwith "invariant failed"
 
                     FakeUnit.ofUnit ()

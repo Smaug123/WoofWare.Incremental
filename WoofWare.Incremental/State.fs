@@ -780,7 +780,7 @@ module State =
             StepFunctionNode.advance stepFunctionNode (Clock.now clock)
             let stepFunctionValue = stepFunctionNode.Value.Value
 
-            match Sequence.hd stepFunctionNode.UpcomingSteps with
+            match Sequence.head stepFunctionNode.UpcomingSteps with
             | None ->
                 if child.IsNone then
                     Node.setKind node (Kind.Const stepFunctionValue)

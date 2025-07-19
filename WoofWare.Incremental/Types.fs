@@ -461,7 +461,7 @@ and StepFunctionNode<'a> =
         mutable Child : 'a StepFunction Node voption
         mutable ExtractedStepFunctionFromChildAt : StabilizationNum
         mutable Value : 'a voption
-        mutable UpcomingSteps : (TimeNs * 'a) seq
+        mutable UpcomingSteps : (TimeNs * 'a) Sequence
         mutable Alarm : TimingWheel.Alarm
         mutable AlarmValue : AlarmValue
         Clock : Clock

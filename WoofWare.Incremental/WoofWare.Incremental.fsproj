@@ -10,6 +10,7 @@
         <Compile Include="FakeUnit.fs" />
         <Compile Include="Map.fs" />
         <Compile Include="List.fs" />
+        <Compile Include="Sequence.fs" />
         <Compile Include="ThreadSafeQueue.fs" />
         <Compile Include="Staged.fs" />
         <Compile Include="Stack.fs" />

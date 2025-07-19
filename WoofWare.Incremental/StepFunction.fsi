@@ -1,18 +1,15 @@
 namespace WoofWare.Incremental
 
-open System
-open System.Collections.Generic
 open WoofWare.TimingWheel
 
 [<NoEquality ; NoComparison ; Sealed>]
-type StepFunction<'a> =
-    interface IDisposable
+type StepFunction<'a>
 
 [<RequireQualifiedAccess>]
 module StepFunction =
 
     val init : 'a StepFunction -> 'a
-    val steps : 'a StepFunction -> (TimeNs * 'a) IEnumerator
+    val steps : 'a StepFunction -> (TimeNs * 'a) Sequence
     val value : 'a StepFunction -> at : TimeNs -> 'a
 
     /// [constant a] is the step function [t] with [value t ~at = a] for all [at].
@@ -24,4 +21,4 @@ module StepFunction =
     ///    [i < j], [ti > tj].
     val createExn : init : 'a -> steps : (TimeNs * 'a) list -> 'a StepFunction
 
-    val createFromSequence : init : 'a -> steps : (TimeNs * 'a) seq -> 'a StepFunction
+    val createFromSequence<'a> : init : 'a -> Sequence<TimeNs * 'a> -> StepFunction<'a>
