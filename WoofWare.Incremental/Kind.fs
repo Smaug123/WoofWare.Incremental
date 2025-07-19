@@ -231,7 +231,7 @@ module internal Kind =
         | Kind.BindMain bind ->
             { new BindMainEval<_, _> with
                 member _.Eval bind =
-                    Bind.invariant inv ignore bind |> FakeUnit.ofUnit
+                    Bind.invariant ignore inv bind |> FakeUnit.ofUnit
             }
             |> bind.Apply
             |> FakeUnit.toUnit

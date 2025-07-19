@@ -1,19 +1,23 @@
 namespace WoofWare.Incremental
 
-open WoofWare.TimingWheel
 open System
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module internal AtIntervals =
+module internal Freeze =
 
-    let invariant (t : AtIntervals) : unit =
-        if not (TimeNs.Span.isPositive t.Interval) then
+    let invariant (_inv : 'a -> unit) (t : Freeze<'a>) : unit =
+        if not (Scope.isTop t.Main.CreatedIn) then
             failwith "invariant failed"
 
         match t.Main.Kind with
-        | Kind.Invalid -> ()
-        | Kind.AtIntervals (t', _) ->
+        | Kind.Invalid ->
+            // happens when freezing an invalid value
+            ()
+        | Kind.Const _ ->
+            // happens on becoming frozen
+            ()
+        | Kind.Freeze t' ->
             if not (Object.ReferenceEquals (t, t')) then
                 failwith "invariant failed"
         | k -> failwith $"invariant failed: {k}"

@@ -2,7 +2,6 @@
 // [Incremental.Make].
 namespace WoofWare.Incremental
 
-open System.Collections.Concurrent
 open System.Collections.Generic
 open TypeEquality
 open System
@@ -682,9 +681,9 @@ module State =
             |> bind.Apply
             |> FakeUnit.toUnit
         | Kind.BindMain bind ->
-            { new BindMainEval<'a, FakeUnit> with
-                member _.Eval<'b> (bind : Bind<'a, 'b>) : FakeUnit =
-                    copyChild<'b> node bind.Rhs.Value |> FakeUnit.ofUnit
+            { new BindMainEval<_, _> with
+                member _.Eval bind : FakeUnit =
+                    copyChild node bind.Rhs.Value |> FakeUnit.ofUnit
             }
             |> bind.Apply
             |> FakeUnit.toUnit
@@ -843,15 +842,21 @@ module State =
                         member _.Eval parent =
                             match parent.Kind with
                             | Kind.Expert expert ->
-                                let child_index = node.MyChildIndexInParentAtIndex.[parentIndex] in
-                                Expert.runEdgeCallback childIndex expert
-                            | Kind.Unordered_array_fold u ->
-                                UnorderedArrayFold.childChanged
-                                    u
-                                    node
-                                    node.MyChildIndexInParentAtIndex.[parentIndex]
-                                    oldValueOpt
-                                    newValue
+                                let childIndex = node.MyChildIndexInParentAtIndex.[parentIndex] in
+                                Expert.runEdgeCallback expert childIndex
+                            | Kind.UnorderedArrayFold u ->
+                                { new UnorderedArrayFoldEval<_, _> with
+                                    member _.Eval u =
+                                        UnorderedArrayFold.childChanged
+                                            u
+                                            node
+                                            node.MyChildIndexInParentAtIndex.[parentIndex]
+                                            oldValueOpt
+                                            newValue
+                                        |> FakeUnit.ofUnit
+                                }
+                                |> u.Apply
+                                |> FakeUnit.toUnit
                             | _ -> ()
 
                             if Debug.globalFlag then
@@ -884,15 +889,21 @@ module State =
                     member _.Eval parent =
                         match parent.Kind with
                         | Kind.Expert p ->
-                            let child_index = node.MyChildIndexInParentAtIndex.[0]
-                            Expert.runEdgeCallback childIndex p
+                            let childIndex = node.MyChildIndexInParentAtIndex.[0]
+                            Expert.runEdgeCallback p childIndex
                         | Kind.UnorderedArrayFold u ->
-                            UnorderedArrayFold.childChanged
-                                u
-                                node
-                                node.MyChildIndexInParentAtIndex.[0]
-                                old_value_opt
-                                new_value
+                            { new UnorderedArrayFoldEval<_, _> with
+                                member _.Eval u =
+                                    UnorderedArrayFold.childChanged
+                                        u
+                                        node
+                                        node.MyChildIndexInParentAtIndex.[0]
+                                        oldValueOpt
+                                        newValue
+                                    |> FakeUnit.ofUnit
+                            }
+                            |> u.Apply
+                            |> FakeUnit.toUnit
                         | _ -> ()
 
                         if Debug.globalFlag then
@@ -908,15 +919,15 @@ module State =
                                 | Invalid
                                 | Snapshot _
                                 | Var _ -> failwith "these nodes aren't parents"
-                                (* These nodes have more than one child. *)
+                                // These nodes have more than one child.
                                 | Kind.ArrayFold _
                                 | Kind.Map2 _
                                 | Kind.UnorderedArrayFold _
                                 | Kind.Expert _ -> failwith "these nodes have more than one child"
-                                (* We can immediately recompute [parent] if no other node needs to be stable
-                         before computing it.  If [parent] has a single child (i.e. [node]), then
-                         this amounts to checking that [parent] won't be invalidated, i.e. that
-                         [parent]'s scope has already stabilized. *)
+                                // We can immediately recompute [parent] if no other node needs to be stable
+                                // before computing it.  If [parent] has a single child (i.e. [node]), then
+                                // this amounts to checking that [parent] won't be invalidated, i.e. that
+                                // [parent]'s scope has already stabilized.
                                 | Kind.BindLhsChange _ -> node.Height > Scope.height parent.CreatedIn
                                 | Kind.Freeze _ -> node.Height > Scope.height parent.CreatedIn
                                 | Kind.IfTestChange _ -> node.Height > Scope.height parent.CreatedIn
@@ -929,9 +940,14 @@ module State =
                          {[
                            node.height > Scope.height parent.created_in
                          ]} *)
-                                | Kind.BindMain b -> node.height > b.lhs_change.height
-                                | Kind.IfThenElse i -> node.height > i.test_change.height
-                                | Kind.JoinMain j -> node.height > j.lhs_change.height
+                                | Kind.BindMain b ->
+                                    { new BindMainEval<_, _> with
+                                        member _.Eval b =
+                                            node.Height > b.LhsChange.Height
+                                    }
+                                    |> b.Apply
+                                | Kind.IfThenElse i -> node.Height > i.TestChange.Height
+                                | Kind.JoinMain j -> node.Height > j.LhsChange.Height
 
                             if canRecomputeNow then
                                 t.NumNodesRecomputedDirectlyBecauseOneChild <-
@@ -939,10 +955,10 @@ module State =
 
                                 recompute parent
                             else if parent.Height <= RecomputeHeap.minHeight t.RecomputeHeap then
-                                (* If [parent.height] is [<=] the height of all nodes in the recompute heap
-                         (possibly because the recompute heap is empty), then we can recompute
-                         [parent] immediately and save adding it to and then removing it from the
-                         recompute heap. *)
+                                // If [parent.height] is [<=] the height of all nodes in the recompute heap
+                                // (possibly because the recompute heap is empty), then we can recompute
+                                // [parent] immediately and save adding it to and then removing it from the
+                                // recompute heap.
                                 t.NumNodesRecomputedDirectlyBecauseMinHeight <-
                                     t.NumNodesRecomputedDirectlyBecauseMinHeight + 1
 
@@ -953,6 +969,8 @@ module State =
                                     assert (not (Node.isInRecomputeHeap parent))
 
                                 RecomputeHeap.add t.RecomputeHeap parent
+
+                        FakeUnit.ofUnit ()
                 }
                 |> node.Parent0.Value.Apply
                 |> FakeUnit.toUnit
@@ -969,8 +987,10 @@ module State =
                     failwith "node unexpectedly does not need to be computed"
 
                 recompute node
+                |> FakeUnit.ofUnit
         }
         |> node.Apply
+        |> FakeUnit.toUnit
 
     let unlinkDisallowedObservers (t : State) : unit =
         while not (Stack.isEmpty t.DisallowedObservers) do
@@ -1025,12 +1045,12 @@ module State =
             |> FakeUnit.toUnit
 
         t.FinalizedObservers
-        |> ThreadSafeQueue.dequeue_until_empty disallow_if_finalized
+        |> ThreadSafeQueue.dequeueUntilEmpty disallowIfFinalized
 
     let observerFinalizer (t : State) =
         Staged.stage (fun observer ->
             let internalObserver = !observer in
-            t.FinalizedObservers.Enqueue (InternalObserverCrate.make internalObserver)
+            t.FinalizedObservers |> ThreadSafeQueue.enqueue (InternalObserverCrate.make internalObserver)
         )
 
     let createObserver (shouldFinalize : bool option) (observing : 'a Node) : InternalObserver<'a> =
@@ -1164,7 +1184,7 @@ module State =
 
             var.ValueSetDuringStabilization <- Some value
 
-    let reclaimSpaceInWeakHashTables t =
+    let reclaimSpaceInWeakHashTables (t : State) =
         let reclaim (w : WeakHashTableCrate) =
             { new WeakHashTableEval<_> with
                 member _.Eval w =
@@ -1173,7 +1193,7 @@ module State =
             |> w.Apply
             |> FakeUnit.toUnit
 
-        Thread_safe_queue.dequeue_until_empty reclaim t.WeakHashTable
+        ThreadSafeQueue.dequeueUntilEmpty reclaim t.WeakHashTables
 
     let stabilizeStart (t : State) : unit =
         t.Status <- Status.Stabilizing
@@ -1837,14 +1857,14 @@ module State =
                 PropagateInvalidity = Stack.create ()
                 NumActiveObservers = 0
                 AllObservers = ValueNone
-                FinalizedObservers = ConcurrentQueue ()
+                FinalizedObservers = ThreadSafeQueue.create ()
                 DisallowedObservers = Stack.create ()
                 NewObservers = Stack.create ()
                 SetDuringStabilization = Stack.create ()
                 HandleAfterStabilization = Stack.create ()
                 RunOnUpdateHandlers = Stack.create ()
                 OnlyInDebug = OnlyInDebug.create ()
-                WeakHashTables = ConcurrentQueue ()
+                WeakHashTables = ThreadSafeQueue.create ()
                 KeepNodeCreationBacktrace = false
                 NumNodesBecameNecessary = 0
                 NumNodesBecameUnnecessary = 0
@@ -1864,7 +1884,7 @@ module State =
         let scope = t.CurrentScope
         let table = WeakHashTable.create (Some initialSize)
         let packed = WeakHashTableCrate.make table
-        WeakHashTable.setRunWhenUnusedData table (fun () -> t.WeakHashTables.Enqueue packed)
+        WeakHashTable.setRunWhenUnusedData table (fun () -> t.WeakHashTables |> ThreadSafeQueue.enqueue packed)
 
         Staged.stage (fun a ->
             let key = project_key a in

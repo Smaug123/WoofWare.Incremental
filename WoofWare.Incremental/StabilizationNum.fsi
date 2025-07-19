@@ -1,12 +1,9 @@
 namespace WoofWare.Incremental
 
-open System
+[<Measure>]
+type stab
 
-[<CustomComparison ; CustomEquality>]
-[<Sealed>]
-type StabilizationNum =
-    interface IComparable
-    interface IComparable<StabilizationNum>
+type StabilizationNum = int<stab>
 
 [<RequireQualifiedAccess>]
 module StabilizationNum =

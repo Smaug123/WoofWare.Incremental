@@ -2,8 +2,8 @@ namespace WoofWare.Incremental
 
 open WoofWare.TimingWheel
 
-
 [<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal Clock =
     let invariant (t : Clock) =
         if t.Now.Value <> TimingWheel.now t.TimingWheel then

@@ -90,8 +90,10 @@ module internal Expert =
 #if DEBUG
             assert (t.NumChildren = t.Children.Length)
 #endif
-        let new_max = max 2 (2 * t.Children.Length)
-        t.Children <- Uniform_array.realloc t.children new_max
+        let newMax = max 2 (2 * t.Children.Length)
+        let realloc = Array.zeroCreate newMax
+        Array.blit t.Children 0 realloc 0 t.Children.Length
+        t.Children <- realloc
 
     let addChildEdge (t : Expert<'a>) (packedEdge : ExpertEdgeCrate) =
         { new ExpertEdgeEval<_> with

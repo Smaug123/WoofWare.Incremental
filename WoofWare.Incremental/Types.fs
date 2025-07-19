@@ -1,6 +1,5 @@
 namespace WoofWare.Incremental
 
-open System.Collections.Concurrent
 open System.Collections.Generic
 open TypeEquality
 open WoofWare.TimingWheel
@@ -182,7 +181,7 @@ and BindCrate =
     abstract Apply<'ret> : BindEval<'ret> -> 'ret
 
 and BindMainEval<'a, 'ret> =
-    abstract Eval<'b> : Bind<'a, 'b> -> 'ret
+    abstract Eval<'b> : Bind<'b, 'a> -> 'ret
 
 and BindMainCrate<'a> =
     abstract Apply<'ret> : BindMainEval<'a, 'ret> -> 'ret
@@ -403,7 +402,7 @@ and State =
         mutable AllObservers : InternalObserverCrate voption
         /// We enqueue finalized observers in a thread-safe queue, for handling during stabilization.
         /// We use a thread-safe queue because OCaml finalizers can run in any thread.
-        FinalizedObservers : InternalObserverCrate ConcurrentQueue
+        FinalizedObservers : InternalObserverCrate ThreadSafeQueue
         /// Observers created since the most recent start of a stabilization.
         /// These have state Created or Unlinked.
         /// At the start of stabilization, we link into AllObservers all observers in NewObservers whose state
@@ -442,7 +441,7 @@ and State =
         HandleAfterStabilization : NodeCrate Stack
         RunOnUpdateHandlers : RunOnUpdateHandlers Stack
         mutable OnlyInDebug : OnlyInDebug
-        WeakHashTables : WeakHashTableCrate ConcurrentQueue
+        WeakHashTables : WeakHashTableCrate ThreadSafeQueue
         (* Stats.  These are all incremented at the appropriate place, and never decremented. *)
         mutable KeepNodeCreationBacktrace : bool
         mutable NumNodesBecameNecessary : int
@@ -545,7 +544,7 @@ module Map2Crate =
 
 [<RequireQualifiedAccess>]
 module BindMainCrate =
-    let make (f : Bind<'a, 'b>) : BindMainCrate<'a> =
+    let make (f : Bind<'b, 'a>) : BindMainCrate<'a> =
         { new BindMainCrate<_> with
             member _.Apply e = e.Eval f
         }

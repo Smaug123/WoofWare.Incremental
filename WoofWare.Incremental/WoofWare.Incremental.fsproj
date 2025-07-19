@@ -10,6 +10,7 @@
         <Compile Include="FakeUnit.fs" />
         <Compile Include="Map.fs" />
         <Compile Include="List.fs" />
+        <Compile Include="ThreadSafeQueue.fs" />
         <Compile Include="Staged.fs" />
         <Compile Include="Stack.fs" />
         <Compile Include="Debug.fs" />
@@ -40,8 +41,8 @@
         <Compile Include="Join.fs" />
         <Compile Include="Scope.fsi" />
         <Compile Include="Scope.fs" />
-        <Compile Include="Freeze.fs" />
         <Compile Include="AtIntervals.fs" />
+        <Compile Include="Freeze.fs" />
         <Compile Include="Snapshot.fs" />
         <Compile Include="ArrayFold.fsi" />
         <Compile Include="ArrayFold.fs" />

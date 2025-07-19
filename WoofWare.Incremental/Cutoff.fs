@@ -33,7 +33,7 @@ module internal Cutoff =
         | Cutoff.Equal f -> f old newValue
         | Cutoff.F f -> f old newValue
 
-    let equal t1 t2 =
+    let equal (t1 : 'a Cutoff) (t2 : 'a Cutoff) =
         match t1, t2 with
         | Cutoff.Always, Cutoff.Always -> true
         | Cutoff.Always, _ -> false

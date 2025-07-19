@@ -1,44 +1,20 @@
 namespace WoofWare.Incremental
 
-open System
+[<Measure>]
+type stab
 
-[<CustomComparison>]
-[<CustomEquality>]
-type StabilizationNum =
-    | StabilizationNum of int
-
-    interface IComparable with
-        member this.CompareTo other =
-            match other with
-            | :? StabilizationNum as other -> (this :> IComparable<StabilizationNum>).CompareTo other
-            | _ -> failwith "oh no"
-
-    interface IComparable<StabilizationNum> with
-        member this.CompareTo (StabilizationNum other) =
-            match this with
-            | StabilizationNum this -> this.CompareTo other
-
-    override this.Equals (other : obj) : bool =
-        match other with
-        | :? StabilizationNum as other ->
-            match this, other with
-            | StabilizationNum this, StabilizationNum other -> this = other
-        | _ -> failwith "oh no"
-
-    override this.GetHashCode () : int =
-        match this with
-        | StabilizationNum this -> this.GetHashCode ()
+type StabilizationNum = int<stab>
 
 [<RequireQualifiedAccess>]
 module StabilizationNum =
 
-    let none = StabilizationNum -1
-    let zero = StabilizationNum 0
-    let isNone (StabilizationNum i) = i = -1
-    let isSome (StabilizationNum i) = i >= 0
-    let add1 (StabilizationNum i) = i + 1 |> StabilizationNum
-    let toInt (StabilizationNum i) = i
+    let none = -1<stab>
+    let zero = 0<stab>
+    let isNone i = i = -1<stab>
+    let isSome i = i >= 0<stab>
+    let add1 i = i + 1<stab>
+    let toInt (i : StabilizationNum) : int = int<int<stab>> i
 
-    let invariant (StabilizationNum i) =
-        if i < -1 then
+    let invariant i =
+        if i < -1<stab> then
             failwith "invariant failed"
