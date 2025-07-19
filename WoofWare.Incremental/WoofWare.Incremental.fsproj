@@ -11,6 +11,7 @@
         <Compile Include="Map.fs" />
         <Compile Include="List.fs" />
         <Compile Include="Sequence.fs" />
+        <Compile Include="Gc.fs" />
         <Compile Include="ThreadSafeQueue.fs" />
         <Compile Include="Staged.fs" />
         <Compile Include="Stack.fs" />
@@ -31,6 +32,7 @@
         <Compile Include="DotUserInfo.fs" />
         <Compile Include="Types.fs" />
         <Compile Include="NodeHelpers.fs" />
+      <!--
         <Compile Include="InternalObserver.fsi" />
         <Compile Include="InternalObserver.fs" />
         <Compile Include="At.fs" />
@@ -76,6 +78,7 @@
         <Compile Include="Expert1.fs" />
         <None Include="ReduceBalanced.fsi" />
         <None Include="ReduceBalanced.fs" />
+        -->
     </ItemGroup>
 
     <ItemGroup>

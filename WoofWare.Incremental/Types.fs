@@ -402,6 +402,8 @@ and State =
         mutable AllObservers : InternalObserverCrate voption
         /// We enqueue finalized observers in a thread-safe queue, for handling during stabilization.
         /// We use a thread-safe queue because OCaml finalizers can run in any thread.
+        /// Delaying finalization until stabilization means the finalizer won't modify the graph during
+        /// user-code execution (because user code isn't running during stabilization).
         FinalizedObservers : InternalObserverCrate ThreadSafeQueue
         /// Observers created since the most recent start of a stabilization.
         /// These have state Created or Unlinked.

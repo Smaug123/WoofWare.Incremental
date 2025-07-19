@@ -1985,9 +1985,15 @@ module Expert =
         | None -> ()
         | Some e ->
             if Debug.globalFlag then
+                let target = NodeCrate.make node
+
                 if
                     State.amStabilizing state
-                    && not (List.mem phys_equal state.only_in_debug.expert_nodes_created_by_current_node (T node))
+                    && not (
+                        List.exists
+                            (fun n -> Object.ReferenceEquals (n, target))
+                            state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
+                    )
                 then
                     assertCurrentlyRunningNodeIsChild state node "add_dependency"
 
