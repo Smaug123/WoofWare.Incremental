@@ -91,6 +91,7 @@ module internal Expert =
 #if DEBUG
             assert (t.NumChildren = t.Children.Length)
 #endif
+            ()
         let newMax = max 2 (2 * t.Children.Length)
         let realloc = Array.zeroCreate newMax
         Array.blit t.Children 0 realloc 0 t.Children.Length

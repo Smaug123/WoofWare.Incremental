@@ -1072,7 +1072,7 @@ module State =
         let mutable observer = internalObserver in
 
         if shouldFinalize then
-            Gc.Expert.add_finalizer_ignore observer (Staged.unstage (observerFinalizer t))
+            Gc.addFinalizerIgnore observer (Staged.unstage (observerFinalizer t))
 
         t.NumActiveObservers <- t.NumActiveObservers + 1
         observer
@@ -1897,160 +1897,160 @@ module State =
                 b
         )
 
-[<RequireQualifiedAccess>]
-module Expert =
-    /// Given that invalid node are at attempt at avoiding breaking the entire incremental
-    /// computation on problems, let's just ignore any operation on an invalid incremental
-    /// rather than raising.
-    let expertKindOfNode (node : 'a Node) : Expert<'a> option =
-        match node.Kind with
-        | Kind.Expert e -> Some e
-        | Kind.Invalid -> None
-        | k -> failwith $"unexpected kind {k} for expert node"
+    [<RequireQualifiedAccess>]
+    module Expert =
+        /// Given that invalid node are at attempt at avoiding breaking the entire incremental
+        /// computation on problems, let's just ignore any operation on an invalid incremental
+        /// rather than raising.
+        let expertKindOfNode (node : 'a Node) : Expert<'a> option =
+            match node.Kind with
+            | Kind.Expert e -> Some e
+            | Kind.Invalid -> None
+            | k -> failwith $"unexpected kind {k} for expert node"
 
-    let create' (state : State) onObservabilityChange f =
-        let e = Expert.create f onObservabilityChange
-        let node = State.createNode state (Expert e) in
+        let create (state : State) onObservabilityChange f =
+            let e = Expert.create f onObservabilityChange
+            let node = createNode state (Expert e) in
 
-        if Debug.globalFlag then
-            if Option.isSome state.OnlyInDebug.CurrentlyRunningNode then
-                state.OnlyInDebug.ExpertNodesCreatedByCurrentNode <-
-                    NodeCrate.make node :: state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
-
-        node
-
-    let currentlyRunningNodeThrowing state name =
-        match state.OnlyInDebug.CurrentlyRunningNode with
-        | None -> failwith "can only call currentlyRunningNode during stabilization"
-        | Some current -> current
-
-    (* Note that the two following functions are not symmetric of one another: in [let y =
-         map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
-         only a parent of [x] if y is necessary. *)
-
-    let assertCurrentlyRunningNodeIsChild (state : State) (node : Node<'a>) (name : string) : unit =
-        let current = currentlyRunningNodeThrowing state name
-
-        { new NodeEval<_> with
-            member _.Eval current =
-                if not (Node.hasChild node current) then
-                    failwith $"can only call %s{name} on parent nodes"
-
-                FakeUnit.ofUnit ()
-        }
-        |> current.Apply
-        |> FakeUnit.toUnit
-
-    let assertCurrentlyRunningNodeIsParent state node name =
-        let current = currentlyRunningNodeThrowing state name
-
-        { new NodeEval<_> with
-            member _.Eval current =
-                if not (Node.hasParent node current) then
-                    failwith $"can only call %s{name} on children nodes"
-
-                FakeUnit.ofUnit ()
-        }
-        |> current.Apply
-        |> FakeUnit.toUnit
-
-    let makeStale (node : 'a Node) : unit =
-        let state = node.State
-
-        match expertKindOfNode node with
-        | None -> ()
-        | Some e ->
             if Debug.globalFlag then
-                assertCurrentlyRunningNodeIsChild state node "makeStale"
+                if Option.isSome state.OnlyInDebug.CurrentlyRunningNode then
+                    state.OnlyInDebug.ExpertNodesCreatedByCurrentNode <-
+                        NodeCrate.make node :: state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
 
-            match Expert.makeStale e with
-            | StaleResult.AlreadyStale -> ()
-            | StaleResult.Ok ->
-                if NodeHelpers.isNecessary node && not (Node.isInRecomputeHeap node) then
-                    RecomputeHeap.add state.RecomputeHeap node
+            node
 
-    let invalidate (node : 'a Node) : unit =
-        let state = node.State
+        let currentlyRunningNodeThrowing state name =
+            match state.OnlyInDebug.CurrentlyRunningNode with
+            | None -> failwith "can only call currentlyRunningNode during stabilization"
+            | Some current -> current
 
-        if Debug.globalFlag then
-            assertCurrentlyRunningNodeIsChild state node "invalidate"
+        (* Note that the two following functions are not symmetric of one another: in [let y =
+             map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
+             only a parent of [x] if y is necessary. *)
 
-        State.invalidateNode node
-        State.propagateInvalidity state
+        let assertCurrentlyRunningNodeIsChild (state : State) (node : Node<'a>) (name : string) : unit =
+            let current = currentlyRunningNodeThrowing state name
 
-    let addDependency (node : 'a Node) (dep : 'b ExpertEdge) : unit =
-        let state = node.State
-
-        match expertKindOfNode node with
-        | None -> ()
-        | Some e ->
-            if Debug.globalFlag then
-                let target = NodeCrate.make node
-
-                if
-                    State.amStabilizing state
-                    && not (
-                        List.exists
-                            (fun n -> Object.ReferenceEquals (n, target))
-                            state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
-                    )
-                then
-                    assertCurrentlyRunningNodeIsChild state node "add_dependency"
-
-            let newChildIndex = Expert.addChildEdge e (ExpertEdgeCrate.make dep)
-            // [node] is not guaranteed to be necessary, even if we are running in a child of
-            // [node], because we could be running due to a parent other than [node] making us
-            // necessary.
-            if NodeHelpers.isNecessary node then
-                State.addParent dep.Child node newChildIndex
-
-                if Debug.globalFlag then
-                    assert (Node.needsToBeComputed node)
-
-                if not (Node.isInRecomputeHeap node) then
-                    RecomputeHeap.add state.RecomputeHeap node
-
-    let remove_dependency (node : 'a Node) (edge : 'b ExpertEdge) : unit =
-        let state = node.State
-
-        match expertKindOfNode node with
-        | None -> ()
-        | Some e ->
-            if Debug.globalFlag then
-                assertCurrentlyRunningNodeIsChild state node "remove_dependency"
-            // [node] is not guaranteed to be necessary, for the reason stated in
-            // [add_dependency]
-            let edgeIndex = edge.Index.Value
-            let lastEdge = Expert.lastChildEdgeThrowing e
-
-            { new ExpertEdgeEval<_> with
-                member _.Eval lastEdge =
-                    let lastEdgeIndex = lastEdge.Index.Value
-
-                    if edgeIndex <> lastEdgeIndex then
-                        if NodeHelpers.isNecessary node then
-                            Node.swapChildrenExceptInKind node edge.Child edgeIndex lastEdge.Child lastEdgeIndex
-
-                        Expert.swapChildren e edgeIndex lastEdgeIndex
-
-                        if Debug.globalFlag then
-                            Node.invariant ignore node
-
-                    Expert.removeLastChildEdgeThrowing e
-
-                    if Debug.globalFlag then
-                        assert (Node.isStale node)
-
-                    if NodeHelpers.isNecessary node then
-                        State.removeChild edge.Child node lastEdgeIndex
-
-                        if not (Node.isInRecomputeHeap node) then
-                            RecomputeHeap.add state.RecomputeHeap node
-
-                        if not (NodeHelpers.isValid edge.Child) then
-                            Expert.decrInvalidChildren e
+            { new NodeEval<_> with
+                member _.Eval current =
+                    if not (Node.hasChild node current) then
+                        failwith $"can only call %s{name} on parent nodes"
 
                     FakeUnit.ofUnit ()
             }
-            |> lastEdge.Apply
+            |> current.Apply
             |> FakeUnit.toUnit
+
+        let assertCurrentlyRunningNodeIsParent state node name =
+            let current = currentlyRunningNodeThrowing state name
+
+            { new NodeEval<_> with
+                member _.Eval current =
+                    if not (Node.hasParent node current) then
+                        failwith $"can only call %s{name} on children nodes"
+
+                    FakeUnit.ofUnit ()
+            }
+            |> current.Apply
+            |> FakeUnit.toUnit
+
+        let makeStale (node : 'a Node) : unit =
+            let state = node.State
+
+            match expertKindOfNode node with
+            | None -> ()
+            | Some e ->
+                if Debug.globalFlag then
+                    assertCurrentlyRunningNodeIsChild state node "makeStale"
+
+                match Expert.makeStale e with
+                | StaleResult.AlreadyStale -> ()
+                | StaleResult.Ok ->
+                    if NodeHelpers.isNecessary node && not (Node.isInRecomputeHeap node) then
+                        RecomputeHeap.add state.RecomputeHeap node
+
+        let invalidate (node : 'a Node) : unit =
+            let state = node.State
+
+            if Debug.globalFlag then
+                assertCurrentlyRunningNodeIsChild state node "invalidate"
+
+            invalidateNode node
+            propagateInvalidity state
+
+        let addDependency (node : 'a Node) (dep : 'b ExpertEdge) : unit =
+            let state = node.State
+
+            match expertKindOfNode node with
+            | None -> ()
+            | Some e ->
+                if Debug.globalFlag then
+                    let target = NodeCrate.make node
+
+                    if
+                        amStabilizing state
+                        && not (
+                            List.exists
+                                (fun n -> Object.ReferenceEquals (n, target))
+                                state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
+                        )
+                    then
+                        assertCurrentlyRunningNodeIsChild state node "add_dependency"
+
+                let newChildIndex = Expert.addChildEdge e (ExpertEdgeCrate.make dep)
+                // [node] is not guaranteed to be necessary, even if we are running in a child of
+                // [node], because we could be running due to a parent other than [node] making us
+                // necessary.
+                if NodeHelpers.isNecessary node then
+                    addParent dep.Child node newChildIndex
+
+                    if Debug.globalFlag then
+                        assert (Node.needsToBeComputed node)
+
+                    if not (Node.isInRecomputeHeap node) then
+                        RecomputeHeap.add state.RecomputeHeap node
+
+        let removeDependency (node : 'a Node) (edge : 'b ExpertEdge) : unit =
+            let state = node.State
+
+            match expertKindOfNode node with
+            | None -> ()
+            | Some e ->
+                if Debug.globalFlag then
+                    assertCurrentlyRunningNodeIsChild state node "remove_dependency"
+                // [node] is not guaranteed to be necessary, for the reason stated in
+                // [add_dependency]
+                let edgeIndex = edge.Index.Value
+                let lastEdge = Expert.lastChildEdgeThrowing e
+
+                { new ExpertEdgeEval<_> with
+                    member _.Eval lastEdge =
+                        let lastEdgeIndex = lastEdge.Index.Value
+
+                        if edgeIndex <> lastEdgeIndex then
+                            if NodeHelpers.isNecessary node then
+                                Node.swapChildrenExceptInKind node edge.Child edgeIndex lastEdge.Child lastEdgeIndex
+
+                            Expert.swapChildren e edgeIndex lastEdgeIndex
+
+                            if Debug.globalFlag then
+                                Node.invariant ignore node
+
+                        Expert.removeLastChildEdgeThrowing e
+
+                        if Debug.globalFlag then
+                            assert (Node.isStale node)
+
+                        if NodeHelpers.isNecessary node then
+                            removeChild edge.Child node lastEdgeIndex
+
+                            if not (Node.isInRecomputeHeap node) then
+                                RecomputeHeap.add state.RecomputeHeap node
+
+                            if not (NodeHelpers.isValid edge.Child) then
+                                Expert.decrInvalidChildren e
+
+                        FakeUnit.ofUnit ()
+                }
+                |> lastEdge.Apply
+                |> FakeUnit.toUnit

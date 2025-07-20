@@ -32,7 +32,6 @@
         <Compile Include="DotUserInfo.fs" />
         <Compile Include="Types.fs" />
         <Compile Include="NodeHelpers.fs" />
-      <!--
         <Compile Include="InternalObserver.fsi" />
         <Compile Include="InternalObserver.fs" />
         <Compile Include="At.fs" />
@@ -76,9 +75,10 @@
         <Compile Include="State.fs" />
         <Compile Include="Expert1.fsi" />
         <Compile Include="Expert1.fs" />
-        <None Include="ReduceBalanced.fsi" />
-        <None Include="ReduceBalanced.fs" />
-        -->
+        <Compile Include="ReduceBalanced.fsi" />
+        <Compile Include="ReduceBalanced.fs" />
+        <Compile Include="Incremental.fsi" />
+        <Compile Include="Incremental.fs" />
     </ItemGroup>
 
     <ItemGroup>

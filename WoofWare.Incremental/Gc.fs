@@ -11,7 +11,7 @@ type private FinalizerAction<'a when 'a : not struct> (action : 'a -> unit, targ
             reraise ()
 
 [<RequireQualifiedAccess>]
-module internal GC =
+module internal Gc =
     // Table to associate finalizer objects with targets
     let private finalizerTable = ConditionalWeakTable<obj, obj> ()
 

@@ -16,7 +16,7 @@ module Expert1Dependency =
         let state = t.Child.State
 
         if Debug.globalFlag then
-            Expert.assertCurrentlyRunningNodeIsParent state t.Child "Dependency.value"
+            State.Expert.assertCurrentlyRunningNodeIsParent state t.Child "Dependency.value"
         // Not exposing the _exn, because this function is advertised as being usable only
         // inside the callbacks of parents, where it will not raise.
         Node.valueThrowing t.Child
@@ -26,12 +26,13 @@ type Expert1Node<'a> = | Expert1Node of Node<'a>
 [<RequireQualifiedAccess>]
 module Expert1Node =
 
-    let create state onObservabilityChange f =
+    let create (state: State) (onObservabilityChange: (bool -> unit) option) (f: unit -> 'a) : Expert1Node<'a> =
         let onObservabilityChange = defaultArg onObservabilityChange (fun _ -> ())
         State.Expert.create state onObservabilityChange f
+        |> Expert1Node
 
-    let make_stale = State.Expert.make_stale
-    let watch (Expert1Node n) = n
-    let invalidate = State.Expert.invalidate
-    let add_dependency = State.Expert.add_dependency
-    let remove_dependency = State.Expert.remove_dependency
+    let makeStale (Expert1Node (n : Node<'a>)) : unit = State.Expert.makeStale n
+    let watch (Expert1Node n: Expert1Node<'a>) : Node<'a> = n
+    let invalidate (Expert1Node (n : Node<'a>)) : unit = State.Expert.invalidate n
+    let addDependency (Expert1Node (n : Node<'a>)) (Expert1Dependency (e : ExpertEdge<'b>)) : unit = State.Expert.addDependency n e
+    let removeDependency (Expert1Node n) (Expert1Dependency e) : unit = State.Expert.removeDependency n e
