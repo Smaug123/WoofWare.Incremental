@@ -15,9 +15,9 @@ module internal Expert =
     let invariant
         (_invariantA : 'a -> unit)
         ({
-            Expert.Children = children
-            NumChildren = numChildren
-        } : Expert<'a>)
+             Expert.Children = children
+             NumChildren = numChildren
+         } : Expert<'a>)
         : unit
         =
         assert (numChildren <= children.Length)
@@ -92,6 +92,7 @@ module internal Expert =
             assert (t.NumChildren = t.Children.Length)
 #endif
             ()
+
         let newMax = max 2 (2 * t.Children.Length)
         let realloc = Array.zeroCreate newMax
         Array.blit t.Children 0 realloc 0 t.Children.Length

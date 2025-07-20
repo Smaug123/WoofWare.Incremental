@@ -24,7 +24,7 @@ module Bind =
             |> r.Value.Apply
             |> FakeUnit.toUnit
 
-    let invariant _invA _invB (t : Bind<'a, 'b>) =
+    let invariant (_invA : 'a -> unit) (_invB : 'b -> unit) (t : Bind<'a, 'b>) : unit =
         match t.Main.Kind with
         | Kind.Invalid -> ()
         | Kind.BindMain cr ->

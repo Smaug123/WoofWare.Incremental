@@ -19,23 +19,23 @@ module NodeToDot =
 
         sprintf "%s\n" (DotUserInfo.toString "Mrecord" name (DotUserInfo.toDot info))
 
-    let renderDot (emitBindEdges : bool) (writeOutput : string -> unit) ts =
+    let renderDot (emitBindEdges : bool) (write : string -> unit) ts =
         let nodeName id = "n" + NodeId.toString id
-        writeOutput "digraph G {\n"
-        writeOutput "  rankdir = BT\n"
+        write "digraph G {\n"
+        write "  rankdir = BT\n"
 
         let seen = HashSet<NodeId> ()
         let bindEdges = ResizeArray ()
 
         ForAnalyzer.traverse
             ts
-            (fun id kind cutoff children bindChildren userInfo _ _ height ->
+            (fun id kind _cutoff children bindChildren userInfo _ _ height ->
                 let name = nodeName id
                 seen.Add id |> ignore<bool>
-                printNode name kind height userInfo |> writeOutput
+                printNode name kind height userInfo |> write
 
                 for childId in children do
-                    writeOutput $"  %s{nodeName childId} -> %s{name}\n"
+                    write $"  %s{nodeName childId} -> %s{name}\n"
 
                 for bindChildId in bindChildren do
                     bindEdges.Add (bindChildId, id)
@@ -44,9 +44,9 @@ module NodeToDot =
         if emitBindEdges then
             for bindChildId, id in bindEdges do
                 if seen.Contains bindChildId then
-                    $"  %s{nodeName id} -> %s{nodeName bindChildId} [style=dashed]\n" |> writeOutput
+                    $"  %s{nodeName id} -> %s{nodeName bindChildId} [style=dashed]\n" |> write
 
-        writeOutput "}\n"
+        write "}\n"
 
     let saveDotToFile (emitBindEdges : bool) (filePath : string) ts =
         use f = File.Open (filePath, FileMode.OpenOrCreate)

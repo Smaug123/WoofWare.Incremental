@@ -7,18 +7,6 @@ open System
 module internal InternalObserver =
     let same (a : InternalObserver<'a>) (b : InternalObserver<'b>) = Object.ReferenceEquals (a, b)
 
-    let sameAsCrate (a : InternalObserver<'a>) (b : InternalObserverCrate) : bool =
-        { new InternalObserverEval<_> with
-            member _.Eval b = same a b
-        }
-        |> b.Apply
-
-    let nextInAll' (i : InternalObserverCrate) =
-        { new InternalObserverEval<_> with
-            member _.Eval i = i.NextInAll
-        }
-        |> i.Apply
-
     let setPrevInAll' (i : InternalObserverCrate) (v : InternalObserverCrate voption) =
         { new InternalObserverEval<_> with
             member _.Eval i = (i.PrevInAll <- v) |> FakeUnit.ofUnit
@@ -32,84 +20,6 @@ module internal InternalObserver =
         }
         |> i.Apply
         |> FakeUnit.toUnit
-
-    let nextInAll' (i : InternalObserverCrate) =
-        { new InternalObserverEval<_> with
-            member _.Eval i = i.NextInAll
-        }
-        |> i.Apply
-
-    let prevInAll' (i : InternalObserverCrate) =
-        { new InternalObserverEval<_> with
-            member _.Eval i = i.PrevInAll
-        }
-        |> i.Apply
-
-    let invariant (invA : 'a -> unit) (t : 'a InternalObserver) =
-        Node.invariant invA t.Observing
-
-        do
-            match t.State with
-            | InternalObserverState.Unlinked ->
-                if not (List.isEmpty t.OnUpdateHandlers) then
-                    failwith "invariant failure"
-            | _ -> ()
-
-        do
-            match t.State with
-            | InternalObserverState.Created
-            | InternalObserverState.Unlinked ->
-                if t.PrevInAll.IsSome then
-                    failwith "invariant failure"
-            | _ -> ()
-
-            match t.PrevInAll with
-            | ValueSome prevInAll ->
-                if not (sameAsCrate t (nextInAll' prevInAll).Value) then
-                    failwith "invariant failed"
-            | ValueNone -> ()
-
-        do
-            match t.State with
-            | InternalObserverState.Created
-            | InternalObserverState.Unlinked ->
-                if t.NextInAll.IsSome then
-                    failwith "invariant failure"
-            | _ -> ()
-
-            match t.NextInAll with
-            | ValueSome nextInAll ->
-                if not (sameAsCrate t (prevInAll' nextInAll).Value) then
-                    failwith "invariant failed"
-            | ValueNone -> ()
-
-        do
-            match t.State with
-            | InternalObserverState.Created
-            | InternalObserverState.Unlinked ->
-                if t.PrevInObserving.IsSome then
-                    failwith "invariant failed"
-            | _ -> ()
-
-            match t.PrevInObserving with
-            | ValueSome prevInObserving ->
-                if not (Object.ReferenceEquals (t, prevInObserving.NextInObserving)) then
-                    failwith "invariant failed"
-            | ValueNone -> ()
-
-        do
-            match t.State with
-            | InternalObserverState.Created
-            | InternalObserverState.Unlinked ->
-                if t.PrevInObserving.IsSome then
-                    failwith "invariant failed"
-            | _ -> ()
-
-            match t.NextInObserving with
-            | ValueSome nextInObserving ->
-                if not (Object.ReferenceEquals (t, nextInObserving.PrevInObserving)) then
-                    failwith "invariant failed"
-            | ValueNone -> ()
 
     let valueThrowing (t : 'a InternalObserver) : 'a =
         match t.State with
@@ -187,16 +97,19 @@ module internal InternalObserver =
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal InternalObserverCrate =
-    let invariant (i : InternalObserverCrate) =
+    let nextInAllEval =
         { new InternalObserverEval<_> with
-            member _.Eval i =
-                InternalObserver.invariant ignore i |> FakeUnit.ofUnit
+            member _.Eval i = i.NextInAll
         }
-        |> i.Apply
-        |> FakeUnit.toUnit
 
-    let nextInAll = InternalObserver.nextInAll'
-    let setPrevInAll = InternalObserver.setPrevInAll'
+    let prevInAllEval =
+        { new InternalObserverEval<_> with
+            member _.Eval i = i.PrevInAll
+        }
+
+    let nextInAll (i : InternalObserverCrate) = i.Apply nextInAllEval
+    let prevInAll (i : InternalObserverCrate) = i.Apply prevInAllEval
+    let setPrevInAll i j = InternalObserver.setPrevInAll' i j
 
     let internalObserverStateEval =
         { new InternalObserverEval<_> with

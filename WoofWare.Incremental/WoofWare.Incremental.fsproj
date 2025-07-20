@@ -72,6 +72,7 @@
         <Compile Include="RunOnUpdateHandlers.fs" />
         <Compile Include="OnlyInDebug.fs" />
         <Compile Include="Clock.fs" />
+        <Compile Include="InternalObserverInvariant.fs" />
         <Compile Include="State.fs" />
         <Compile Include="Expert1.fsi" />
         <Compile Include="Expert1.fs" />
