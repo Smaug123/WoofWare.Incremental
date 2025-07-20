@@ -1,5 +1,6 @@
 namespace WoofWare.Incremental
 
+open System.Collections.Generic
 open WoofWare.TimingWheel
 
 [<RequireQualifiedAccess>]
@@ -52,8 +53,8 @@ module ForAnalyzer =
             (NodeId
                 -> Kind
                 -> Cutoff
-                -> NodeId seq
-                -> NodeId seq
+                -> NodeId IReadOnlyList
+                -> NodeId IReadOnlyList
                 -> DotUserInfo option
                 -> StabilizationNum
                 -> StabilizationNum

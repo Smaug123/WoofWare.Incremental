@@ -1,6 +1,5 @@
 namespace WoofWare.Incremental
 
-open System.Collections.Generic
 open WoofWare.TimingWheel
 
 [<NoEquality ; NoComparison>]

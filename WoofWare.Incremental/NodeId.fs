@@ -18,3 +18,6 @@ module NodeId =
             failwith "invariant failure"
 
     let toString (NodeId n) = $"%i{n}"
+
+    let internal toInt (NodeId i) = i
+    let internal ofInt i = NodeId i
