@@ -340,7 +340,7 @@ and NodeEval<'ret> =
 and NodeCrate =
     abstract Apply<'ret> : NodeEval<'ret> -> 'ret
 
-and Observer<'a> = 'a InternalObserver ref
+and Observer'<'a> = 'a InternalObserver ref
 
 /// Extra state kept only when [Debug.globalFlag] for the purpose of writing assertions.
 and OnlyInDebug =
@@ -382,80 +382,81 @@ and SnapshotCrate =
     abstract Apply<'ret> : SnapshotEval<'ret> -> 'ret
 
 and State =
-    {
-        mutable Status : Status
-        BindLhsChangeShouldInvalidateRhs : bool
-        /// Starts at zer, and is incremented at the end of each stabilization.
-        mutable StabilizationNum : StabilizationNum
-        mutable CurrentScope : Scope
-        RecomputeHeap : RecomputeHeap
-        AdjustHeightsHeap : AdjustHeightsHeap
-        /// Holds nodes that have invalid children that should be considered for invalidation.
-        /// It is only used during graph restructuring: [invalidate_node] and [add_parent].
-        /// Once an element is added to the stack, we then iterate until invalidity has propagated to all ancestors
-        /// as necessary, according to [Node.should_be_invalidated].
-        PropagateInvalidity : NodeCrate Stack
-        /// The number of observers whose state is Created or InUse.
-        mutable NumActiveObservers : int
-        /// The doubly-linked list of all observers in effect, or that have been disallowed since the most recent
-        /// start of a stabilization. These have state InUse or Disallowed.
-        mutable AllObservers : InternalObserverCrate voption
-        /// We enqueue finalized observers in a thread-safe queue, for handling during stabilization.
-        /// We use a thread-safe queue because OCaml finalizers can run in any thread.
-        /// Delaying finalization until stabilization means the finalizer won't modify the graph during
-        /// user-code execution (because user code isn't running during stabilization).
-        FinalizedObservers : InternalObserverCrate ThreadSafeQueue
-        /// Observers created since the most recent start of a stabilization.
-        /// These have state Created or Unlinked.
-        /// At the start of stabilization, we link into AllObservers all observers in NewObservers whose state
-        /// is Created, and add them to the Observers of the node they are observing.
-        /// We structure things this way to allow observers to be created during stabilization
-        /// while running user code ([map], [bind], etc), but to not have to deal with nodes
-        /// becoming necessary and the graph changing during such code.
-        NewObservers : InternalObserverCrate Stack
-        /// [disallowed_observers] holds all observers that have been disallowed since the most
-        ///    recent start of a stabilization -- these have [state = Disallowed].  At the start
-        ///    of stabilization, these are unlinked from [all_observers] and their state is
-        ///    changed to [Unlinked].  We structure things this way to allow user code running
-        ///    during stabilization to call [disallow_future_use], but to not have to deal with
-        ///    nodes becoming unnecessary and the graph changing during such code.
-        DisallowedObservers : InternalObserverCrate Stack
-        /// We delay all [Var.set] calls that happen during stabilization so that they take
-        ///  effect after stabilization.  All variables set during stabilization are pushed on
-        ///  [set_during_stabilization] rather than setting them.  Then, after the graph has
-        ///  stabilized, we do all the sets, so that they take effect at the start of the next
-        ///  stabilization.
-        SetDuringStabilization : VarCrate Stack
-        /// [handle_after_stabilization] has all nodes with handlers to consider running at the
-        ///  end of the next stabilization.  At the end of stabilization, we consider each node
-        ///  in [handle_after_stabilization], and if we decide to run its on-update handlers,
-        ///  push it on [run_on_update_handlers].  Then, once we've considered all nodes in
-        ///  [handle_after_stabilization], we iterate through [run_on_update_handlers] and
-        ///  actually run the handlers.
-        ///  These two passes are essential for correctness.  During the first pass, we haven't
-        ///  run any user handlers, so we know that the state is exactly as it was when
-        ///  stabilization finished.  In particular, we know that if a node is necessary, then
-        ///  it has a stable value; once user handlers run, we don't know this.  During the
-        ///  second pass, user handlers can make calls to any incremental function except for
-        ///  [stabilize].  In particular, some functions push nodes on
-        ///  [handle_after_stabilization].  But no functions (except for [stabilize]) modify
-        ///  [run_on_update_handlers].
-        HandleAfterStabilization : NodeCrate Stack
-        RunOnUpdateHandlers : RunOnUpdateHandlers Stack
-        mutable OnlyInDebug : OnlyInDebug
-        WeakHashTables : WeakHashTableCrate ThreadSafeQueue
-        (* Stats.  These are all incremented at the appropriate place, and never decremented. *)
-        mutable KeepNodeCreationBacktrace : bool
-        mutable NumNodesBecameNecessary : int
-        mutable NumNodesBecameUnnecessary : int
-        mutable NumNodesChanged : int
-        mutable NumNodesCreated : int
-        mutable NumNodesInvalidated : int
-        mutable NumNodesRecomputed : int
-        mutable NumNodesRecomputedDirectlyBecauseOneChild : int
-        mutable NumNodesRecomputedDirectlyBecauseMinHeight : int
-        mutable NumVarSets : int
-    }
+    internal
+        {
+            mutable Status : Status
+            BindLhsChangeShouldInvalidateRhs : bool
+            /// Starts at zer, and is incremented at the end of each stabilization.
+            mutable StabilizationNum : StabilizationNum
+            mutable CurrentScope : Scope
+            RecomputeHeap : RecomputeHeap
+            AdjustHeightsHeap : AdjustHeightsHeap
+            /// Holds nodes that have invalid children that should be considered for invalidation.
+            /// It is only used during graph restructuring: [invalidate_node] and [add_parent].
+            /// Once an element is added to the stack, we then iterate until invalidity has propagated to all ancestors
+            /// as necessary, according to [Node.should_be_invalidated].
+            PropagateInvalidity : NodeCrate Stack
+            /// The number of observers whose state is Created or InUse.
+            mutable NumActiveObservers : int
+            /// The doubly-linked list of all observers in effect, or that have been disallowed since the most recent
+            /// start of a stabilization. These have state InUse or Disallowed.
+            mutable AllObservers : InternalObserverCrate voption
+            /// We enqueue finalized observers in a thread-safe queue, for handling during stabilization.
+            /// We use a thread-safe queue because OCaml finalizers can run in any thread.
+            /// Delaying finalization until stabilization means the finalizer won't modify the graph during
+            /// user-code execution (because user code isn't running during stabilization).
+            FinalizedObservers : InternalObserverCrate ThreadSafeQueue
+            /// Observers created since the most recent start of a stabilization.
+            /// These have state Created or Unlinked.
+            /// At the start of stabilization, we link into AllObservers all observers in NewObservers whose state
+            /// is Created, and add them to the Observers of the node they are observing.
+            /// We structure things this way to allow observers to be created during stabilization
+            /// while running user code ([map], [bind], etc), but to not have to deal with nodes
+            /// becoming necessary and the graph changing during such code.
+            NewObservers : InternalObserverCrate Stack
+            /// [disallowed_observers] holds all observers that have been disallowed since the most
+            ///    recent start of a stabilization -- these have [state = Disallowed].  At the start
+            ///    of stabilization, these are unlinked from [all_observers] and their state is
+            ///    changed to [Unlinked].  We structure things this way to allow user code running
+            ///    during stabilization to call [disallow_future_use], but to not have to deal with
+            ///    nodes becoming unnecessary and the graph changing during such code.
+            DisallowedObservers : InternalObserverCrate Stack
+            /// We delay all [Var.set] calls that happen during stabilization so that they take
+            ///  effect after stabilization.  All variables set during stabilization are pushed on
+            ///  [set_during_stabilization] rather than setting them.  Then, after the graph has
+            ///  stabilized, we do all the sets, so that they take effect at the start of the next
+            ///  stabilization.
+            SetDuringStabilization : VarCrate Stack
+            /// [handle_after_stabilization] has all nodes with handlers to consider running at the
+            ///  end of the next stabilization.  At the end of stabilization, we consider each node
+            ///  in [handle_after_stabilization], and if we decide to run its on-update handlers,
+            ///  push it on [run_on_update_handlers].  Then, once we've considered all nodes in
+            ///  [handle_after_stabilization], we iterate through [run_on_update_handlers] and
+            ///  actually run the handlers.
+            ///  These two passes are essential for correctness.  During the first pass, we haven't
+            ///  run any user handlers, so we know that the state is exactly as it was when
+            ///  stabilization finished.  In particular, we know that if a node is necessary, then
+            ///  it has a stable value; once user handlers run, we don't know this.  During the
+            ///  second pass, user handlers can make calls to any incremental function except for
+            ///  [stabilize].  In particular, some functions push nodes on
+            ///  [handle_after_stabilization].  But no functions (except for [stabilize]) modify
+            ///  [run_on_update_handlers].
+            HandleAfterStabilization : NodeCrate Stack
+            RunOnUpdateHandlers : RunOnUpdateHandlers Stack
+            mutable OnlyInDebug : OnlyInDebug
+            WeakHashTables : WeakHashTableCrate ThreadSafeQueue
+            (* Stats.  These are all incremented at the appropriate place, and never decremented. *)
+            mutable KeepNodeCreationBacktrace : bool
+            mutable NumNodesBecameNecessary : int
+            mutable NumNodesBecameUnnecessary : int
+            mutable NumNodesChanged : int
+            mutable NumNodesCreated : int
+            mutable NumNodesInvalidated : int
+            mutable NumNodesRecomputed : int
+            mutable NumNodesRecomputedDirectlyBecauseOneChild : int
+            mutable NumNodesRecomputedDirectlyBecauseMinHeight : int
+            mutable NumVarSets : int
+        }
 
 and StepFunctionNode<'a> =
     {

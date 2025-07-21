@@ -177,3 +177,5 @@ module ForAnalyzer =
 
                 addNode id kind cutoff children bindChildren userInfo recomputedAt changedAt height
             )
+
+    let directlyObserved s = State.directlyObserved s

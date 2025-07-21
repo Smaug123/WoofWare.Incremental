@@ -7,19 +7,21 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="TestConfig.fs" />
-        <Compile Include="TestExceptionalBehaviour.fs" />
+        <Compile Include="TestSurface.fs" />
+        <None Include="TestConfig.fs" />
+        <None Include="TestExceptionalBehaviour.fs" />
         <Compile Include="TestForAnalyzer.fs" />
-        <Compile Include="TestGenerics.fs" />
-        <Compile Include="TestIncremental.fs" />
-        <Compile Include="TestSyntax.fs" />
-        <Compile Include="TestNonDebug.fs" />
-        <Compile Include="TestSkeleton.fs" />
-        <Compile Include="TestGc.fs" />
-        <Compile Include="TestList.fs" />
+        <None Include="TestGenerics.fs" />
+        <None Include="TestIncremental.fs" />
+        <None Include="TestSyntax.fs" />
+        <None Include="TestNonDebug.fs" />
+        <None Include="TestSkeleton.fs" />
+        <None Include="TestGc.fs" />
+        <None Include="TestList.fs" />
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="ApiSurface" Version="4.1.22" />
       <PackageReference Include="FsCheck" Version="3.3.0" />
       <PackageReference Include="FsUnit" Version="7.1.1"/>
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1"/>

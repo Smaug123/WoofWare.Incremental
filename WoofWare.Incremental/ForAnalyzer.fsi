@@ -61,3 +61,5 @@ module ForAnalyzer =
                 -> int
                 -> unit) ->
             unit
+
+    val directlyObserved : State -> NodeCrate list

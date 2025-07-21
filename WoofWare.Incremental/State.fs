@@ -54,7 +54,7 @@ module State =
     let iterObserverDescendants (t : State) (f : NodeCrate -> unit) : unit =
         NodeCrate.iterDescendants (directlyObserved t) f
 
-    let stats (t : State) : StateStats =
+    let internal stats (t : State) : StateStats =
         let mutable maxNumParents = -1
         let mutable numNecessaryNodes = 0
 
@@ -977,7 +977,7 @@ module State =
         if Debug.globalFlag then
             invariant t
 
-    let inline recomputeFirstNodeThatIsNecessary r =
+    let recomputeFirstNodeThatIsNecessary (r: RecomputeHeap) : unit =
         let node = RecomputeHeap.removeMin r
 
         { new NodeEval<_> with
@@ -1129,17 +1129,17 @@ module State =
             |> packed.Apply
             |> FakeUnit.toUnit
 
-    let observerValueThrowing (observer : Observer<'a>) : 'a =
-        let t = Observer.incrState observer
+    let observerValueThrowing (observer : Observer'<'a>) : 'a =
+        let t = Observer'.incrState observer
 
         match t.Status with
         | Status.Not_stabilizing
-        | Status.Running_on_update_handlers -> Observer.valueThrowing observer
+        | Status.Running_on_update_handlers -> Observer'.valueThrowing observer
         | Status.Stabilize_previously_raised exn ->
             RaisedException.reraiseWithMessage exn "Observer.valueThrowing called after stabilize previously raised"
         | Status.Stabilizing -> failwith "Observer.valueThrowing called during stabilization"
 
-    let observerValue (observer : Observer<'a>) : Result<'a, exn> =
+    let observerValue (observer : Observer'<'a>) : Result<'a, exn> =
         try
             Ok (observerValueThrowing observer)
         with exn ->
@@ -1151,9 +1151,9 @@ module State =
         handleAfterStabilization node
 
     let observerOnUpdateThrowing observer f =
-        let t = Observer.incrState observer
-        Observer.onUpdateThrowing observer (OnUpdateHandler.create f t.StabilizationNum)
-        handleAfterStabilization (Observer.observing observer)
+        let t = Observer'.incrState observer
+        Observer'.onUpdateThrowing observer (OnUpdateHandler.create f t.StabilizationNum)
+        handleAfterStabilization (Observer'.observing observer)
 
     let setVarWhileNotStabilizing (var : Var<'a>) (value : 'a) : unit =
         let t = Var.incrState var
@@ -1513,7 +1513,7 @@ module State =
     let all (t : State) (ts : Node<'a> list) : Node<'a list> =
         arrayFold t (Array.ofList (List.rev ts)) [] (fun ac a -> a :: ac)
 
-    let unorderedArrayFold
+    let internal unorderedArrayFold
         (t : State)
         (fullComputeEveryNChanges : int option)
         (children : Node<'b> array)
@@ -1532,7 +1532,6 @@ module State =
                 $"unordered_array_fold got non-positive full_compute_every_n_changes %i{fullComputeEveryNChanges}"
         else
             let main = createNode t Kind.Uninitialized
-
 
             UnorderedArrayFold.create init f update fullComputeEveryNChanges children main
             |> UnorderedArrayFoldCrate.make
@@ -1661,8 +1660,7 @@ module State =
 
     let nextIntervalAlarmStrict (clock : Clock) base_ interval : TimeNs =
         let after = Clock.now clock
-        // let at = TimeNs.nextMultiple ~base_ ~after ~interval ~can_equal_after:false ()
-        failwith "TODO"
+        let at = TimeNs.nextMultiple (Some false) base_ after interval
 
         if Debug.globalFlag then
             assert (at > after)
@@ -1673,7 +1671,7 @@ module State =
         let t = Clock.incrState clock
 
         if interval < (TimingWheel.alarmPrecision clock.TimingWheel) then
-            failwith "at_intervals got too small interval" interval
+            failwith $"at_intervals got too small interval: {interval}"
 
         let main = createNode t Kind.Uninitialized
         let base_ = Clock.now clock

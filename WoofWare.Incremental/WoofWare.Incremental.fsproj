@@ -1,8 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net5.0</TargetFramework>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+      <TargetFramework>net5.0</TargetFramework>
+      <GenerateDocumentationFile>true</GenerateDocumentationFile>
+      <Authors>Patrick Stevens</Authors>
+      <Copyright>Copyright (c) Patrick Stevens 2025</Copyright>
+      <Description>A library for expressing computations that can change efficiently based on their inputs over time.</Description>
+      <RepositoryType>git</RepositoryType>
+      <RepositoryUrl>https://github.com/Smaug123/WoofWare.Incremental</RepositoryUrl>
+      <PackageLicenseExpression>MIT</PackageLicenseExpression>
+      <PackageReadmeFile>README.md</PackageReadmeFile>
+      <PackageTags>incremental;reactive</PackageTags>
+      <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 
     <ItemGroup>
@@ -66,15 +75,15 @@
         <Compile Include="RecomputeHeap.fs" />
         <Compile Include="AdjustHeightsHeap.fsi" />
         <Compile Include="AdjustHeightsHeap.fs" />
-        <Compile Include="ForAnalyzer.fsi" />
-        <Compile Include="ForAnalyzer.fs" />
-        <Compile Include="NodeToDot.fsi" />
-        <Compile Include="NodeToDot.fs" />
         <Compile Include="RunOnUpdateHandlers.fs" />
         <Compile Include="OnlyInDebug.fs" />
         <Compile Include="Clock.fs" />
         <Compile Include="InternalObserverInvariant.fs" />
         <Compile Include="State.fs" />
+        <Compile Include="ForAnalyzer.fsi" />
+        <Compile Include="ForAnalyzer.fs" />
+        <Compile Include="NodeToDot.fsi" />
+        <Compile Include="NodeToDot.fs" />
         <Compile Include="Expert1.fsi" />
         <Compile Include="Expert1.fs" />
         <Compile Include="ReduceBalanced.fsi" />
@@ -85,12 +94,15 @@
         <Compile Include="Skeleton\Node.fs" />
         <Compile Include="Skeleton\Skeleton.fsi" />
         <Compile Include="Skeleton\Skeleton.fs" />
+      <None Include="../README.md" />
+      <EmbeddedResource Include="SurfaceBaseline.txt" />
+      <EmbeddedResource Include="../version.json" />
     </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="TypeEquality" Version="0.3.0" />
       <PackageReference Include="WoofWare.BalancedReducer" Version="1.0.2" />
-      <PackageReference Include="WoofWare.TimingWheel" Version="0.3.1" />
+      <PackageReference Include="WoofWare.TimingWheel" Version="0.4.1" />
       <PackageReference Include="WoofWare.WeakHashTable" Version="1.1.1" />
     </ItemGroup>
 
