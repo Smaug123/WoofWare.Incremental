@@ -8,7 +8,7 @@
 
     <ItemGroup>
         <Compile Include="TestSurface.fs" />
-        <None Include="TestConfig.fs" />
+        <Compile Include="TestConfig.fs" />
         <None Include="TestExceptionalBehaviour.fs" />
         <Compile Include="TestForAnalyzer.fs" />
         <None Include="TestGenerics.fs" />
@@ -16,8 +16,8 @@
         <None Include="TestSyntax.fs" />
         <None Include="TestNonDebug.fs" />
         <None Include="TestSkeleton.fs" />
-        <None Include="TestGc.fs" />
-        <None Include="TestList.fs" />
+        <Compile Include="TestGc.fs" />
+        <Compile Include="TestList.fs" />
     </ItemGroup>
 
     <ItemGroup>

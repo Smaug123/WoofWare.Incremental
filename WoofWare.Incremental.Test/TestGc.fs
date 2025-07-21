@@ -21,8 +21,6 @@ module TestGc =
 
     let forceGCAndFinalizers () =
         GC.Collect ()
-        // GC.Collect()
-        // GC.Collect()
         GC.WaitForPendingFinalizers ()
         GC.Collect ()
 
@@ -32,9 +30,9 @@ module TestGc =
         let mutable testResult = -1
 
         do
-            let target = TestObject (42)
+            let target = TestObject 42
 
-            GC.addFinalizerIgnore
+            Gc.addFinalizerIgnore
                 target
                 (fun t ->
                     Interlocked.Increment &finalizerRan |> ignore
@@ -49,9 +47,9 @@ module TestGc =
     [<Test>]
     let ``Does not keep target alive unnecessarily`` () =
         let weakRef =
-            let target = TestObject (123)
-            let weak = WeakReference (target)
-            GC.addFinalizerIgnore target (fun _ -> ())
+            let target = TestObject 123
+            let weak = WeakReference target
+            Gc.addFinalizerIgnore target (fun _ -> ())
             weak
 
         weakRef.IsAlive |> shouldEqual true
@@ -65,8 +63,8 @@ module TestGc =
         let mutable receivedId = 0
 
         do
-            let target = TestObject (999)
-            GC.addFinalizerIgnore target (fun t -> receivedId <- t.Id)
+            let target = TestObject 999
+            Gc.addFinalizerIgnore target (fun t -> receivedId <- t.Id)
 
         forceGCAndFinalizers ()
 
@@ -75,9 +73,9 @@ module TestGc =
     [<Test>]
     let ``Finalizer does not run while object is still reachable`` () =
         let mutable finalizerRan = 0
-        let target = TestObject (55)
+        let target = TestObject 55
 
-        GC.addFinalizerIgnore target (fun _ -> Interlocked.Increment &finalizerRan |> ignore<int>)
+        Gc.addFinalizerIgnore target (fun _ -> Interlocked.Increment &finalizerRan |> ignore<int>)
 
         forceGCAndFinalizers ()
 
@@ -91,8 +89,8 @@ module TestGc =
         let mainThreadId = Thread.CurrentThread.ManagedThreadId
 
         do
-            let target = TestObject (88)
-            GC.addFinalizerIgnore target (fun _ -> finalizerThreadId <- Thread.CurrentThread.ManagedThreadId)
+            let target = TestObject 88
+            Gc.addFinalizerIgnore target (fun _ -> finalizerThreadId <- Thread.CurrentThread.ManagedThreadId)
 
         forceGCAndFinalizers ()
 
@@ -103,13 +101,12 @@ module TestGc =
         let mutable finalizerRan = -1
 
         do
-            let target = TestObject (42)
-            GC.addFinalizerIgnore target (fun t -> Interlocked.Increment &finalizerRan |> ignore)
+            let target = TestObject 42
+            Gc.addFinalizerIgnore target (fun _ -> Interlocked.Increment &finalizerRan |> ignore)
 
         forceGCAndFinalizers ()
 
         finalizerRan |> shouldEqual 0
-    // if finalizerRan <> 0 then failwith ""
 
     [<Test>]
     let ``ConditionalWeakTable does not create strong references`` () =
@@ -118,17 +115,17 @@ module TestGc =
         let finalizerCounts = ResizeArray<int> ()
 
         for i = 1 to 10 do
-            let target = TestObject (i)
-            let weakRef = WeakReference (target)
-            collectableRefs.Add (weakRef)
+            let target = TestObject i
+            let weakRef = WeakReference target
+            collectableRefs.Add weakRef
 
             let mutable count = 0
 
-            GC.addFinalizerIgnore
+            Gc.addFinalizerIgnore
                 target
                 (fun _ ->
                     let count = Interlocked.Increment &count
-                    lock finalizerCounts (fun () -> finalizerCounts.Add (count))
+                    lock finalizerCounts (fun () -> finalizerCounts.Add count)
                 )
 
         forceGCAndFinalizers ()
@@ -147,21 +144,19 @@ module TestGc =
             // put on the heap, don't intern
             let stringTarget = "H" + "ello" :> obj
 
-            GC.addFinalizerIgnore
+            Gc.addFinalizerIgnore
                 stringTarget
                 (fun s ->
                     let s = unbox<string> s
-                    lock results (fun () -> results.Add ($"String: %s{s}"))
+                    lock results (fun () -> results.Add $"String: %s{s}")
                 )
 
             let arrayTarget = [| 1 ; 2 ; 3 |]
 
-            GC.addFinalizerIgnore
-                arrayTarget
-                (fun arr -> lock results (fun () -> results.Add ($"Array: %i{arr.Length}")))
+            Gc.addFinalizerIgnore arrayTarget (fun arr -> lock results (fun () -> results.Add $"Array: %i{arr.Length}"))
 
             let tupleTarget = (42, "test")
-            GC.addFinalizerIgnore tupleTarget (fun t -> lock results (fun () -> results.Add ($"Tuple: %i{fst t}")))
+            Gc.addFinalizerIgnore tupleTarget (fun t -> lock results (fun () -> results.Add $"Tuple: %i{fst t}"))
 
         forceGCAndFinalizers ()
 
@@ -186,11 +181,11 @@ module TestGc =
 
         // Create many objects with finalizers
         for i in 1..expectedCount do
-            let target = TestObject (i)
-            GC.addFinalizerIgnore target (fun _ -> Interlocked.Increment (&finalizerCount) |> ignore<int>)
+            let target = TestObject i
+            Gc.addFinalizerIgnore target (fun _ -> Interlocked.Increment (&finalizerCount) |> ignore<int>)
 
         // Force multiple GC cycles to ensure all finalizers run
-        for _ in 1..5 do
+        for _ = 1 to 5 do
             forceGCAndFinalizers ()
 
         finalizerCount |> shouldEqual expectedCount

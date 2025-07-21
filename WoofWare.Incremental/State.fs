@@ -977,7 +977,7 @@ module State =
         if Debug.globalFlag then
             invariant t
 
-    let recomputeFirstNodeThatIsNecessary (r: RecomputeHeap) : unit =
+    let recomputeFirstNodeThatIsNecessary (r : RecomputeHeap) : unit =
         let node = RecomputeHeap.removeMin r
 
         { new NodeEval<_> with

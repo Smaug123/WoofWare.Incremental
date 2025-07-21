@@ -1,8 +1,8 @@
 [
   {
     "pname": "ApiSurface",
-    "version": "4.1.21",
-    "hash": "sha256-v2adBYoE9NZPaQR3u2qq9r/9PxAM/wqi2Uiky0xGq+E="
+    "version": "4.1.22",
+    "hash": "sha256-voj9m3YmyJ95FAMLV4sWzQMod3Em0mTjzf0LBUUFOso="
   },
   {
     "pname": "fantomas",
@@ -10,14 +10,14 @@
     "hash": "sha256-v4bXmvjZOYxl5RSIHuqVfDzBQdRz5SrmzZtD6SeEYTY="
   },
   {
+    "pname": "FsCheck",
+    "version": "3.3.0",
+    "hash": "sha256-TFDR/uAGv4OqrMX8/reQ4faaAhH9hxTHr1T/YkNPCCU="
+  },
+  {
     "pname": "fsharp-analyzers",
     "version": "0.28.0",
     "hash": "sha256-BqGk9MzHHA3oRPNfWuANcM1YELsdhzWI+kLF4mUDUx8="
-  },
-  {
-    "pname": "FSharp.Core",
-    "version": "5.0.0",
-    "hash": "sha256-HYn+BzwplXow+tl9ziT5MHYcMmuWonqczReUxHKaEoM="
   },
   {
     "pname": "FSharp.Core",
@@ -40,6 +40,26 @@
     "hash": "sha256-mUQ63atpT00r49ca50uZu2YCiLg3yd6r3HzTryqcuEA="
   },
   {
+    "pname": "Microsoft.AspNetCore.App.Ref",
+    "version": "5.0.0",
+    "hash": "sha256-z22ZDldoIlDUYeF9Rje0aVPlYAGKIpdj5wDzn1CW+jQ="
+  },
+  {
+    "pname": "Microsoft.AspNetCore.App.Runtime.linux-arm64",
+    "version": "5.0.17",
+    "hash": "sha256-ELWBHK+1ijGTvq1BsK/vJx/MNqKS8daZgrQ0Tj9+faA="
+  },
+  {
+    "pname": "Microsoft.AspNetCore.App.Runtime.linux-x64",
+    "version": "5.0.17",
+    "hash": "sha256-iHn2yGpaL5EM8L7nJJ2aRCIZ+kE98NS+KWUvrWnjzhg="
+  },
+  {
+    "pname": "Microsoft.AspNetCore.App.Runtime.osx-x64",
+    "version": "5.0.17",
+    "hash": "sha256-TdhOyPN+WA27WFd3PLKdsC+bbyNidOiOOuz/WpHDe+M="
+  },
+  {
     "pname": "Microsoft.CodeCoverage",
     "version": "17.14.1",
     "hash": "sha256-f8QytG8GvRoP47rO2KEmnDLxIpyesaq26TFjDdW40Gs="
@@ -50,9 +70,39 @@
     "hash": "sha256-mZUzDFvFp7x1nKrcnRd0hhbNu5g8EQYt8SKnRgdhT/A="
   },
   {
-    "pname": "Microsoft.NETCore.Platforms",
-    "version": "1.1.0",
-    "hash": "sha256-FeM40ktcObQJk4nMYShB61H/E8B7tIKfl9ObJ0IOcCM="
+    "pname": "Microsoft.NETCore.App.Host.linux-arm64",
+    "version": "5.0.17",
+    "hash": "sha256-a8FLTWaNL6TknXDx+YFwLzcDn7nuq3l9yN2UUrHfZx8="
+  },
+  {
+    "pname": "Microsoft.NETCore.App.Host.linux-x64",
+    "version": "5.0.17",
+    "hash": "sha256-exMpVamk8ZzfCQDQcDmQDYJplDcOOU99ic7NSDKUgtE="
+  },
+  {
+    "pname": "Microsoft.NETCore.App.Host.osx-x64",
+    "version": "5.0.17",
+    "hash": "sha256-bDgVacWuwDTJqEL/RbZ2gS9EGexx0OGZsYPnHQPh5Qk="
+  },
+  {
+    "pname": "Microsoft.NETCore.App.Ref",
+    "version": "5.0.0",
+    "hash": "sha256-kQ8wpR4crWoqy/jrskat34Y3Nr3nbxoSpEPMnxycwtw="
+  },
+  {
+    "pname": "Microsoft.NETCore.App.Runtime.linux-arm64",
+    "version": "5.0.17",
+    "hash": "sha256-2KU5RRHGbkCA+lCEH5QaBHma1AZqVLWBws7IKxBWkJs="
+  },
+  {
+    "pname": "Microsoft.NETCore.App.Runtime.linux-x64",
+    "version": "5.0.17",
+    "hash": "sha256-2NpVvrbqct3M1fKiSe/zyt41mf1aV6WUdxIlJod27Ek="
+  },
+  {
+    "pname": "Microsoft.NETCore.App.Runtime.osx-x64",
+    "version": "5.0.17",
+    "hash": "sha256-V1arT33a215ZP+Jo/vkrhko78FsA8X8XujZ6jUKfBd4="
   },
   {
     "pname": "Microsoft.NETCore.Platforms",
@@ -103,11 +153,6 @@
     "pname": "Nerdbank.GitVersioning",
     "version": "3.8.38-alpha",
     "hash": "sha256-gPMrVbjOZxXoofczF/pn6eVkLhjVSJIyQrLO2oljrDc="
-  },
-  {
-    "pname": "NETStandard.Library",
-    "version": "2.0.3",
-    "hash": "sha256-Prh2RPebz/s8AzHb2sPHg3Jl8s31inv9k+Qxd293ybo="
   },
   {
     "pname": "Newtonsoft.Json",
@@ -220,8 +265,28 @@
     "hash": "sha256-aM5Dh4okLnDv940zmoFAzRmqZre83uQBtGOImJpoIqk="
   },
   {
+    "pname": "TypeEquality",
+    "version": "0.3.0",
+    "hash": "sha256-V50xAOzzyUJrY+MYPRxtnqW5MVeATXCes89wPprv1r4="
+  },
+  {
+    "pname": "WoofWare.BalancedReducer",
+    "version": "1.0.2",
+    "hash": "sha256-3QJSfo3eyfcyz8EueNjEh/IOZJrBNCoD/g7cY0hh+YU="
+  },
+  {
     "pname": "WoofWare.Expect",
     "version": "0.5.1",
     "hash": "sha256-8qGvyC8tyrgrUKnhqh9YKjfqwUFl9Z/1Tm/Hfbf/BIs="
+  },
+  {
+    "pname": "WoofWare.TimingWheel",
+    "version": "0.6.1",
+    "hash": "sha256-zEupF3zeFaC2yigryXTcxbFuNgWPmltPtdQruJdrwOI="
+  },
+  {
+    "pname": "WoofWare.WeakHashTable",
+    "version": "1.1.1",
+    "hash": "sha256-Y1S6QSyaPIyGU1DljGCPycO0blRUaOndqmbdcnyxTIw="
   }
 ]

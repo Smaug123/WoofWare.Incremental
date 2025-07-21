@@ -145,11 +145,11 @@ module TestForAnalyzer =
     let ``traverses bind`` () =
         let Incr = Incremental.make ()
 
-        let x = Incr.VarCreate 1
+        let x = Incr.Var.Create 1
         let a = Incr.Return 3
         let b = Incr.Return 4
 
-        let cond = Incr.Map (fun i -> i % 2 = 0) (Incr.VarWatch x)
+        let cond = Incr.Map (fun i -> i % 2 = 0) (Incr.Var.Watch x)
 
         let c = Incr.Bind (fun bool -> if bool then a else Incr.Map (fun i -> i * 4) b) cond
 
@@ -262,8 +262,8 @@ module TestForAnalyzer =
     [<Test>]
     let ``different recomputedAt and changedAt`` () =
         let Incr = Incremental.make ()
-        let a = Incr.VarCreate 3
-        let aVal = Incr.VarWatch a
+        let a = Incr.Var.Create 3
+        let aVal = Incr.Var.Watch a
         let mult = aVal |> Incr.Map (fun a -> a % 2)
         let multObserver = Incr.Observe mult
 
@@ -277,7 +277,7 @@ module TestForAnalyzer =
             return printNodes [ mult ] Incr.Pack printComputationInfo
         }
 
-        Incr.VarSet a 1
+        Incr.Var.Set a 1
         Incr.Stabilize ()
 
         (* NOTE: The reason that [recomputed_at] and [changed_at] are different here, is that -

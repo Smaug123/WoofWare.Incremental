@@ -11,80 +11,53 @@ module TestConfig =
 
     [<Test>]
     let ``default timing-wheel precision and level durations`` () =
-        let i = Incremental.make ()
-        let config = i.Clock.defaultTimingWheelConfig
-        let durations = Config.durations config
+        let Incr = Incremental.make ()
+        let config = Incr.Clock.DefaultTimingWheelConfig
+        let durations = TimingWheelConfig.durations config
 
         List.last durations >= TimeNs.Span.day |> shouldEqual true
 
         expect {
-            snapshot ""
-            return Config.alarmPrecision config
+            snapshot @"1048576"
+            return TimingWheelConfig.alarmPrecision config |> TimeNs.Span.toInt64Ns
         }
 
         expect {
-            snapshot ""
-            return durations
-        }
+            snapshot
+                @"17s.179869100
+01d15h05m37s.488355300
+52d02h59m59s.627370400
+104d05h59m59s.254740899
+208d11h59m58s.509481899
+416d23h59m57s.018963903
+833d23h59m54s.037927896
+1667d23h59m48s.075855792
+3335d23h59m36s.151711702
+6671d23h59m12s.303423524
+13343d23h58m24s.606847048
+26687d23h56m49s.213694096
+53375d23h53m38s.427388191
+106751d23h47m16s.854776382"
 
-let%expect_test "default timing-wheel precision and level durations" =
-  let module I = Incremental.Make () in
-  let config = I.Clock.default_timing_wheel_config in
-  let durations = Timing_wheel.Config.durations config in
-  require (Time_ns.Span.( >= ) (List.last_exn durations) Time_ns.Span.day);
-  print_s
-    [%message
-      ""
-        ~alarm_precision:(Timing_wheel.Config.alarm_precision config : Time_ns.Span.t)
-        (durations : Time_ns.Span.t list)];
-  [%expect
-    {|
-    ((alarm_precision 1.048576ms)
-     (durations (
-       17.179869184s
-       1d15h5m37.488355328s
-       52d2h59m59.627370496s
-       104d5h59m59.254740992s
-       208d11h59m58.509481984s
-       416d23h59m57.018963968s
-       833d23h59m54.037927936s
-       1667d23h59m48.075855872s
-       3335d23h59m36.151711744s
-       6671d23h59m12.303423488s
-       13343d23h58m24.606846976s
-       26687d23h56m49.213693952s
-       53375d23h53m38.427387903s)))
-    |}]
-;;
+            return durations |> List.map TimeNs.Span.display |> String.concat "\n"
+        }
 
     [<Test>]
     let ``default timing wheel cna handle the full range of times`` () =
-        let i = Incremental.make ()
-        let clock = i.Clock.create TimeNs.epoch
-        let o = Incremental.observe (Clock.at clock TimeNs.maxValueRepresentable)
-        Incremental.stabilize i
+        let Incr = Incremental.make ()
+        let clock = Incr.Clock.Create TimeNs.epoch
+        let o = Incr.Observe (Incr.Clock.At clock TimeNs.maxValueRepresentable)
+        Incr.Stabilize ()
+
         expect {
-            snapshot ""
-            return o
-        }
-        Clock.advanceClock clock TimeNs.maxValueRepresentable
-        Incremental.stabilize i
-        expect {
-            snapshot ""
+            snapshot "Before"
             return o
         }
 
-let%expect_test "default timing wheel can handle the full range of times" =
-  let module I = Incremental.Make () in
-  let open I in
-  let clock = Clock.create ~start:Time_ns.epoch () in
-  let o = observe (Clock.at clock Time_ns.max_value_representable) in
-  let show_o () = print_s [%sexp (o : Before_or_after.t Observer.t)] in
-  stabilize ();
-  show_o ();
-  [%expect {| Before |}];
-  Clock.advance_clock clock ~to_:Time_ns.max_value_representable;
-  stabilize ();
-  show_o ();
-  [%expect {| After |}]
-;;
+        Incr.Clock.AdvanceClock clock TimeNs.maxValueRepresentable
+        Incr.Stabilize ()
+
+        expect {
+            snapshot "After"
+            return o
+        }
