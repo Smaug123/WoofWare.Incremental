@@ -1053,7 +1053,7 @@ module State =
             |> ThreadSafeQueue.enqueue (InternalObserverCrate.make internalObserver)
         )
 
-    let createObserver (shouldFinalize : bool option) (observing : 'a Node) : InternalObserver<'a> =
+    let createObserver (shouldFinalize : bool option) (observing : 'a Node) : InternalObserver<'a> ref =
         let shouldFinalize = defaultArg shouldFinalize true
         let t = observing.State
 
@@ -1069,7 +1069,7 @@ module State =
             }
 
         Stack.push (InternalObserverCrate.make internalObserver) t.NewObservers
-        let mutable observer = internalObserver in
+        let observer = ref internalObserver
 
         if shouldFinalize then
             Gc.addFinalizerIgnore observer (Staged.unstage (observerFinalizer t))
