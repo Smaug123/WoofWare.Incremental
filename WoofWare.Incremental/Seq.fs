@@ -5,11 +5,13 @@ module internal Seq =
 
     let tryReduce<'a> (f : 'a -> 'a -> 'a) (l : 'a seq) : 'a option =
         use enum = l.GetEnumerator ()
+
         if not (enum.MoveNext ()) then
             None
         else
 
         let mutable result = enum.Current
+
         while enum.MoveNext () do
             result <- f result enum.Current
 

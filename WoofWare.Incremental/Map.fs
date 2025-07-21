@@ -15,3 +15,14 @@ module internal Map =
                     | Some existing -> Some (f k existing v)
                 )
         )
+
+    let addMulti (k : 'k) (v : 'v) (m : Map<'k, 'v list>) : Map<'k, 'v list> =
+        m
+        |> Map.change
+            k
+            (fun vs ->
+                match vs with
+                | None -> [ v ]
+                | Some vs -> v :: vs
+                |> Some
+            )

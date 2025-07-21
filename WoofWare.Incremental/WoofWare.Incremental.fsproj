@@ -13,8 +13,6 @@
         <Compile Include="Seq.fs" />
         <Compile Include="Sequence.fs" />
         <Compile Include="Gc.fs" />
-        <Compile Include="Skeleton\IncrementalSkeleton.fsi" />
-        <Compile Include="Skeleton\IncrementalSkeleton.fs" />
         <Compile Include="ThreadSafeQueue.fs" />
         <Compile Include="Staged.fs" />
         <Compile Include="Stack.fs" />
