@@ -7,20 +7,22 @@ open WoofWare.Incremental
 open WoofWare.Expect
 
 type NodePrint =
-  { Id : NodeId
-  ; Kind : ForAnalyzer.Kind
-  ; Cutoff : ForAnalyzer.Cutoff
-  ; Children : NodeId IReadOnlyList
-  ; BindChildren : NodeId IReadOnlyList
-  ; RecomputedAt : StabilizationNum
-  ; ChangedAt : StabilizationNum
-  ; Height : int
-  }
+    {
+        Id : NodeId
+        Kind : ForAnalyzer.Kind
+        Cutoff : ForAnalyzer.Cutoff
+        Children : NodeId IReadOnlyList
+        BindChildren : NodeId IReadOnlyList
+        RecomputedAt : StabilizationNum
+        ChangedAt : StabilizationNum
+        Height : int
+    }
 
-  override this.ToString () =
-      let children = this.Children |> Seq.map NodeId.toString |> String.concat " "
-      let bindChildren = this.BindChildren |> Seq.map NodeId.toString |> String.concat " "
-      $"(node (
+    override this.ToString () =
+        let children = this.Children |> Seq.map NodeId.toString |> String.concat " "
+        let bindChildren = this.BindChildren |> Seq.map NodeId.toString |> String.concat " "
+
+        $"(node (
   (id %i{NodeId.toInt this.Id})
   (kind %s{ForAnalyzer.Kind.toString this.Kind})
   (cutoff %s{ForAnalyzer.Cutoff.toString this.Cutoff})
@@ -32,11 +34,24 @@ type NodePrint =
 
 [<TestFixture>]
 module TestForAnalyzer =
-    let printNodes (nodeList: 'a list) (pack: 'a -> NodeCrate) (outputNode : NodePrint -> string) : string =
+    let printNodes (nodeList : 'a list) (pack : 'a -> NodeCrate) (outputNode : NodePrint -> string) : string =
         let nodes = ResizeArray<NodePrint> ()
-        ForAnalyzer.traverse (List.map pack nodeList) (fun id kind cutoff children bindChildren _userInfo recomputedAt changedAt height ->
-            nodes.Add { Id = id ; Kind = kind ; Cutoff = cutoff ; Children = children ; BindChildren = bindChildren ; RecomputedAt = recomputedAt ; ChangedAt = changedAt ; Height = height }
-        )
+
+        ForAnalyzer.traverse
+            (List.map pack nodeList)
+            (fun id kind cutoff children bindChildren _userInfo recomputedAt changedAt height ->
+                nodes.Add
+                    {
+                        Id = id
+                        Kind = kind
+                        Cutoff = cutoff
+                        Children = children
+                        BindChildren = bindChildren
+                        RecomputedAt = recomputedAt
+                        ChangedAt = changedAt
+                        Height = height
+                    }
+            )
 
         let minIdOpt =
             nodes
@@ -44,6 +59,7 @@ module TestForAnalyzer =
             |> Seq.tryMin
 
         let result = ResizeArray ()
+
         match minIdOpt with
         | None -> ()
         | Some minId ->
@@ -55,16 +71,17 @@ module TestForAnalyzer =
                 let node =
                     let newChildren = node.Children |> Seq.map newId |> ResizeArray
                     let newBindChildren = node.BindChildren |> Seq.map newId |> ResizeArray
+
                     { node with
-                         Id = newId node.Id
-                         Children = newChildren
-                         BindChildren = newBindChildren
+                        Id = newId node.Id
+                        Children = newChildren
+                        BindChildren = newBindChildren
                     }
-                outputNode node
-                |> result.Add
+
+                outputNode node |> result.Add
+
         result.Reverse ()
-        result
-        |> String.concat "\n"
+        result |> String.concat "\n"
 
     let printComputationInfo node =
         let id = node.Id
@@ -77,8 +94,10 @@ module TestForAnalyzer =
         let Incr = Incremental.make ()
 
         let n = Incr.Return "hello"
+
         expect {
-            snapshot @"(node (
+            snapshot
+                @"(node (
   (id 1)
   (kind Const)
   (cutoff PhysEqual)
@@ -87,6 +106,7 @@ module TestForAnalyzer =
   (recomputed_at -1)
   (changed_at    -1)
   (height        -1)))"
+
             return printNodes [ n ] Incr.Pack (fun n -> n.ToString ())
         }
 
@@ -98,7 +118,8 @@ module TestForAnalyzer =
         let r = Incr.Map (fun s -> s + "!") n
 
         expect {
-            snapshot @"(node (
+            snapshot
+                @"(node (
   (id 1)
   (kind Const)
   (cutoff PhysEqual)
@@ -116,7 +137,8 @@ module TestForAnalyzer =
   (recomputed_at -1)
   (changed_at    -1)
   (height        -1)))"
-            return printNodes [r] Incr.Pack (fun n -> n.ToString ())
+
+            return printNodes [ r ] Incr.Pack (fun n -> n.ToString ())
         }
 
     [<Test>]
@@ -132,7 +154,8 @@ module TestForAnalyzer =
         let c = Incr.Bind (fun bool -> if bool then a else Incr.Map (fun i -> i * 4) b) cond
 
         expect {
-            snapshot @"(node (
+            snapshot
+                @"(node (
   (id 1)
   (kind Var)
   (cutoff PhysEqual)
@@ -168,7 +191,8 @@ module TestForAnalyzer =
   (recomputed_at -1)
   (changed_at    -1)
   (height        -1)))"
-            return printNodes [c] Incr.Pack (fun n -> n.ToString ())
+
+            return printNodes [ c ] Incr.Pack (fun n -> n.ToString ())
         }
 
         let observerSoThatStabilizationPerformsWork = Incr.Observe c
@@ -176,7 +200,8 @@ module TestForAnalyzer =
         GC.KeepAlive observerSoThatStabilizationPerformsWork
 
         expect {
-            snapshot @"(node (
+            snapshot
+                @"(node (
   (id 3)
   (kind Const)
   (cutoff PhysEqual)
@@ -230,7 +255,8 @@ module TestForAnalyzer =
   (recomputed_at 0)
   (changed_at    0)
   (height        4)))"
-            return printNodes [c] Incr.Pack (fun n -> n.ToString ())
+
+            return printNodes [ c ] Incr.Pack (fun n -> n.ToString ())
         }
 
     [<Test>]
@@ -244,9 +270,11 @@ module TestForAnalyzer =
         Incr.Stabilize ()
 
         expect {
-            snapshot @"(id 1) (recomputedAt 0) (changedAt 0)
+            snapshot
+                @"(id 1) (recomputedAt 0) (changedAt 0)
 (id 2) (recomputedAt 0) (changedAt 0)"
-            return printNodes [mult] Incr.Pack printComputationInfo
+
+            return printNodes [ mult ] Incr.Pack printComputationInfo
         }
 
         Incr.VarSet a 1
@@ -265,10 +293,13 @@ module TestForAnalyzer =
            value was the "same" according to its phys_equal cutoff. *)
 
         GC.KeepAlive multObserver
+
         expect {
-            snapshot @"(id 1) (recomputedAt 1) (changedAt 1)
+            snapshot
+                @"(id 1) (recomputedAt 1) (changedAt 1)
 (id 2) (recomputedAt 1) (changedAt 0)"
-            return printNodes [mult] Incr.Pack printComputationInfo
+
+            return printNodes [ mult ] Incr.Pack printComputationInfo
         }
 
     [<Test>]
@@ -280,6 +311,7 @@ module TestForAnalyzer =
         let b' = a' |> Incr.Map (fun s -> s + ".")
         let bObs = Incr.Observe b
         let b'Obs = Incr.Observe b'
+
         expect {
             snapshot ""
             return printNodes (ForAnalyzer.directlyObserved Incr.State) id (fun n -> n.ToString ())
@@ -289,8 +321,9 @@ module TestForAnalyzer =
         GC.KeepAlive bObs
         GC.KeepAlive b'Obs
 
-        expect' {
-            snapshot @"(node (
+        expect {
+            snapshot
+                @"(node (
   (id 1)
   (kind Const)
   (cutoff PhysEqual)
@@ -326,5 +359,6 @@ module TestForAnalyzer =
   (recomputed_at 0)
   (changed_at    0)
   (height        1)))"
+
             return printNodes (ForAnalyzer.directlyObserved Incr.State) id (fun n -> n.ToString ())
         }
