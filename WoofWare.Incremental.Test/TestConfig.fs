@@ -43,7 +43,7 @@ module TestConfig =
         }
 
     [<Test>]
-    let ``default timing wheel cna handle the full range of times`` () =
+    let ``default timing wheel can handle the full range of times`` () =
         let Incr = Incremental.make ()
         let clock = Incr.Clock.Create TimeNs.epoch
         let o = Incr.Observe (Incr.Clock.At clock TimeNs.maxValueRepresentable)

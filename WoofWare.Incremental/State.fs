@@ -1519,7 +1519,7 @@ module State =
         (children : Node<'b> array)
         (init : 'acc)
         (f : 'acc -> 'b -> 'acc)
-        (update : Update<'b, 'acc>)
+        (update : FoldUpdate<'b, 'acc>)
         : Node<'acc>
         =
         let fullComputeEveryNChanges = defaultArg fullComputeEveryNChanges Int32.MaxValue
@@ -1559,7 +1559,7 @@ module State =
             | None -> accum, num_invalid - 1
             | Some x -> fInverse accum x, num_invalid
 
-        unorderedArrayFold t fullComputeEveryNChanges ts (init, 0) f (Update.FInverse fInverse)
+        unorderedArrayFold t fullComputeEveryNChanges ts (init, 0) f (FoldUpdate.FInverse fInverse)
         |> map (fun (accum, numInvalid) -> if numInvalid = 0 then Some accum else None)
 
     let atLeastKOf (t : State) (nodes : Node<bool> array) (k : int) : Node<bool> =
@@ -1571,7 +1571,7 @@ module State =
             nodes
             0
             (fun numTrue b -> numTrue + boolToInt b)
-            (Update.FInverse (fun numTrue b -> numTrue - boolToInt b))
+            (FoldUpdate.FInverse (fun numTrue b -> numTrue - boolToInt b))
         |> map (fun i -> i >= k)
 
     let exists (t : State) (nodes : Node<bool> array) : Node<bool> = atLeastKOf t nodes 1
@@ -1586,7 +1586,7 @@ module State =
         (sub : 'b -> 'a -> 'b)
         : Node<'b>
         =
-        unorderedArrayFold t fullComputeEveryNChanges nodes zero add (Update.FInverse sub)
+        unorderedArrayFold t fullComputeEveryNChanges nodes zero add (FoldUpdate.FInverse sub)
 
     let optSum
         (t : State)
@@ -1667,7 +1667,7 @@ module State =
 
         at
 
-    let at_intervals (clock : Clock) interval =
+    let atIntervals (clock : Clock) interval =
         let t = Clock.incrState clock
 
         if interval < (TimingWheel.alarmPrecision clock.TimingWheel) then

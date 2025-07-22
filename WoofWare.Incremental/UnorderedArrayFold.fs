@@ -3,17 +3,17 @@ namespace WoofWare.Incremental
 open System
 open TypeEquality
 
-type internal Update<'a, 'b> =
+type internal FoldUpdate<'a, 'b> =
     | FInverse of ('b -> 'a -> 'b)
     | Update of ('b -> 'a -> 'a -> 'b)
 
 
 [<RequireQualifiedAccess>]
-module Update =
+module FoldUpdate =
     let update t f =
         match t with
-        | Update.Update update -> update
-        | Update.FInverse fInverse -> fun fold_value old newValue -> f (fInverse fold_value old) newValue
+        | FoldUpdate.Update update -> update
+        | FoldUpdate.FInverse fInverse -> fun fold_value old newValue -> f (fInverse fold_value old) newValue
 
 [<RequireQualifiedAccess>]
 module internal UnorderedArrayFold =
@@ -23,7 +23,7 @@ module internal UnorderedArrayFold =
         {
             Init = init
             F = f
-            Update = Update.update update f
+            Update = FoldUpdate.update update f
             FullComputeEveryNChanges = fullComputeEveryNChanges
             Children = children
             Main = main

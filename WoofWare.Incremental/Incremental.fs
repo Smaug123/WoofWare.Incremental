@@ -2,14 +2,42 @@ namespace WoofWare.Incremental
 
 open WoofWare.TimingWheel
 
+type Update<'a> =
+    | Necessary of 'a
+    | Changed of 'a * 'a
+    | Invalidated
+    | Unnecessary
+
 type Observer<'a> = | Observer of Observer'<'a>
+
+[<RequireQualifiedAccess>]
+module Observer =
+    let disallowFutureUse<'a> (Observer o : 'a Observer) : unit = State.disallowFutureUse o.Value
+
+    let value (Observer o) = State.observerValue o
+
+    let valueThrowing (Observer o) = State.observerValueThrowing o
+
+    let onUpdateThrowing (Observer a) f =
+        fun x ->
+            match x with
+            | NodeUpdate.Changed (a, b) -> f (Update.Changed (a, b))
+            | NodeUpdate.Necessary m -> f (Update.Necessary m)
+            | NodeUpdate.Invalidated -> f Update.Invalidated
+            | NodeUpdate.Unnecessary ->
+                failwith
+                    "Logic error in WoofWare.Incremental: Observer.onUpdateThrowing got unexpected Unnecessary update"
+        |> State.observerOnUpdateThrowing a
 
 type IClock =
     abstract DefaultTimingWheelConfig : TimingWheelConfig
     abstract Create' : TimingWheelConfig -> TimeNs -> Clock
     abstract Create : TimeNs -> Clock
     abstract At : Clock -> TimeNs -> Node<BeforeOrAfter>
+    abstract AtIntervals : Clock -> TimeNs.Span -> Node<unit>
     abstract AdvanceClock : Clock -> TimeNs -> unit
+    abstract AdvanceClockBy : Clock -> TimeNs.Span -> unit
+    abstract Snapshot<'a> : Clock -> Node<'a> -> at : TimeNs -> before : 'a -> Result<Node<'a>, string>
 
 type IVar =
     abstract Create<'a> : 'a -> Var<'a>
@@ -18,14 +46,20 @@ type IVar =
 
 type Incremental =
     abstract Return<'a> : 'a -> Node<'a>
+    abstract Const<'a> : 'a -> Node<'a>
     abstract Pack<'a> : Node<'a> -> NodeCrate
     abstract Map<'a, 'b> : ('a -> 'b) -> Node<'a> -> Node<'b>
+    abstract Map2<'a, 'b, 'c> : ('a -> 'b -> 'c) -> Node<'a> -> Node<'b> -> Node<'c>
+    abstract Join<'a> : 'a Node Node -> 'a Node
+    abstract Both<'a, 'b> : 'a Node -> 'b Node -> ('a * 'b) Node
     abstract Var : IVar
     abstract Clock : IClock
     abstract Bind<'a, 'b> : ('a -> Node<'b>) -> Node<'a> -> Node<'b>
     abstract Stabilize : unit -> unit
     abstract Observe<'a> : Node<'a> -> Observer<'a>
     abstract State : State
+    abstract SaveDot' : renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
+    abstract SaveDot : writeChunk : (string -> unit) -> unit
 
 type IncrementalImpl (state : State) =
     let var =
@@ -45,9 +79,8 @@ type IncrementalImpl (state : State) =
             // Make sure [start] is rounded to the nearest microsecond.  Otherwise, if you
             // feed [Clock.now ()] to a time function, it can be rounded down to a time in
             // the past, causing errors.
-            let start = failwith ""
-            // Time_ns.of_time_float_round_nearest_microsecond
-            //   (Time_ns.to_time_float_round_nearest_microsecond start)
+            let divided = float<int64<timeNs>> start / 1000.0
+            let start = int64<float> (System.Math.Round (divided)) * 1000L<timeNs>
             State.createClock state config start
 
         { new IClock with
@@ -55,19 +88,35 @@ type IncrementalImpl (state : State) =
             member this.Create' config start = create config start
             member this.Create start = create defaultConfig start
             member this.At clock time = State.at clock time
+            member this.AtIntervals clock time = State.atIntervals clock time
             member this.AdvanceClock clock time = State.advanceClock clock time
+
+            member this.AdvanceClockBy clock span =
+                State.advanceClock clock (TimeNs.add (Clock.now clock) span)
+
+            member this.Snapshot clock v at before = State.snapshot clock v at before
         }
 
     interface Incremental with
         member this.Return a = State.konst state a
+        member this.Const a = State.konst state a
         member this.Pack a = NodeCrate.make a
         member this.Map f a = State.map f a
+        member this.Map2 f a b = State.map2 a b f
+        member this.Both a b = State.both a b
+        member this.Join n = State.join n
         member this.Bind f n = State.bind n f
         member this.Stabilize () = State.stabilize state
         member this.Var = var
         member this.Clock = clock
         member this.Observe n = State.createObserver None n |> Observer
         member this.State = state
+
+        member this.SaveDot' renderBindEdges writeChunk =
+            NodeToDot.renderDot renderBindEdges writeChunk (State.directlyObserved state)
+
+        member this.SaveDot writeChunk =
+            (this :> Incremental).SaveDot' true writeChunk
 
 [<RequireQualifiedAccess>]
 module Incremental =

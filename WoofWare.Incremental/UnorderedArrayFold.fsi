@@ -3,7 +3,7 @@ namespace WoofWare.Incremental
 // An UnorderedArrayFold<'a, 'acc> is a kind of DAG node, where 'a is the type of value being folded
 // and 'acc is the type of the accumulator.
 
-type internal Update<'a, 'b> =
+type internal FoldUpdate<'a, 'b> =
     | FInverse of ('b -> 'a -> 'b)
     // 'a params are old, then new
     | Update of ('b -> 'a -> 'a -> 'b)
@@ -13,7 +13,7 @@ module internal UnorderedArrayFold =
     val create :
         init : 'acc ->
         f : ('acc -> 'a -> 'acc) ->
-        update : Update<'a, 'acc> ->
+        update : FoldUpdate<'a, 'acc> ->
         fullComputeEveryNChanges : int ->
         children : 'a Node[] ->
         main : 'acc Node ->
