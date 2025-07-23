@@ -35,3 +35,5 @@ module internal Bind =
     val iterNodesCreatedOnRhs : Bind<'a, 'b> -> f : (NodeCrate -> unit) -> unit
 
     val internal invariant<'a, 'b> : ('a -> unit) -> ('b -> unit) -> Bind<'a, 'b> -> unit
+
+    val internal physSame<'a, 'b, 'c, 'd> : Bind<'a, 'b> -> Bind<'c, 'd> -> bool

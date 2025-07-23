@@ -1,7 +1,5 @@
 namespace WoofWare.Incremental
 
-open System
-
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Scope =
 
@@ -43,7 +41,7 @@ module Scope =
             |> bind.Apply
 
     let addNode (t : Scope) (node : 'a Node) : unit =
-        assert (Object.ReferenceEquals (node.CreatedIn, t))
+        assert (Type.referenceEqual node.CreatedIn t)
 
         match t with
         | Top -> ()

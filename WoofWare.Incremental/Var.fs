@@ -23,6 +23,6 @@ module Var =
             // possible with useCurrentScope = true
             ()
         | Kind.Var t' ->
-            if not (Object.ReferenceEquals (v, t')) then
+            if not (Type.referenceEqual v t') then
                 failwith "invariant failed"
         | k -> failwith $"invariant failed: {k}"

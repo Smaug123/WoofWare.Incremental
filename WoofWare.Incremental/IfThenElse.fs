@@ -6,22 +6,25 @@ open System
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal IfThenElse =
 
+    let physSame<'a, 'b> (a : IfThenElse<'a>) (b : IfThenElse<'b>) : bool =
+        Type.referenceEqual' a b
+
     let invariant (_inv : 'a -> unit) (t : IfThenElse<'a>) : unit =
         do
             match t.Main.Kind with
             | Kind.Invalid -> ()
             | Kind.IfThenElse t' ->
-                if not (Object.ReferenceEquals (t, t')) then
+                if not (Type.referenceEqual t t') then
                     failwith "invariant failure"
             | _ -> ()
 
         do
             match t.TestChange.Kind with
             | Kind.Invalid -> ()
-            | Kind.IfTestChange (cr, t) ->
+            | Kind.IfTestChange (cr, _) ->
                 { new IfThenElseEval<_> with
                     member _.Eval t' =
-                        if not (Object.ReferenceEquals (t, t')) then
+                        if not (physSame t t') then
                             failwith "invariant failure"
 
                         FakeUnit.ofUnit ()
@@ -36,8 +39,8 @@ module internal IfThenElse =
             | ValueSome currentBranch ->
                 if
                     not (
-                        Object.ReferenceEquals (currentBranch, t.Then)
-                        || Object.ReferenceEquals (currentBranch, t.Else)
+                        Type.referenceEqual currentBranch t.Then
+                        || Type.referenceEqual currentBranch t.Else
                     )
                 then
                     failwith "invariant failure"

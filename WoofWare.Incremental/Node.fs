@@ -8,7 +8,7 @@ module Node =
 
     let nodeIsInjective<'a, 'b> (t : Teq<'a Node, 'b Node>) : Teq<'a, 'b> = Teq.Cong.believeMe t
 
-    let same (t1 : Node<'a>) (t2 : Node<'b>) = Object.ReferenceEquals (t1, t2)
+    let same (t1 : Node<'a>) (t2 : Node<'b>) = Type.referenceEqual' t1 t2
 
     let packedSame (t1 : NodeCrate) (t2 : NodeCrate) =
         { new NodeEval<_> with
@@ -122,7 +122,7 @@ module Node =
         if t.NumParents > 0 then
             f 0 t.Parent0.Value
 
-            for index = 0 to t.NumParents - 1 do
+            for index = 1 to t.NumParents - 1 do
                 f index t.Parent1AndBeyond.[index - 1].Value
 
     let hasChild (t : Node<'a>) (child : Node<'b>) : bool =
@@ -483,7 +483,7 @@ module Node =
         iterObservers
             t
             (fun obs ->
-                if not (Object.ReferenceEquals (t, obs.Observing)) then
+                if not (Type.referenceEqual t obs.Observing) then
                     failwith "invariant failure"
 
                 match obs.State with

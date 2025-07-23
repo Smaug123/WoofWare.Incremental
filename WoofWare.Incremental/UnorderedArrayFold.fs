@@ -17,7 +17,7 @@ module FoldUpdate =
 
 [<RequireQualifiedAccess>]
 module internal UnorderedArrayFold =
-    let same (t1 : UnorderedArrayFold<'a, 'b>) (t2 : UnorderedArrayFold<'c, 'd>) = Object.ReferenceEquals (t1, t2)
+    let same (t1 : UnorderedArrayFold<'a, 'b>) (t2 : UnorderedArrayFold<'c, 'd>) : bool = Type.referenceEqual' t1 t2
 
     let create init f update fullComputeEveryNChanges children main =
         {

@@ -14,6 +14,6 @@ module internal AtIntervals =
         match t.Main.Kind with
         | Kind.Invalid -> ()
         | Kind.AtIntervals (t', _) ->
-            if not (Object.ReferenceEquals (t, t')) then
+            if not (Type.referenceEqual t t') then
                 failwith "invariant failed"
         | k -> failwith $"invariant failed: {k}"

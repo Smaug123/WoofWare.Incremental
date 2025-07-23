@@ -1,7 +1,5 @@
 namespace WoofWare.Incremental
 
-open System
-
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal Snapshot =
@@ -19,7 +17,7 @@ module internal Snapshot =
                 // happens after the snapshot
                 ()
             | Kind.Snapshot t' ->
-                if not (Object.ReferenceEquals (t, t')) then
+                if not (Type.referenceEqual t t') then
                     failwith "invariant failed"
             | k -> failwith $"invariant failed: {k}"
 

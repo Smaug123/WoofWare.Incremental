@@ -163,7 +163,7 @@ module State =
 
             StabilizationNum.invariant t.StabilizationNum
 
-            if not (Object.ReferenceEquals (t.CurrentScope, Scope.top)) then
+            if not (Type.referenceEqual t.CurrentScope Scope.top) then
                 failwith "invariant failed"
 
             RecomputeHeap.invariant t.RecomputeHeap
@@ -606,7 +606,7 @@ module State =
         match oldChild with
         | ValueNone -> addParent newChild parent childIndex
         | ValueSome oldChild ->
-            if not (Object.ReferenceEquals (oldChild, newChild)) then
+            if not (Type.referenceEqual oldChild newChild) then
                 // We remove [old_child] before adding [new_child], because they share the same child index.
                 Node.removeParent oldChild parent childIndex
                 // We force [old_child] to temporarily be necessary so that [add_parent] can't
@@ -1997,7 +1997,7 @@ module State =
                         amStabilizing state
                         && not (
                             List.exists
-                                (fun n -> Object.ReferenceEquals (n, target))
+                                (fun n -> Type.referenceEqual n target)
                                 state.OnlyInDebug.ExpertNodesCreatedByCurrentNode
                         )
                     then

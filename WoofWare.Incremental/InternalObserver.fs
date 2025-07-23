@@ -1,11 +1,9 @@
 namespace WoofWare.Incremental
 
-open System
-
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal InternalObserver =
-    let same (a : InternalObserver<'a>) (b : InternalObserver<'b>) = Object.ReferenceEquals (a, b)
+    let same (a : InternalObserver<'a>) (b : InternalObserver<'b>) = Type.referenceEqual' a b
 
     let setPrevInAll' (i : InternalObserverCrate) (v : InternalObserverCrate voption) =
         { new InternalObserverEval<_> with
@@ -60,7 +58,7 @@ module internal InternalObserver =
 
         let observing = t.Observing
 
-        if Object.ReferenceEquals (t, observing.Observers.Value) then
+        if Type.referenceEqual t observing.Observers.Value then
             observing.Observers <- next
 
         observing.NumOnUpdateHandlers <- observing.NumOnUpdateHandlers - List.length t.OnUpdateHandlers

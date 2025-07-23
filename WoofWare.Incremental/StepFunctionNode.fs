@@ -5,7 +5,7 @@ open WoofWare.TimingWheel
 
 [<RequireQualifiedAccess>]
 module internal StepFunctionNode =
-    let physSame (t1 : StepFunctionNode<'a>) (t2 : StepFunctionNode<'b>) = Object.ReferenceEquals (t1, t2)
+    let physSame (t1 : StepFunctionNode<'a>) (t2 : StepFunctionNode<'b>) = Type.referenceEqual' t1 t2
 
     let rec advanceInternal (t : StepFunctionNode<'a>) (to_ : TimeNs) (a1 : 'a) (steps : Sequence<TimeNs * 'a>) : unit =
         match Sequence.next steps with
@@ -24,7 +24,7 @@ module internal StepFunctionNode =
             // happens when upcomingSteps becomes empty
             ()
         | Kind.StepFunction t' ->
-            if not (Object.ReferenceEquals (t, t')) then
+            if not (physSame t t') then
                 failwith "invariant failed"
         | k -> failwith $"invariant failed: {k}"
 

@@ -16,19 +16,19 @@ module TestExceptionalBehaviour =
                 failwith "oh no!"
             )
         let o = I.Observe y
-        expect' {
+        expect {
             snapshotThrows @"System.Exception: oh no!"
             return! fun () -> I.Stabilize ()
         }
-        expect' {
-            snapshotThrows "cannot stabilize -- stabilize previously raised"
+        expect {
+            snapshotThrows @"System.AggregateException: cannot stabilize -- stabilize previously raised (oh no!)"
             return! fun () -> I.Stabilize ()
         }
-        expect' {
-            snapshotThrows "Observer.value_exn called after stabilize previously raised"
+        expect {
+            snapshotThrows @"System.AggregateException: Observer.valueThrowing called after stabilize previously raised (oh no!)"
             return! fun () -> Observer.valueThrowing o
         }
-        expect' {
-            snapshotThrows "cannot set var -- stabilization previously raised"
+        expect {
+            snapshotThrows @"System.AggregateException: cannot set var -- stabilization previously raised (oh no!)"
             return! fun () -> I.Var.Set x ()
         }

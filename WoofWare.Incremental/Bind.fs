@@ -1,7 +1,5 @@
 namespace WoofWare.Incremental
 
-open System
-
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Bind =
@@ -9,6 +7,9 @@ module Bind =
         match t.Main.Kind with
         | Kind.Invalid -> false
         | _ -> true
+
+    let physSame<'a, 'b, 'c, 'd> (a : Bind<'a, 'b>) (b : Bind<'c, 'd>) : bool =
+        Type.referenceEqual' a b
 
     let iterNodesCreatedOnRhs (t : Bind<'a, 'b>) (f : NodeCrate -> unit) : unit =
         let mutable r = t.AllNodesCreatedOnRhs
@@ -30,7 +31,7 @@ module Bind =
         | Kind.BindMain cr ->
             { new BindMainEval<_, _> with
                 member _.Eval t' =
-                    if not (Object.ReferenceEquals (t, t')) then
+                    if not (physSame t t') then
                         failwith "invariant failed"
 
                     FakeUnit.ofUnit ()
@@ -44,7 +45,7 @@ module Bind =
         | Scope.Bind t' ->
             { new BindEval<_> with
                 member _.Eval t' =
-                    if not (Object.ReferenceEquals (t, t')) then
+                    if not (physSame t t') then
                         failwith "invariant failed"
 
                     FakeUnit.ofUnit ()
@@ -57,7 +58,7 @@ module Bind =
             (fun node ->
                 { new NodeEval<_> with
                     member _.Eval node =
-                        if not (Object.ReferenceEquals (node.CreatedIn, t.RhsScope)) then
+                        if not (Type.referenceEqual node.CreatedIn t.RhsScope) then
                             failwith "invariant failed"
 
                         if NodeHelpers.isNecessary node then
@@ -71,7 +72,7 @@ module Bind =
             )
 
         do
-            if not (Object.ReferenceEquals (t.LhsChange.CreatedIn, t.Main.CreatedIn)) then
+            if not (Type.referenceEqual t.LhsChange.CreatedIn t.Main.CreatedIn) then
                 failwith "invariant failed"
 
             match t.LhsChange.Kind with
@@ -79,7 +80,7 @@ module Bind =
             | Kind.BindLhsChange (node, _) ->
                 { new BindEval<_> with
                     member _.Eval t' =
-                        if not (Object.ReferenceEquals (t, t')) then
+                        if not (physSame t t') then
                             failwith "invariant failed"
 
                         FakeUnit.ofUnit ()

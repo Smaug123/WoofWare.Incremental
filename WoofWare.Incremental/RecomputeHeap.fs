@@ -125,8 +125,14 @@ module RecomputeHeap =
         match t.NodesByHeight.[node.HeightInRecomputeHeap] with
         | ValueNone -> ()
         | ValueSome existing ->
-            if Object.ReferenceEquals (node, existing) then
-                t.NodesByHeight.[node.HeightInRecomputeHeap] <- next
+            { new NodeEval<_> with
+                member _.Eval existing =
+                    if Node.same node existing then
+                        t.NodesByHeight.[node.HeightInRecomputeHeap] <- next
+                    FakeUnit.ofUnit ()
+            }
+            |> existing.Apply
+            |> FakeUnit.toUnit
 
         setPrev next prev
         setNext prev next

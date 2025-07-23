@@ -17,6 +17,7 @@
     <ItemGroup>
         <Compile Include="AssemblyInfo.fs" />
         <Compile Include="FakeUnit.fs" />
+        <Compile Include="Type.fs" />
         <Compile Include="Map.fs" />
         <Compile Include="List.fs" />
         <Compile Include="Seq.fs" />

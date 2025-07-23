@@ -210,10 +210,8 @@ module TestVar =
 
         fix.Stabilize ()
         Observer.valueThrowing o |> shouldEqual 13
-        // (Patrick added this:)
         fix.Stabilize ()
         Observer.valueThrowing o |> shouldEqual 15
-        failwith<unit> "TODO: confirm above"
 
     [<TestCase false>]
     [<TestCase true>]

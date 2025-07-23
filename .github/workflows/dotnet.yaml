@@ -173,65 +173,65 @@ jobs:
         with:
           needs-context: ${{ toJSON(needs) }}
 
-  nuget-publish:
-    runs-on: ubuntu-latest
-    if: ${{ !github.event.repository.fork && github.ref == 'refs/heads/main' }}
-    needs: [all-required-checks-complete]
-    environment: main-deploy
-    permissions:
-      id-token: write
-      attestations: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31
-        with:
-          extra_nix_config: |
-            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-      - name: Download NuGet artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: nuget-package
-          path: packed
-      - name: Identify `dotnet`
-        id: dotnet-identify
-        run: nix develop --command bash -c 'echo "dotnet=$(which dotnet)" >> $GITHUB_OUTPUT'
-      - name: Publish to NuGet
-        id: publish-success
-        uses: G-Research/common-actions/publish-nuget@2b7dc49cb14f3344fbe6019c14a31165e258c059
-        with:
-          package-name: WoofWare.Incremental
-          nuget-key: ${{ secrets.NUGET_API_KEY }}
-          nupkg-dir: packed/
-          dotnet: ${{ steps.dotnet-identify.outputs.dotnet }}
+  # nuget-publish:
+  #   runs-on: ubuntu-latest
+  #   if: ${{ !github.event.repository.fork && github.ref == 'refs/heads/main' }}
+  #   needs: [all-required-checks-complete]
+  #   environment: main-deploy
+  #   permissions:
+  #     id-token: write
+  #     attestations: write
+  #     contents: read
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Install Nix
+  #       uses: cachix/install-nix-action@v31
+  #       with:
+  #         extra_nix_config: |
+  #           access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+  #     - name: Download NuGet artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: nuget-package
+  #         path: packed
+  #     - name: Identify `dotnet`
+  #       id: dotnet-identify
+  #       run: nix develop --command bash -c 'echo "dotnet=$(which dotnet)" >> $GITHUB_OUTPUT'
+  #     - name: Publish to NuGet
+  #       id: publish-success
+  #       uses: G-Research/common-actions/publish-nuget@2b7dc49cb14f3344fbe6019c14a31165e258c059
+  #       with:
+  #         package-name: WoofWare.Incremental
+  #         nuget-key: ${{ secrets.NUGET_API_KEY }}
+  #         nupkg-dir: packed/
+  #         dotnet: ${{ steps.dotnet-identify.outputs.dotnet }}
 
-  github-release:
-    runs-on: ubuntu-latest
-    if: ${{ !github.event.repository.fork && github.ref == 'refs/heads/main' }}
-    needs: [all-required-checks-complete]
-    environment: main-deploy
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download NuGet artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: nuget-package
-      - name: Compute package path
-        id: compute-path
-        run: |
-          find . -maxdepth 1 -type f -name 'WoofWare.Incremental.*.nupkg' -exec sh -c 'echo "output=$(basename "$1")" >> $GITHUB_OUTPUT' shell {} \;
-      - name: Compute tag name
-        id: compute-tag
-        env:
-          NUPKG_PATH: ${{ steps.compute-path.outputs.output }}
-        run: echo "output=$(basename "$NUPKG_PATH" .nupkg)" >> $GITHUB_OUTPUT
-      - name: Tag and release
-        uses: G-Research/common-actions/github-release@19d7281a0f9f83e13c78f99a610dbc80fc59ba3b
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          target-commitish: ${{ github.sha }}
-          tag: ${{ steps.compute-tag.outputs.output }}
-          binary-contents: ${{ steps.compute-path.outputs.output }}
+  # github-release:
+  #   runs-on: ubuntu-latest
+  #   if: ${{ !github.event.repository.fork && github.ref == 'refs/heads/main' }}
+  #   needs: [all-required-checks-complete]
+  #   environment: main-deploy
+  #   permissions:
+  #     contents: write
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Download NuGet artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: nuget-package
+  #     - name: Compute package path
+  #       id: compute-path
+  #       run: |
+  #         find . -maxdepth 1 -type f -name 'WoofWare.Incremental.*.nupkg' -exec sh -c 'echo "output=$(basename "$1")" >> $GITHUB_OUTPUT' shell {} \;
+  #     - name: Compute tag name
+  #       id: compute-tag
+  #       env:
+  #         NUPKG_PATH: ${{ steps.compute-path.outputs.output }}
+  #       run: echo "output=$(basename "$NUPKG_PATH" .nupkg)" >> $GITHUB_OUTPUT
+  #     - name: Tag and release
+  #       uses: G-Research/common-actions/github-release@19d7281a0f9f83e13c78f99a610dbc80fc59ba3b
+  #       with:
+  #         github-token: ${{ secrets.GITHUB_TOKEN }}
+  #         target-commitish: ${{ github.sha }}
+  #         tag: ${{ steps.compute-tag.outputs.output }}
+  #         binary-contents: ${{ steps.compute-path.outputs.output }}

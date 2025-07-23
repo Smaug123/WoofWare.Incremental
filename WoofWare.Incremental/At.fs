@@ -13,6 +13,6 @@ module internal At =
             // happens once the current time passes [t.at].
             ()
         | Kind.At (t', _) ->
-            if not (Object.ReferenceEquals (t, t')) then
+            if not (Type.arePhysEqual t t') then
                 failwith "invariant failed"
         | k -> failwith $"invariant failed: {k}"

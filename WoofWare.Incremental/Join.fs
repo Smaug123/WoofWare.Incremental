@@ -1,16 +1,17 @@
 namespace WoofWare.Incremental
 
-open System
-
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal Join =
+
+    let physSame<'a, 'b> (a : Join<'a>) (b : Join<'b>) : bool =
+        Type.referenceEqual' a b
 
     let invariant (_inv : 'a -> unit) (t : Join<'a>) : unit =
         match t.Main.Kind with
         | Kind.Invalid -> ()
         | Kind.JoinMain t' ->
-            if not (Object.ReferenceEquals (t, t')) then
+            if not (Type.referenceEqual t t') then
                 failwith "invariant failed"
         | k -> failwith $"invariant failed: {k}"
 
@@ -19,7 +20,7 @@ module internal Join =
         | Kind.JoinLhsChange (t', _) ->
             { new JoinEval<_> with
                 member _.Eval t' =
-                    if not (Object.ReferenceEquals (t, t')) then
+                    if not (physSame t t') then
                         failwith "invariant failed"
 
                     FakeUnit.ofUnit ()

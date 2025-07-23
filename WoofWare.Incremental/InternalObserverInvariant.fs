@@ -1,7 +1,5 @@
 namespace WoofWare.Incremental
 
-open System
-
 [<AutoOpen>]
 module internal InternalObserverInvariant =
     let private sameAsCrate (a : InternalObserver<'a>) (b : InternalObserverCrate) : bool =
@@ -60,7 +58,7 @@ module internal InternalObserverInvariant =
 
                 match t.PrevInObserving with
                 | ValueSome prevInObserving ->
-                    if not (Object.ReferenceEquals (t, prevInObserving.NextInObserving)) then
+                    if not (Type.referenceEqual t prevInObserving.NextInObserving.Value) then
                         failwith "invariant failed"
                 | ValueNone -> ()
 
@@ -74,7 +72,7 @@ module internal InternalObserverInvariant =
 
                 match t.NextInObserving with
                 | ValueSome nextInObserving ->
-                    if not (Object.ReferenceEquals (t, nextInObserving.PrevInObserving)) then
+                    if not (Type.referenceEqual t nextInObserving.PrevInObserving.Value) then
                         failwith "invariant failed"
                 | ValueNone -> ()
 

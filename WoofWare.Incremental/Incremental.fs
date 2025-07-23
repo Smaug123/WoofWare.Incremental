@@ -8,7 +8,19 @@ type Update<'a> =
     | Invalidated
     | Unnecessary
 
-type Observer<'a> = | Observer of Observer'<'a>
+type Observer<'a> =
+    | Observer of Observer'<'a>
+    override this.ToString () =
+        match this with
+        | Observer this ->
+            match this.Value.State with
+            | InternalObserverState.Created -> "<unstabilized>"
+            | InternalObserverState.Disallowed
+            | InternalObserverState.Unlinked -> "<disallowed>"
+            | InternalObserverState.InUse ->
+                match this.Value.Observing.ValueOpt with
+                | ValueNone -> "<invalid>"
+                | ValueSome v -> v.ToString ()
 
 [<RequireQualifiedAccess>]
 module Observer =
