@@ -129,6 +129,7 @@ module RecomputeHeap =
                 member _.Eval existing =
                     if Node.same node existing then
                         t.NodesByHeight.[node.HeightInRecomputeHeap] <- next
+
                     FakeUnit.ofUnit ()
             }
             |> existing.Apply

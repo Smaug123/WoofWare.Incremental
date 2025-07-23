@@ -4,8 +4,7 @@ namespace WoofWare.Incremental
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal Join =
 
-    let physSame<'a, 'b> (a : Join<'a>) (b : Join<'b>) : bool =
-        Type.referenceEqual' a b
+    let physSame<'a, 'b> (a : Join<'a>) (b : Join<'b>) : bool = Type.referenceEqual' a b
 
     let invariant (_inv : 'a -> unit) (t : Join<'a>) : unit =
         match t.Main.Kind with

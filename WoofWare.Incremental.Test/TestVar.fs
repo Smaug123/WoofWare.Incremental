@@ -9,15 +9,15 @@ module TestVar =
 
     [<Test>]
     let ``observe a var after stabilization`` () =
-      let fix = IncrementalFixture.Make ()
-      let I = fix.I
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-      let x = I.Var.Create 0
-      fix.Stabilize ()
-      let o = I.Observe (I.Var.Watch x)
-      fix.Stabilize ()
+        let x = I.Var.Create 0
+        fix.Stabilize ()
+        let o = I.Observe (I.Var.Watch x)
+        fix.Stabilize ()
 
-      Observer.valueThrowing o |> shouldEqual 0
+        Observer.valueThrowing o |> shouldEqual 0
 
     [<Test>]
     let ``observe a set var after stabilization`` () =
@@ -83,6 +83,7 @@ module TestVar =
         let v1 = I.Var.Create 1
         let v2 = I.Var.Create 2
         let o0 = I.Observe (I.Var.Watch v0)
+
         let o1 =
             I.Var.Watch v1
             |> I.Map (fun i ->
@@ -98,9 +99,7 @@ module TestVar =
             )
             |> I.Observe
 
-        let o2 =
-            I.Var.Watch v2
-            |> I.Observe
+        let o2 = I.Var.Watch v2 |> I.Observe
 
         let varVals i0 i1 i2 =
             I.Var.Value v0 |> shouldEqual i0
@@ -135,6 +134,7 @@ module TestVar =
         let I = fix.I
 
         let x = I.Var.Create 0
+
         let o =
             I.Var.Watch x
             |> I.Map (fun v ->
@@ -144,6 +144,7 @@ module TestVar =
                 v
             )
             |> I.Observe
+
         fix.Stabilize ()
         I.Var.Value x |> shouldEqual 2
         fix.Stabilize ()
@@ -156,17 +157,23 @@ module TestVar =
         let I = fix.I
 
         let x = I.Var.Create 0
+
         let o =
             I.Var.Watch x
             |> I.Map (fun v ->
                 I.Var.Set x 2
-                I.Var.Replace x (fun v ->
-                    v |> shouldEqual 2
-                    v + 1
-                )
+
+                I.Var.Replace
+                    x
+                    (fun v ->
+                        v |> shouldEqual 2
+                        v + 1
+                    )
+
                 v
             )
             |> I.Observe
+
         fix.Stabilize ()
 
         I.Var.Value x |> shouldEqual 3
@@ -221,6 +228,7 @@ module TestVar =
 
         let lhs = I.Var.Create 0
         let rhs = ref (I.Const 0)
+
         let o =
             I.Var.Watch lhs
             |> I.Bind (fun i ->

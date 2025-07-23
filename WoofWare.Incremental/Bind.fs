@@ -8,8 +8,7 @@ module Bind =
         | Kind.Invalid -> false
         | _ -> true
 
-    let physSame<'a, 'b, 'c, 'd> (a : Bind<'a, 'b>) (b : Bind<'c, 'd>) : bool =
-        Type.referenceEqual' a b
+    let physSame<'a, 'b, 'c, 'd> (a : Bind<'a, 'b>) (b : Bind<'c, 'd>) : bool = Type.referenceEqual' a b
 
     let iterNodesCreatedOnRhs (t : Bind<'a, 'b>) (f : NodeCrate -> unit) : unit =
         let mutable r = t.AllNodesCreatedOnRhs

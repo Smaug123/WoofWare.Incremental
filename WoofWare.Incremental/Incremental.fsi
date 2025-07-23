@@ -2,6 +2,7 @@ namespace WoofWare.Incremental
 
 open WoofWare.TimingWheel
 
+[<RequireQualifiedAccess>]
 type Update<'a> =
     | Necessary of 'a
     | Changed of 'a * 'a
@@ -12,12 +13,18 @@ type Observer<'a>
 
 [<RequireQualifiedAccess>]
 module Observer =
+    type Update<'a> =
+        | Initialized of 'a
+        | Changed of 'a * 'a
+        | Invalidated
+
     val disallowFutureUse<'a> : 'a Observer -> unit
     val useIsAllowed<'a> : 'a Observer -> bool
     val value<'a> : 'a Observer -> Result<'a, exn>
     val valueThrowing<'a> : 'a Observer -> 'a
     val onUpdateThrowing<'a> : 'a Observer -> (Update<'a> -> unit) -> unit
     val observing<'a> : 'a Observer -> 'a Node
+    val toString<'a> : 'a Observer -> string
 
 type IClock =
     abstract DefaultTimingWheelConfig : TimingWheelConfig
@@ -31,12 +38,15 @@ type IClock =
 
 type IVar =
     abstract Create<'a> : 'a -> Var<'a>
-    abstract Create'<'a> : useCurrentScope: bool -> 'a -> Var<'a>
+    abstract Create'<'a> : useCurrentScope : bool -> 'a -> Var<'a>
     abstract Watch<'a> : Var<'a> -> Node<'a>
     abstract Set<'a> : Var<'a> -> 'a -> unit
     abstract Replace<'a> : Var<'a> -> ('a -> 'a) -> unit
     abstract Value<'a> : Var<'a> -> 'a
     abstract LatestValue<'a> : Var<'a> -> 'a
+
+type IExpertIncremental =
+    abstract DoOneStepOfStabilize : unit -> StepResult
 
 type Incremental =
     abstract Return<'a> : 'a -> Node<'a>
@@ -55,7 +65,9 @@ type Incremental =
     abstract SaveDot : writeChunk : (string -> unit) -> unit
     abstract SaveDot' : renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
     abstract CurrentScope : Scope
+    abstract Expert : IExpertIncremental
     abstract WithinScope : Scope -> (unit -> 'a) -> 'a
+    abstract OnUpdate<'a> : 'a Node -> (NodeUpdate<'a> -> unit) -> unit
 
 [<RequireQualifiedAccess>]
 module Incremental =

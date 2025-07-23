@@ -6,8 +6,7 @@ open System
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal IfThenElse =
 
-    let physSame<'a, 'b> (a : IfThenElse<'a>) (b : IfThenElse<'b>) : bool =
-        Type.referenceEqual' a b
+    let physSame<'a, 'b> (a : IfThenElse<'a>) (b : IfThenElse<'b>) : bool = Type.referenceEqual' a b
 
     let invariant (_inv : 'a -> unit) (t : IfThenElse<'a>) : unit =
         do

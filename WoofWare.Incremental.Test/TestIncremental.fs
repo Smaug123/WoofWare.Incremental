@@ -12,17 +12,6 @@ open FsUnitTyped
 module TestIncremental =
     let sec = TimeNs.Span.ofSec
 
-    let onUpdateQueue<'update when 'update : equality> () =
-        let mutable r : 'update list = []
-        let add e = r <- e :: r
-        let exp expect =
-            List.rev r |> shouldEqual expect
-            r <- []
-        add, exp
-
-    let onObserverUpdateQueue = onUpdateQueue<Observer.Update>
-    let onUpdateQueue = onUpdateQueue<Observer.Update>
-
     [<Test>]
     let ``test 1`` () =
       let fix = IncrementalFixture.Make ()

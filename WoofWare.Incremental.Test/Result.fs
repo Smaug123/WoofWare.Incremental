@@ -6,4 +6,3 @@ module Result =
         match r with
         | Ok o -> o
         | Error e -> failwith $"error: {e}"
-

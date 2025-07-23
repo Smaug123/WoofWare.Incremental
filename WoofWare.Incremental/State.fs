@@ -29,8 +29,7 @@ module State =
     let numStabilizes (t : State) =
         StabilizationNum.toInt t.StabilizationNum
 
-    let numActiveObservers (t : State) =
-        t.NumActiveObservers
+    let numActiveObservers (t : State) = t.NumActiveObservers
 
     let maxHeightAllowed (t : State) =
         AdjustHeightsHeap.maxHeightAllowed t.AdjustHeightsHeap

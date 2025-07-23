@@ -2,6 +2,7 @@ namespace WoofWare.Incremental
 
 open WoofWare.TimingWheel
 
+[<RequireQualifiedAccess>]
 type Update<'a> =
     | Necessary of 'a
     | Changed of 'a * 'a
@@ -10,6 +11,7 @@ type Update<'a> =
 
 type Observer<'a> =
     | Observer of Observer'<'a>
+
     override this.ToString () =
         match this with
         | Observer this ->
@@ -24,6 +26,13 @@ type Observer<'a> =
 
 [<RequireQualifiedAccess>]
 module Observer =
+    type Update<'a> =
+        | Initialized of 'a
+        | Changed of 'a * 'a
+        | Invalidated
+
+    let toString (a : Observer<'a>) = a.ToString ()
+
     let disallowFutureUse<'a> (Observer o : 'a Observer) : unit = State.disallowFutureUse o.Value
     let useIsAllowed<'a> (Observer o : 'a Observer) : bool = Observer'.useIsAllowed o
 
@@ -33,16 +42,19 @@ module Observer =
 
     let valueThrowing (Observer o) = State.observerValueThrowing o
 
-    let onUpdateThrowing (Observer a) f =
+    let onUpdateThrowing (Observer a) (f : Update<'a> -> unit) =
         fun x ->
             match x with
             | NodeUpdate.Changed (a, b) -> f (Update.Changed (a, b))
-            | NodeUpdate.Necessary m -> f (Update.Necessary m)
+            | NodeUpdate.Necessary m -> f (Update.Initialized m)
             | NodeUpdate.Invalidated -> f Update.Invalidated
             | NodeUpdate.Unnecessary ->
                 failwith
                     "Logic error in WoofWare.Incremental: Observer.onUpdateThrowing got unexpected Unnecessary update"
         |> State.observerOnUpdateThrowing a
+
+type IExpertIncremental =
+    abstract DoOneStepOfStabilize : unit -> StepResult
 
 type IClock =
     abstract DefaultTimingWheelConfig : TimingWheelConfig
@@ -56,7 +68,7 @@ type IClock =
 
 type IVar =
     abstract Create<'a> : 'a -> Var<'a>
-    abstract Create'<'a> : useCurrentScope: bool -> 'a -> Var<'a>
+    abstract Create'<'a> : useCurrentScope : bool -> 'a -> Var<'a>
     abstract Watch<'a> : Var<'a> -> Node<'a>
     abstract Set<'a> : Var<'a> -> 'a -> unit
     abstract Replace<'a> : Var<'a> -> ('a -> 'a) -> unit
@@ -80,13 +92,18 @@ type Incremental =
     abstract SaveDot' : renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
     abstract SaveDot : writeChunk : (string -> unit) -> unit
     abstract CurrentScope : Scope
+    abstract Expert : IExpertIncremental
     abstract WithinScope : Scope -> (unit -> 'a) -> 'a
+    abstract OnUpdate<'a> : 'a Node -> (NodeUpdate<'a> -> unit) -> unit
 
 type IncrementalImpl (state : State) =
     let var =
         { new IVar with
             member this.Create x = State.createVar state None x
-            member this.Create' useCurrentScope x = State.createVar state (Some useCurrentScope) x
+
+            member this.Create' useCurrentScope x =
+                State.createVar state (Some useCurrentScope) x
+
             member this.Watch v = v.Watch
             member this.Set var a = State.setVar var a
 
@@ -95,6 +112,11 @@ type IncrementalImpl (state : State) =
 
             member this.Value var = var.Value
             member this.LatestValue var = Var.latestValue var
+        }
+
+    let expert =
+        { new IExpertIncremental with
+            member _.DoOneStepOfStabilize () = State.doOneStepOfStabilize state
         }
 
     let clock =
@@ -141,12 +163,16 @@ type IncrementalImpl (state : State) =
         member this.State = state
         member this.CurrentScope = state.CurrentScope
         member this.WithinScope scope f = State.withinScope state scope f
+        member this.Expert = expert
 
         member this.SaveDot' renderBindEdges writeChunk =
             NodeToDot.renderDot renderBindEdges writeChunk (State.directlyObserved state)
 
         member this.SaveDot writeChunk =
             (this :> Incremental).SaveDot' true writeChunk
+
+        member this.OnUpdate n f = State.nodeOnUpdate n f
+
 
 [<RequireQualifiedAccess>]
 module Incremental =

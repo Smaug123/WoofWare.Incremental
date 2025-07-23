@@ -15,9 +15,7 @@ module TestScope =
     let ``within scope`` () =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
-        let o =
-            I.WithinScope I.CurrentScope (fun () -> I.Const 13)
-            |> I.Observe
+        let o = I.WithinScope I.CurrentScope (fun () -> I.Const 13) |> I.Observe
         fix.Stabilize ()
 
         Observer.valueThrowing o |> shouldEqual 13
@@ -30,6 +28,7 @@ module TestScope =
         let s = I.CurrentScope
         let r = ref None
         let x = I.Var.Create 13
+
         let o =
             I.Var.Watch x
             |> I.Bind (fun i ->
@@ -37,6 +36,7 @@ module TestScope =
                 I.Return ()
             )
             |> I.Observe
+
         fix.Stabilize ()
         let o2 = I.Observe r.Value.Value
         fix.Stabilize ()
@@ -54,13 +54,15 @@ module TestScope =
         let I = fix.I
         let r = ref None
         let x = I.Var.Create 13
+
         let o1 =
-          I.Var.Watch x
-          |> I.Bind (fun _ ->
-              r.Value <- Some I.CurrentScope
-              I.Return ()
-          )
-          |> I.Observe
+            I.Var.Watch x
+            |> I.Bind (fun _ ->
+                r.Value <- Some I.CurrentScope
+                I.Return ()
+            )
+            |> I.Observe
+
         fix.Stabilize ()
         let s = r.Value.Value
         let o2 = I.Observe (I.WithinScope s (fun () -> I.Const 13))
@@ -73,21 +75,22 @@ module TestScope =
 
     [<Test>]
     let ``top is top`` () =
-        Scope.isTop Scope.top
+        Scope.isTop Scope.top |> shouldEqual true
 
     [<Test>]
     let ``scope inside bind is not top`` () =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
         let i = I.Var.Create true
+
         let o =
             I.Var.Watch i
             |> I.Bind (fun b ->
-                Scope.isTop I.CurrentScope
-                |> shouldEqual false
+                Scope.isTop I.CurrentScope |> shouldEqual false
                 I.Return b
             )
             |> I.Observe
+
         fix.Stabilize ()
 
         Observer.valueThrowing o |> shouldEqual true

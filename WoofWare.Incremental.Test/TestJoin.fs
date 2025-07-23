@@ -9,10 +9,7 @@ open WoofWare.Incremental
 [<TestFixture false>]
 type TestJoin (joinViaBind : bool) =
     let join (I : Incremental) (x : Node<Node<'a>>) : Node<'a> =
-        if joinViaBind then
-            I.Bind id x
-        else
-            I.Join x
+        if joinViaBind then I.Bind id x else I.Join x
 
     [<Test>]
     member _.``join of a constant`` () =
@@ -76,6 +73,7 @@ type TestJoin (joinViaBind : bool) =
 
         let x = I.Var.Create (I.Const 0)
         let lhs = I.Var.Create 1
+
         let o1 =
             I.Var.Watch lhs
             |> I.Bind (fun i ->
@@ -83,11 +81,9 @@ type TestJoin (joinViaBind : bool) =
                 I.Return ()
             )
             |> I.Observe
+
         fix.Stabilize ()
-        let o2 =
-            Utils.makeHigh I (I.Var.Watch x)
-            |> join I
-            |> I.Observe
+        let o2 = Utils.makeHigh I (I.Var.Watch x) |> join I |> I.Observe
         fix.Stabilize ()
         I.Var.Set lhs 2
         // invalidate
@@ -105,7 +101,7 @@ type TestJoin (joinViaBind : bool) =
         let o = I.Observe join
         fix.Stabilize ()
         Observer.disallowFutureUse o
-        isValid join |> shouldEqual true
+        NodeHelpers.isValid join |> shouldEqual true
 
     [<Test>]
     member _.``Change RHS from a node to its ancestor`` () =
@@ -116,15 +112,15 @@ type TestJoin (joinViaBind : bool) =
 
         let mutable numCalls = 0
         let rhsVar = I.Var.Create 13
+
         let first =
             I.Var.Watch rhsVar
             |> I.Map (fun i ->
                 Interlocked.Increment &numCalls |> ignore<int>
                 i + 1
             )
-        let second =
-            first
-            |> I.Map (fun i -> i + 1)
+
+        let second = first |> I.Map (fun i -> i + 1)
 
         let lhsVar = I.Var.Create first
         let o = I.Observe (join I (I.Var.Watch lhsVar))

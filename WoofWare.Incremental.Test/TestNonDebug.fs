@@ -19,8 +19,7 @@ module TestNonDebug =
         Debug.globalFlag <- false
 
     [<OneTimeTearDown>]
-    let oneTimeTearDown () =
-        Debug.globalFlag <- oldDebugFlag
+    let oneTimeTearDown () = Debug.globalFlag <- oldDebugFlag
 
     let inline noAlloc ([<InlineIfLambda>] f : unit -> unit) =
         let alloc = GC.GetTotalAllocatedBytes ()
