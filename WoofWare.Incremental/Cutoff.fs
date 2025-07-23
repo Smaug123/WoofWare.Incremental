@@ -1,7 +1,7 @@
 namespace WoofWare.Incremental
 
 [<NoEquality ; NoComparison>]
-type internal 'a Cutoff =
+type 'a Cutoff =
     (* We specialize some cutoffs to avoid an indirect function call; in particular we
      specialize the default (and hence overwhelmingly common) case of physical
      equality. *)
@@ -14,7 +14,7 @@ type internal 'a Cutoff =
     | F of ('a -> 'a -> bool)
 
 [<RequireQualifiedAccess>]
-module internal Cutoff =
+module Cutoff =
     let create f = Cutoff.F f
     let ofCompare f = Cutoff.Compare f
     let ofEqual f = Cutoff.Equal f

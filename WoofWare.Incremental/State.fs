@@ -434,8 +434,12 @@ module State =
                node.IsSome) do
             { new NodeEval<_> with
                 member _.Eval node =
-                    if NodeHelpers.isValid node then
-                        invalidateNode node |> FakeUnit.ofUnit
+                    if not (NodeHelpers.isValid node) then
+                        FakeUnit.ofUnit ()
+                    else
+                    if Node.shouldBeInvalidated node then
+                        invalidateNode node
+                        |> FakeUnit.ofUnit
                     else
                     // [Node.needs_to_be_computed node] is true because
                     // - node is necessary. This is because children can only point to necessary parents

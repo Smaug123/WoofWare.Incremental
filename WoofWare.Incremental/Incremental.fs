@@ -95,6 +95,7 @@ type Incremental =
     abstract Expert : IExpertIncremental
     abstract WithinScope : Scope -> (unit -> 'a) -> 'a
     abstract OnUpdate<'a> : 'a Node -> (NodeUpdate<'a> -> unit) -> unit
+    abstract SetCutoff<'a> : 'a Node -> 'a Cutoff -> unit
 
 type IncrementalImpl (state : State) =
     let var =
@@ -164,6 +165,7 @@ type IncrementalImpl (state : State) =
         member this.CurrentScope = state.CurrentScope
         member this.WithinScope scope f = State.withinScope state scope f
         member this.Expert = expert
+        member this.SetCutoff node cutoff = Node.setCutoff node cutoff
 
         member this.SaveDot' renderBindEdges writeChunk =
             NodeToDot.renderDot renderBindEdges writeChunk (State.directlyObserved state)

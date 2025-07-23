@@ -1,118 +1,149 @@
 namespace WoofWare.Incremental.Test
 
+open System.Threading
+open FsUnitTyped
+open FsCheck
 open NUnit.Framework
 open WoofWare.Incremental
 
 [<TestFixture>]
 module TestCutoff =
+    [<Test>]
+    let ``test ofCompare`` () =
+        let t = Cutoff.ofCompare (fun (a : int) (b : int) -> a.CompareTo b)
 
-      module Cutoff = struct
-        open Cutoff
+        let property (a : int) (b : int) =
+            Cutoff.shouldCutoff t a b |> shouldEqual (a <= b)
 
-        type nonrec 'a t = 'a t
+        Check.QuickThrowOnFailure property
 
-        let sexp_of_t = sexp_of_t
-        let invariant = invariant
-        let create = create
+    [<Test>]
+    let ``test equal`` () =
+        let t = Cutoff.ofEqual (fun (a : int) b -> a = b)
 
-        (* tested below *)
+        let property (a : int) =
+            Cutoff.shouldCutoff t a a |> shouldEqual true
 
-        let _ = create
-        let of_compare = of_compare
-        let of_equal = of_equal
-        let should_cutoff = should_cutoff
+        Check.QuickThrowOnFailure property
 
-        let%expect_test _ =
-          let t = of_compare Int.compare in
-          assert (should_cutoff t ~old_value:0 ~new_value:0);
-          assert (not (should_cutoff t ~old_value:0 ~new_value:1))
-        ;;
+        let property (a : int) (b : int) =
+            Cutoff.shouldCutoff t a b |> shouldEqual (a = b)
 
-        let%expect_test _ =
-          let t = of_equal Int.equal in
-          assert (should_cutoff t ~old_value:0 ~new_value:0);
-          assert (not (should_cutoff t ~old_value:0 ~new_value:1))
-        ;;
+        Check.QuickThrowOnFailure property
 
-        let always = always
+    [<Test>]
+    let ``test always`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-        let%expect_test _ =
-          let x = Var.create_ [%here] 0 in
-          set_cutoff (watch x) always;
-          let r = ref 0 in
-          let o = observe (watch x >>| fun _i -> incr r) in
-          stabilize_ [%here];
-          assert (!r = 1);
-          List.iter
-            [ 1, 1; 0, 1 ]
-            ~f:(fun (v, expect) ->
-              Var.set x v;
-              stabilize_ [%here];
-              assert (!r = expect));
-          disallow_future_use o
-        ;;
+        let x = I.Var.Create 0
+        I.SetCutoff (I.Var.Watch x) Cutoff.always
+        let mutable r = 0
 
-        let never = never
+        let o =
+            I.Var.Watch x
+            |> I.Map (fun _ -> Interlocked.Increment &r |> ignore<int>)
+            |> I.Observe
 
-        let%expect_test _ =
-          let x = Var.create_ [%here] 0 in
-          set_cutoff (watch x) never;
-          let r = ref 0 in
-          let o = observe (watch x >>| fun _i -> incr r) in
-          stabilize_ [%here];
-          assert (!r = 1);
-          List.iter
-            [ 1, 2; 1, 3; 1, 4 ]
-            ~f:(fun (v, expect) ->
-              Var.set x v;
-              stabilize_ [%here];
-              assert (!r = expect));
-          disallow_future_use o
-        ;;
+        fix.Stabilize ()
 
-        let phys_equal = phys_equal
+        r |> shouldEqual 1
 
-        let%expect_test _ =
-          let r1 = ref () in
-          let r2 = ref () in
-          let x = Var.create_ [%here] r1 in
-          set_cutoff (watch x) phys_equal;
-          let r = ref 0 in
-          let o = observe (watch x >>| fun _i -> incr r) in
-          stabilize_ [%here];
-          assert (!r = 1);
-          List.iter
-            [ r1, 1; r2, 2; r2, 2; r1, 3 ]
-            ~f:(fun (v, expect) ->
-              Var.set x v;
-              stabilize_ [%here];
-              assert (!r = expect));
-          disallow_future_use o
-        ;;
+        for v, expect in [ 1, 1 ; 0, 1 ] do
+            I.Var.Set x v
+            fix.Stabilize ()
+            r |> shouldEqual expect
 
-        let poly_equal = poly_equal
+        Observer.disallowFutureUse o
 
-        let%expect_test _ =
-          let r1a = ref 1 in
-          let r1b = ref 1 in
-          let r2 = ref 2 in
-          let x = Var.create_ [%here] r1a in
-          set_cutoff (watch x) poly_equal;
-          let r = ref 0 in
-          let o = observe (watch x >>| fun _i -> incr r) in
-          stabilize_ [%here];
-          assert (!r = 1);
-          List.iter
-            [ r1a, 1; r1b, 1; r2, 2; r1a, 3 ]
-            ~f:(fun (v, expect) ->
-              Var.set x v;
-              stabilize_ [%here];
-              assert (!r = expect));
-          disallow_future_use o
-        ;;
+    [<Test>]
+    let ``test never`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-        let equal = equal
-        let%test _ = equal never never
-        let%test _ = not (equal never always)
-      end
+        let x = I.Var.Create 0
+        I.SetCutoff (I.Var.Watch x) Cutoff.never
+        let mutable r = 0
 
+        let o =
+            I.Var.Watch x
+            |> I.Map (fun _ -> Interlocked.Increment &r |> ignore<int>)
+            |> I.Observe
+
+        fix.Stabilize ()
+
+        r |> shouldEqual 1
+
+        for v, expect in [ 1, 2 ; 1, 3 ; 1, 4 ] do
+            I.Var.Set x v
+            fix.Stabilize ()
+            r |> shouldEqual expect
+
+        Observer.disallowFutureUse o
+
+    [<Test>]
+    let ``test physEqual`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let r1 = ref ()
+        let r2 = ref ()
+
+        let x = I.Var.Create r1
+        I.SetCutoff (I.Var.Watch x) Cutoff.physEqual
+
+        let mutable r = 0
+
+        let o =
+            I.Var.Watch x
+            |> I.Map (fun _ -> Interlocked.Increment &r |> ignore<int>)
+            |> I.Observe
+
+        fix.Stabilize ()
+
+        r |> shouldEqual 1
+
+        for v, expect in [ r1, 1 ; r2, 2 ; r2, 2 ; r1, 3 ] do
+            I.Var.Set x v
+            fix.Stabilize ()
+            r |> shouldEqual expect
+
+        Observer.disallowFutureUse o
+
+    [<Test>]
+    let ``test polyEqual`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let r1a = ref 1
+        let r1b = ref 1
+        let r2 = ref 2
+
+        let x = I.Var.Create r1a
+        I.SetCutoff (I.Var.Watch x) Cutoff.polyEqual
+
+        let mutable r = 0
+
+        let o =
+            I.Var.Watch x
+            |> I.Map (fun _ -> Interlocked.Increment &r |> ignore<int>)
+            |> I.Observe
+
+        fix.Stabilize ()
+
+        r |> shouldEqual 1
+
+        for v, expect in [ r1a, 1 ; r1b, 1 ; r2, 2 ; r1a, 3 ] do
+            I.Var.Set x v
+            fix.Stabilize ()
+            r |> shouldEqual expect
+
+        Observer.disallowFutureUse o
+
+    [<Test>]
+    let ``never is never`` () =
+        Cutoff.equal Cutoff.never Cutoff.never<int>
+
+    [<Test>]
+    let ``never isn't always`` () =
+        Cutoff.equal Cutoff.never Cutoff.always<int>

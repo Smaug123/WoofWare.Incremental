@@ -19,7 +19,7 @@
     <None Include="TestIncremental.fs"/>
     <Compile Include="TestJoin.fs"/>
     <Compile Include="TestScope.fs"/>
-    <None Include="TestCutoff.fs"/>
+    <Compile Include="TestCutoff.fs"/>
     <Compile Include="TestVar.fs"/>
     <Compile Include="TestIncrementalFailures.fs"/>
     <None Include="TestExpert.fs"/>

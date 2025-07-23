@@ -1,10 +1,10 @@
 namespace WoofWare.Incremental
 
-// A Cutoff<'a> is a function that returns [true] if propagation of changes should be
-// cut off at a node based on the old value and the (possible) new value of the node.
-
+/// A Cutoff<'a> is a function that returns [true] if propagation of changes should be
+/// cut off at a node based on the old value and the (possible) new value of the node.
 [<NoEquality ; NoComparison>]
-type internal Cutoff<'a> =
+type Cutoff<'a> =
+    internal
     | Always
     | Never
     | PhysEqual
@@ -13,8 +13,10 @@ type internal Cutoff<'a> =
     /// old -> new -> bool
     | F of ('a -> 'a -> bool)
 
+/// A Cutoff<'a> is a function that returns [true] if propagation of changes should be
+/// cut off at a node based on the old value and the (possible) new value of the node.
 [<RequireQualifiedAccess>]
-module internal Cutoff =
+module Cutoff =
     /// argument is old -> new -> bool
     val create<'a> : ('a -> 'a -> bool) -> 'a Cutoff
 
@@ -25,7 +27,9 @@ module internal Cutoff =
     val never<'a> : 'a Cutoff
     val physEqual<'a> : 'a Cutoff
     val polyEqual<'a when 'a : equality> : 'a Cutoff
-    val equal<'a> : 'a Cutoff -> 'a Cutoff -> bool
+
+    val internal equal<'a> : 'a Cutoff -> 'a Cutoff -> bool
+
     val shouldCutoff<'a> : 'a Cutoff -> old : 'a -> newValue : 'a -> bool
 
-    val invariant<'a> : ('a -> unit) -> 'a Cutoff -> unit
+    val internal invariant<'a> : ('a -> unit) -> 'a Cutoff -> unit

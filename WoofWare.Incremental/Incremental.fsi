@@ -68,6 +68,7 @@ type Incremental =
     abstract Expert : IExpertIncremental
     abstract WithinScope : Scope -> (unit -> 'a) -> 'a
     abstract OnUpdate<'a> : 'a Node -> (NodeUpdate<'a> -> unit) -> unit
+    abstract SetCutoff<'a> : 'a Node -> 'a Cutoff -> unit
 
 [<RequireQualifiedAccess>]
 module Incremental =
