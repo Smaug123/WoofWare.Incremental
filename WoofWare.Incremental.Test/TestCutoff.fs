@@ -12,8 +12,13 @@ module TestCutoff =
     let ``test ofCompare`` () =
         let t = Cutoff.ofCompare (fun (a : int) (b : int) -> a.CompareTo b)
 
+        let property (a : int) =
+            Cutoff.shouldCutoff t a a |> shouldEqual true
+
+        Check.QuickThrowOnFailure property
+
         let property (a : int) (b : int) =
-            Cutoff.shouldCutoff t a b |> shouldEqual (a <= b)
+            Cutoff.shouldCutoff t a b |> shouldEqual (a = b)
 
         Check.QuickThrowOnFailure property
 
@@ -142,8 +147,8 @@ module TestCutoff =
 
     [<Test>]
     let ``never is never`` () =
-        Cutoff.equal Cutoff.never Cutoff.never<int>
+        Cutoff.equal Cutoff.never Cutoff.never<int> |> shouldEqual true
 
     [<Test>]
     let ``never isn't always`` () =
-        Cutoff.equal Cutoff.never Cutoff.always<int>
+        Cutoff.equal Cutoff.never Cutoff.always<int> |> shouldEqual true
