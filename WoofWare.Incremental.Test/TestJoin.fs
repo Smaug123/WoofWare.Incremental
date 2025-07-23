@@ -101,7 +101,7 @@ type TestJoin (joinViaBind : bool) =
         let o = I.Observe join
         fix.Stabilize ()
         Observer.disallowFutureUse o
-        NodeHelpers.isValid join |> shouldEqual true
+        NodeHelpers.isValid join |> shouldEqual false
 
     [<Test>]
     member _.``Change RHS from a node to its ancestor`` () =

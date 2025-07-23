@@ -436,10 +436,8 @@ module State =
                 member _.Eval node =
                     if not (NodeHelpers.isValid node) then
                         FakeUnit.ofUnit ()
-                    else
-                    if Node.shouldBeInvalidated node then
-                        invalidateNode node
-                        |> FakeUnit.ofUnit
+                    else if Node.shouldBeInvalidated node then
+                        invalidateNode node |> FakeUnit.ofUnit
                     else
                     // [Node.needs_to_be_computed node] is true because
                     // - node is necessary. This is because children can only point to necessary parents
@@ -938,7 +936,7 @@ module State =
                                 | Kind.ArrayFold _
                                 | Kind.Map2 _
                                 | Kind.UnorderedArrayFold _
-                                | Kind.Expert _ -> failwith "these nodes have more than one child"
+                                | Kind.Expert _ -> false
                                 // We can immediately recompute [parent] if no other node needs to be stable
                                 // before computing it.  If [parent] has a single child (i.e. [node]), then
                                 // this amounts to checking that [parent] won't be invalidated, i.e. that

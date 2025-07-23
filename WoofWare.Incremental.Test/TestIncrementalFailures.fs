@@ -125,14 +125,14 @@ module TestIncrementalFailures =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
         let clock = I.Clock.Create TimeNs.epoch
-        let r = ref None
-        let valueAt = I.Const () |> I.Bind (fun () -> r.Value.Value)
+        let mutable r = None
+        let valueAt = I.Const () |> I.Bind (fun () -> r.Value)
 
         let s =
             I.Clock.Snapshot clock valueAt (TimeNs.add (Clock.now clock) (TimeNs.Span.ofSec 1.0)) 13
             |> Result.get
 
-        r.Value <- Some s
+        r <- Some s
         let o1 = I.Observe valueAt
         let o2 = I.Observe s
         fix.Stabilize ()

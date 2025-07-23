@@ -151,4 +151,4 @@ module TestCutoff =
 
     [<Test>]
     let ``never isn't always`` () =
-        Cutoff.equal Cutoff.never Cutoff.always<int> |> shouldEqual true
+        Cutoff.equal Cutoff.never Cutoff.always<int> |> shouldEqual false
