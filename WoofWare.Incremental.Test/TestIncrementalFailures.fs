@@ -280,8 +280,8 @@ module TestIncrementalFailures =
        Observer.valueThrowing o |> shouldEqual 0
 
        match I.Expert.DoOneStepOfStabilize () with
-       | KeepGoing -> ()
-       | Done -> failwith "oh no"
+       | StepResult.KeepGoing -> ()
+       | StepResult.Done -> failwith "oh no"
 
        I.Var.Set v 1
 
@@ -306,8 +306,8 @@ module TestIncrementalFailures =
       Observer.valueThrowing o |> shouldEqual 0
 
       match I.Expert.DoOneStepOfStabilize () with
-      | KeepGoing -> ()
-      | Done -> failwith "oh no"
+      | StepResult.KeepGoing -> ()
+      | StepResult.Done -> failwith "oh no"
 
       I.Var.Set v 1
       expect' {

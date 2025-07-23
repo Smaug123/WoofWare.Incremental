@@ -40,3 +40,10 @@ type IncrementalFixture =
         State.invariant this.Incremental.State
         Node.invariant ignore this.Invalid
 
+[<RequireQualifiedAccess>]
+module Utils =
+      let makeHigh (i : Incremental) (t : Node<'a>) : Node<'a> =
+        let rec loop t n =
+          if n = 0 then t else loop (i.Map2 (fun a _ -> a) t t) (n - 1)
+        loop t 5
+

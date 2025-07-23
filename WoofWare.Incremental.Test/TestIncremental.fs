@@ -10,9 +10,6 @@ open FsUnitTyped
 
 [<TestFixture>]
 module TestIncremental =
-    let checkInvalidity = true
-    let skipInvalidityCheck = not checkInvalidity
-
     let sec = TimeNs.Span.ofSec
 
     let onUpdateQueue<'update when 'update : equality> () =
@@ -518,13 +515,6 @@ module TestIncremental =
           stabilize_ [%here]
         done;
         disallow_future_use o
-      ;;
-
-      let make_high t =
-        let rec loop t n =
-          if n = 0 then t else loop (map2 t t ~f:(fun a _ -> a)) (n - 1)
-        in
-        loop t 5
       ;;
 
       let%expect_test _ =

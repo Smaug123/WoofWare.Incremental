@@ -43,6 +43,9 @@ type IVar =
     abstract Create<'a> : 'a -> Var<'a>
     abstract Watch<'a> : Var<'a> -> Node<'a>
     abstract Set<'a> : Var<'a> -> 'a -> unit
+    abstract Replace<'a> : Var<'a> -> ('a -> 'a) -> unit
+    abstract Value<'a> : Var<'a> -> 'a
+    abstract LatestValue<'a> : Var<'a> -> 'a
 
 type Incremental =
     abstract Return<'a> : 'a -> Node<'a>
@@ -60,6 +63,8 @@ type Incremental =
     abstract State : State
     abstract SaveDot' : renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
     abstract SaveDot : writeChunk : (string -> unit) -> unit
+    abstract CurrentScope : Scope
+    abstract WithinScope : Scope -> (unit -> 'a) -> 'a
 
 type IncrementalImpl (state : State) =
     let var =
@@ -67,6 +72,12 @@ type IncrementalImpl (state : State) =
             member this.Create x = State.createVar state None x
             member this.Watch v = v.Watch
             member this.Set var a = State.setVar var a
+
+            member this.Replace var f =
+                State.setVar var (f (Var.latestValue var))
+
+            member this.Value var = var.Value
+            member this.LatestValue var = Var.latestValue var
         }
 
     let clock =
@@ -80,7 +91,7 @@ type IncrementalImpl (state : State) =
             // feed [Clock.now ()] to a time function, it can be rounded down to a time in
             // the past, causing errors.
             let divided = float<int64<timeNs>> start / 1000.0
-            let start = int64<float> (System.Math.Round (divided)) * 1000L<timeNs>
+            let start = int64<float> (System.Math.Round divided) * 1000L<timeNs>
             State.createClock state config start
 
         { new IClock with
@@ -111,6 +122,8 @@ type IncrementalImpl (state : State) =
         member this.Clock = clock
         member this.Observe n = State.createObserver None n |> Observer
         member this.State = state
+        member this.CurrentScope = state.CurrentScope
+        member this.WithinScope scope f = State.withinScope state scope f
 
         member this.SaveDot' renderBindEdges writeChunk =
             NodeToDot.renderDot renderBindEdges writeChunk (State.directlyObserved state)

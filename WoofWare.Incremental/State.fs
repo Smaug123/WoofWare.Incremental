@@ -14,6 +14,15 @@ type internal StateStats =
         PercentageOfNodesByNumParents : (int * float) list
     }
 
+/// Indicates whether stabilization has completed. You probably shouldn't use this type;
+/// it's for advanced use of the Expert module only.
+[<RequireQualifiedAccess>]
+type StepResult =
+    /// Stabilization has not completed.
+    | KeepGoing
+    /// Stabilization has completed.
+    | Done
+
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module State =
@@ -1290,10 +1299,6 @@ module State =
             stabilizeEnd t
         with exn ->
             raiseDuringStabilization t exn
-
-    type StepResult =
-        | KeepGoing
-        | Done
 
     let doOneStepOfStabilize (t : State) : StepResult =
         try

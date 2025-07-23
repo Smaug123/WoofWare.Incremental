@@ -1,94 +1,98 @@
 namespace WoofWare.Incremental.Test
 
+open FsUnitTyped
 open NUnit.Framework
 open WoofWare.Incremental
 
 [<TestFixture>]
 module TestScope =
+    [<Test>]
+    let ``current is top`` () =
+        let I = Incremental.make ()
+        I.CurrentScope |> shouldEqual Scope.top
 
-      module Scope = struct
-        open Scope
+    [<Test>]
+    let ``within scope`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let o =
+            I.WithinScope I.CurrentScope (fun () -> I.Const 13)
+            |> I.Observe
+        fix.Stabilize ()
 
-        type nonrec t = t
+        Observer.valueThrowing o |> shouldEqual 13
 
-        let top = top
-        let is_top = is_top
+    [<Test>]
+    let ``escape a bind`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-        let%expect_test _ =
-          let t = current () in
-          assert (phys_equal t top)
-        ;;
+        let s = I.CurrentScope
+        let r = ref None
+        let x = I.Var.Create 13
+        let o =
+            I.Var.Watch x
+            |> I.Bind (fun i ->
+                r.Value <- Some (I.WithinScope s (fun () -> I.Const i))
+                I.Return ()
+            )
+            |> I.Observe
+        fix.Stabilize ()
+        let o2 = I.Observe r.Value.Value
+        fix.Stabilize ()
+        Observer.valueThrowing o2 |> shouldEqual 13
+        I.Var.Set x 14
+        fix.Stabilize ()
+        Observer.valueThrowing o2 |> shouldEqual 13
+        Observer.disallowFutureUse o
+        fix.Stabilize ()
+        Observer.valueThrowing o2 |> shouldEqual 13
 
-        let current = current
-        let within = within
+    [<Test>]
+    let ``return to a bind`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let r = ref None
+        let x = I.Var.Create 13
+        let o1 =
+          I.Var.Watch x
+          |> I.Bind (fun _ ->
+              r.Value <- Some I.CurrentScope
+              I.Return ()
+          )
+          |> I.Observe
+        fix.Stabilize ()
+        let s = r.Value.Value
+        let o2 = I.Observe (I.WithinScope s (fun () -> I.Const 13))
+        fix.Stabilize ()
+        Observer.valueThrowing o2 |> shouldEqual 13
+        I.Var.Set x 14
+        Observer.disallowFutureUse o2
+        fix.Stabilize ()
+        Observer.disallowFutureUse o1
 
-        let%expect_test _ =
-          let o = observe (within (current ()) ~f:(fun () -> const 13)) in
-          stabilize_ [%here];
-          assert (value o = 13)
-        ;;
+    [<Test>]
+    let ``top is top`` () =
+        Scope.isTop Scope.top
 
-        let%expect_test _ =
-          (* escaping a [bind] *)
-          let s = current () in
-          let r = ref None in
-          let x = Var.create_ [%here] 13 in
-          let o =
-            observe
-              (bind (watch x) ~f:(fun i ->
-                 r := Some (within s ~f:(fun () -> const i));
-                 return ()))
-          in
-          stabilize_ [%here];
-          let o2 = observe (Option.value_exn !r) in
-          stabilize_ [%here];
-          assert (value o2 = 13);
-          Var.set x 14;
-          stabilize_ [%here];
-          assert (value o2 = 13);
-          disallow_future_use o;
-          stabilize_ [%here];
-          assert (value o2 = 13)
-        ;;
+    [<Test>]
+    let ``scope inside bind is not top`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let i = I.Var.Create true
+        let o =
+            I.Var.Watch i
+            |> I.Bind (fun b ->
+                Scope.isTop I.CurrentScope
+                |> shouldEqual false
+                I.Return b
+            )
+            |> I.Observe
+        fix.Stabilize ()
 
-        let%expect_test _ =
-          (* returning to a [bind] *)
-          let r = ref None in
-          let x = Var.create_ [%here] 13 in
-          let o1 =
-            observe
-              (bind (watch x) ~f:(fun _i ->
-                 r := Some (current ());
-                 return ()))
-          in
-          stabilize_ [%here];
-          let s = Option.value_exn !r in
-          let o2 = observe (within s ~f:(fun () -> const 13)) in
-          stabilize_ [%here];
-          assert (value o2 = 13);
-          Var.set x 14;
-          disallow_future_use o2;
-          stabilize_ [%here];
-          disallow_future_use o1
-        ;;
+        Observer.valueThrowing o |> shouldEqual true
 
-        let%test "top is top" = is_top top
+        I.Var.Set i false
+        fix.Stabilize ()
 
-        let%expect_test "scope inside bind is not top" =
-          let i = Var.create_ [%here] true in
-          let o =
-            observe
-              (bind (watch i) ~f:(fun b ->
-                 assert (not (is_top (current ())));
-                 return b))
-          in
-          stabilize_ [%here];
-          print_s [%sexp (value o : bool)];
-          [%expect {| true |}];
-          Var.set i false;
-          stabilize_ [%here];
-          print_s [%sexp (value o : bool)];
-          [%expect {| false |}]
-        ;;
-      end
-
+        Observer.valueThrowing o |> shouldEqual false

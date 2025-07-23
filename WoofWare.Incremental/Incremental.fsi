@@ -31,6 +31,9 @@ type IVar =
     abstract Create<'a> : 'a -> Var<'a>
     abstract Watch<'a> : Var<'a> -> Node<'a>
     abstract Set<'a> : Var<'a> -> 'a -> unit
+    abstract Replace<'a> : Var<'a> -> ('a -> 'a) -> unit
+    abstract Value<'a> : Var<'a> -> 'a
+    abstract LatestValue<'a> : Var<'a> -> 'a
 
 type Incremental =
     abstract Return<'a> : 'a -> Node<'a>
@@ -48,6 +51,8 @@ type Incremental =
     abstract State : State
     abstract SaveDot : writeChunk : (string -> unit) -> unit
     abstract SaveDot' : renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
+    abstract CurrentScope : Scope
+    abstract WithinScope : Scope -> (unit -> 'a) -> 'a
 
 [<RequireQualifiedAccess>]
 module Incremental =
