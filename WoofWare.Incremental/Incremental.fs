@@ -13,6 +13,9 @@ type Observer<'a> = | Observer of Observer'<'a>
 [<RequireQualifiedAccess>]
 module Observer =
     let disallowFutureUse<'a> (Observer o : 'a Observer) : unit = State.disallowFutureUse o.Value
+    let useIsAllowed<'a> (Observer o : 'a Observer) : bool = Observer'.useIsAllowed o
+
+    let observing<'a> (Observer o : 'a Observer) = InternalObserver.observing o.Value
 
     let value (Observer o) = State.observerValue o
 

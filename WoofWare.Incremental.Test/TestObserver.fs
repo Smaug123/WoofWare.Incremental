@@ -1,97 +1,140 @@
 namespace WoofWare.Incremental.Test
 
+open System
+open System.Threading
+open FsUnitTyped
 open NUnit.Framework
 open WoofWare.Incremental
+open WoofWare.Expect
 
 [<TestFixture>]
 module TestObserver =
 
-      module Observer = struct
-        open Observer
+    let collect () =
+        GC.Collect ()
+        GC.WaitForPendingFinalizers ()
+        GC.Collect ()
 
-        type nonrec 'a t = 'a t [@@deriving sexp_of]
+    [<Test>]
+    let ``toString test`` () =
+      let fix = IncrementalFixture.Make ()
+      let I = fix.I
+      let t = I.Observe (I.Var.Watch (I.Var.Create 13))
 
-        let%expect_test "[sexp_of_t]" =
-          let t = observe (watch (Var.create 13)) in
-          let show_t () = print_s [%sexp (t : int t)] in
-          show_t ();
-          [%expect {| <unstabilized> |}];
-          stabilize_ [%here];
-          show_t ();
-          [%expect {| 13 |}];
-          disallow_future_use t;
-          show_t ();
-          [%expect {| <disallowed> |}]
-        ;;
+      expect' {
+          snapshot "<unstabilized>"
+          return Observer.toString t
+      }
 
-        let invariant = invariant
-        let observing = observing
+      fix.Stabilize ()
 
-        let%expect_test _ =
-          let x = Var.create_ [%here] 0 in
-          let o = observe (watch x) in
-          assert (phys_same (observing o) (watch x))
-        ;;
+      expect' {
+          snapshot "13"
+          return Observer.toString t
+      }
 
-        let use_is_allowed = use_is_allowed
+      Observer.disallowFutureUse o
 
-        let%expect_test _ =
-          let o = observe (watch (Var.create_ [%here] 0)) in
-          assert (use_is_allowed o);
-          disallow_future_use o;
-          assert (not (use_is_allowed o))
-        ;;
+      expect' {
+          snapshot "<disallowed>"
+          return Observer.toString t
+      }
 
-        let disallow_future_use = disallow_future_use
-        let value = value
-        let value_exn = value_exn
+    [<Test>]
+    let ``observe and watch`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-        let%expect_test _ =
-          (* calling [value] before stabilizing returns error. *)
-          let x = Var.create_ [%here] 0 in
-          let o = observe (watch x) in
-          assert (is_error (value o));
-          assert (does_raise (fun () -> value_exn o))
-        ;;
+        let x = I.Var.Create 0
+        let o = I.Observe (I.Var.Watch x)
 
-        let%expect_test _ =
-          (* calling [value] on a just-created observer of an already computed
-               incremental before stabilizing returns error. *)
-          let x = Var.create_ [%here] 13 in
-          let o = observe (watch x) in
-          stabilize_ [%here];
-          disallow_future_use o;
-          Var.set x 14;
-          stabilize_ [%here];
-          Var.set x 15;
-          let o = observe (watch x) in
-          assert (is_error (value o));
-          assert (does_raise (fun () -> value_exn o))
-        ;;
+        Object.ReferenceEquals (I.Var.Watch x, Observer.observing o)
+        |> shouldEqual true
 
-        let%expect_test _ =
-          (* calling [value] after [disallow_future_use] returns error. *)
-          let x = Var.create_ [%here] 0 in
-          let o = observe (watch x) in
-          stabilize_ [%here];
-          disallow_future_use o;
-          assert (is_error (value o));
-          assert (does_raise (fun () -> value_exn o))
-        ;;
+    [<Test>]
+    let ``useIsAllowed test`` () =
+        let I = Incremental.make ()
+        let o = I.Observe (I.Var.Watch (I.Var.Create 0))
 
-        let%expect_test _ =
-          (* [disallow_future_use] disables on-update handlers. *)
-          let x = Var.create_ [%here] 13 in
-          let o = observe (Var.watch x) in
-          let r = ref 0 in
-          Observer.on_update_exn o ~f:(fun _ -> incr r);
-          stabilize_ [%here];
-          assert (!r = 1);
-          disallow_future_use o;
-          Var.set x 14;
-          stabilize_ [%here];
-          assert (!r = 1)
-        ;;
+        Observer.useIsAllowed o |> shouldEqual true
+        Observer.disallowFutureUse o
+        Observer.useIsAllowed o |> shouldEqual false
+
+    [<Test>]
+    let ``calling value before stabilizing returns error`` () =
+        let I = Incremental.make ()
+        let x = I.Var.Create 0
+        let o = I.Observe (I.Var.Watch x)
+        Observer.value(o).IsError |> shouldEqual true
+        expect' {
+            snapshotThrows ""
+            return! fun () -> Observer.valueThrowing o
+        }
+
+    [<Test>]
+    let ``calling value on a just-created observer of an already computed incremental before stabilizing is error`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let x = I.Var.Create 13
+        let o = I.Observe (I.Var.Watch x)
+        fix.Stabilize ()
+
+        Observer.disallowFutureUse o
+        I.Var.Set x 14
+        fix.Stabilize ()
+        I.Var.Set x 15
+        let o = I.Observe (I.Var.Watch x)
+
+        Observer.value(o).IsError |> shouldEqual true
+        expect' {
+            snapshotThrows ""
+            return! fun () -> Observer.valueThrowing o
+        }
+
+    [<Test>]
+    let ``calling value after disallowFutureUse returns error`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let x = I.Var.Create 0
+        let o = I.Observe (I.Var.Watch x)
+        fix.Stabilize ()
+        Observer.disallowFutureUse o
+
+        Observer.value(o).IsError |> shouldEqual true
+        expect' {
+            snapshotThrows ""
+            return! fun () -> Observer.valueThrowing o
+        }
+
+    [<Test>]
+    let ``disallowFutureUse disables on-update handlers`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let x = I.Var.Create 13
+        let o = I.Observe (I.Var.Watch x)
+        let mutable r = 0
+
+        Observer.onUpdateThrowing o (fun _ -> Interlocked.Increment r |> ignore<int>)
+        fix.Stabilize ()
+        r |> shouldEqual 1
+
+        Observer.disallowFutureUse o
+        I.Var.Set x 14
+        fix.Stabilize ()
+
+        r |> shouldEqual 1
+
+    [<Test>]
+    let ``finalizers work`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        collect ()
+
+        fix.Stabilize ()
 
         let%expect_test _ =
           (* finalizers work *)

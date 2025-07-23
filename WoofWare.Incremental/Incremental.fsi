@@ -13,9 +13,11 @@ type Observer<'a>
 [<RequireQualifiedAccess>]
 module Observer =
     val disallowFutureUse<'a> : 'a Observer -> unit
+    val useIsAllowed<'a> : 'a Observer -> bool
     val value<'a> : 'a Observer -> Result<'a, exn>
     val valueThrowing<'a> : 'a Observer -> 'a
     val onUpdateThrowing<'a> : 'a Observer -> (Update<'a> -> unit) -> unit
+    val observing<'a> : 'a Observer -> 'a Node
 
 type IClock =
     abstract DefaultTimingWheelConfig : TimingWheelConfig

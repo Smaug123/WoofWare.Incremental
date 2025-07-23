@@ -23,103 +23,92 @@ module TestIncremental =
     let onObserverUpdateQueue = onUpdateQueue<Observer.Update>
     let onUpdateQueue = onUpdateQueue<Observer.Update>
 
-  module%test _ = struct
-    module I = Make ()
-    open I
+    [<Test>]
+    let ``test 1`` () =
+      let fix = IncrementalFixture.Make ()
+      let I = fix.I
 
-    struct
-      type nonrec state_witness = state_witness [@@deriving sexp_of]
-      type nonrec 'a t = 'a t
+      State.invariant I.State
+      let i = 13
+      let t = I.Const i
+      let o = I.Observe t
+      fix.Stabilize ()
 
-      module Infix = Infix
-      module Before_or_after = Before_or_after
-      module Node_value = Node_value
-      module Step_function = Step_function
+      Var.toString t
+      |> shouldEqual (string<int> i)
+      Observer.disallowFutureUse o
 
-      let invariant = invariant
-      let stabilize = stabilize
+    let isInvalid (fix : IncrementalFixture) (t : Node<'a>) =
+        let o = fix.I.Observe t
+        fix.Stabilize ()
+        let result = Observer.value o |> Result.isError
+        Observer.disallowFutureUse o
 
-      (* used in lots of tests *)
-      let observe = observe
-
-      (* *)
-      let user_info = user_info
-      let set_user_info = set_user_info
-      let append_user_info_graphviz = append_user_info_graphviz
-
-      module Update = Update
-      module Packed = Packed
-
-      let pack = pack
-
-      module Let_syntax = Let_syntax
-
-      let sexp_of_t = sexp_of_t
-
-      let%expect_test _ =
-        State.(invariant t);
-        let i = 13 in
-        let t = const i in
-        let o = observe t in
-        stabilize_ [%here];
-        [%test_eq: Sexp.t] (t |> [%sexp_of: int t]) (i |> [%sexp_of: int]);
-        disallow_future_use o
-      ;;
-
-      let is_invalid t =
-        let o = observe t in
-        stabilize_ [%here];
-        let result = is_error (Observer.value o) in
-        disallow_future_use o;
-        skip_invalidity_check || result
-      ;;
-
-      let is_invalidated_on_bind_rhs (f : int -> _ t) =
-        let x = Var.create 13 in
-        let r = ref None in
-        let o1 =
-          observe
-            (Var.watch x
-             >>= fun i ->
-             r := Some (f i);
-             return ())
-        in
-        stabilize_ [%here];
-        let t = Option.value_exn !r in
-        let o2 = observe t in
-        Var.set x 14;
-        stabilize_ [%here];
-        let result = is_invalid t in
-        disallow_future_use o1;
-        disallow_future_use o2;
         result
-      ;;
 
-      let%test _ = is_invalid invalid
-      let is_valid = is_valid
-      let%test _ = is_valid (const 3)
-      let%test _ = skip_invalidity_check || not (is_valid invalid)
-      let const = const
-      let return = return
-      let is_const = is_const
-      let is_necessary = is_necessary
+    let isInvalidatedOnBindRhs (fix : IncrementalFixture) (f : int -> Node<'a>) : bool =
+        let x = fix.I.Var.Create 13
+        let r = ref None
+        let o1 =
+            fix.I.Var.Watch x
+            |> fix.I.Bind (fun i ->
+                r.Value <- Some (f i)
+                fix.I.Return ()
+            )
+            |> fix.I.Observe
+        fix.Stabilize ()
+        let t = r.Value.Value
+        let o2 = fix.I.Observe t
+        fix.I.Var.Set x 14
+        fix.Stabilize ()
+        let result = isInvalid fix t
+        Observer.disallowFutureUse o1
+        Observer.disallowFutureUse o2
+        result
 
-      let%expect_test _ =
-        List.iter [ const; return ] ~f:(fun const ->
-          let i = const 13 in
-          assert (is_const i);
-          assert (not (is_necessary i));
-          let o = observe i in
-          assert (not (is_necessary i));
-          stabilize_ [%here];
-          assert (is_necessary i);
-          assert (value o = 13);
-          assert (is_const i))
-      ;;
+    [<Test>]
+    let ``invalid is invalid`` () =
+      let fix = IncrementalFixture.Make ()
+      isInvalid fix fix.Invalid
+      |> shouldEqual true
 
-      let%test _ = is_invalidated_on_bind_rhs (fun _ -> const 13)
+      fix.Invalid
+      |> NodeHelpers.isValid
+      |> shouldEqual false
 
-      let am_stabilizing = am_stabilizing
+    [<Test>]
+    let ``const is valid`` () =
+      let I = Incremental.make ()
+      I.Const 3
+      |> NodeHelpers.isValid
+      |> shouldEqual true
+
+    [<TestCase true>]
+    [<TestCase false>]
+    let ``const and return`` (useConst : bool) =
+      let fix = IncrementalFixture.Make ()
+      let I = fix.I
+
+      let i =
+          if useConst then I.Const 13 else I.Return 13
+      Node.isConst i |> shouldEqual true
+      NodeHelpers.isNecessary i |> shouldEqual false
+
+      let o = I.Observe i
+      NodeHelpers.isNecessary i |> shouldEqual false
+
+      fix.Stabilize ()
+
+      NodeHelpers.isNecessary i |> shouldEqual true
+      Observer.valueThrowing o |> shouldEqual 13
+      Node.isConst i |> shouldEqual true
+
+    [<Test>]
+    let ``Test isInvalidatedOnBindRhs`` () =
+        let fix = IncrementalFixture.Make ()
+        isInvalidatedOnBindRhs fix (fun _ -> fix.I.Const 13)
+        |> shouldEqual true
+
       let%test _ = not (am_stabilizing ())
 
       let%expect_test _ =
@@ -128,23 +117,6 @@ module TestIncremental =
         stabilize_ [%here];
         disallow_future_use o
       ;;
-
-      let map = map
-      let map2 = map2
-      let map3 = map3
-      let map4 = map4
-      let map5 = map5
-      let map6 = map6
-      let map7 = map7
-      let map8 = map8
-      let map9 = map9
-      let map10 = map10
-      let map11 = map11
-      let map12 = map12
-      let map13 = map13
-      let map14 = map14
-      let map15 = map15
-      let ( >>| ) = ( >>| )
 
       let test_map n (mapN : int t -> int t) =
         let o = observe (mapN (const 1)) in
@@ -167,83 +139,6 @@ module TestIncremental =
       let%expect_test _ = test_map 1 (fun i -> i >>| fun a1 -> a1)
       let%expect_test _ = test_map 1 (fun i -> map i ~f:(fun a1 -> a1))
       let%expect_test _ = test_map 2 (fun i -> map2 i i ~f:(fun a1 a2 -> a1 + a2))
-
-      let%expect_test _ =
-        test_map 3 (fun i -> map3 i i i ~f:(fun a1 a2 a3 -> a1 + a2 + a3))
-      ;;
-
-      let%expect_test _ =
-        test_map 4 (fun i -> map4 i i i i ~f:(fun a1 a2 a3 a4 -> a1 + a2 + a3 + a4))
-      ;;
-
-      let%expect_test _ =
-        test_map 5 (fun i ->
-          map5 i i i i i ~f:(fun a1 a2 a3 a4 a5 -> a1 + a2 + a3 + a4 + a5))
-      ;;
-
-      let%expect_test _ =
-        test_map 6 (fun i ->
-          map6 i i i i i i ~f:(fun a1 a2 a3 a4 a5 a6 -> a1 + a2 + a3 + a4 + a5 + a6))
-      ;;
-
-      let%expect_test _ =
-        test_map 7 (fun i ->
-          map7 i i i i i i i ~f:(fun a1 a2 a3 a4 a5 a6 a7 ->
-            a1 + a2 + a3 + a4 + a5 + a6 + a7))
-      ;;
-
-      let%expect_test _ =
-        test_map 8 (fun i ->
-          map8 i i i i i i i i ~f:(fun a1 a2 a3 a4 a5 a6 a7 a8 ->
-            a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8))
-      ;;
-
-      let%expect_test _ =
-        test_map 9 (fun i ->
-          map9 i i i i i i i i i ~f:(fun a1 a2 a3 a4 a5 a6 a7 a8 a9 ->
-            a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9))
-      ;;
-
-      let%expect_test _ =
-        test_map 10 (fun i ->
-          map10 i i i i i i i i i i ~f:(fun a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 ->
-            a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10))
-      ;;
-
-      let%expect_test _ =
-        let f a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 =
-          a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11
-        in
-        test_map 11 (fun i -> map11 i i i i i i i i i i i ~f)
-      ;;
-
-      let%expect_test _ =
-        let f a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 =
-          a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12
-        in
-        test_map 12 (fun i -> map12 i i i i i i i i i i i i ~f)
-      ;;
-
-      let%expect_test _ =
-        let f a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 =
-          a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13
-        in
-        test_map 13 (fun i -> map13 i i i i i i i i i i i i i ~f)
-      ;;
-
-      let%expect_test _ =
-        let f a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 =
-          a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14
-        in
-        test_map 14 (fun i -> map14 i i i i i i i i i i i i i i ~f)
-      ;;
-
-      let%expect_test _ =
-        let f a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 =
-          a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15
-        in
-        test_map 15 (fun i -> map15 i i i i i i i i i i i i i i i ~f)
-      ;;
 
       let%expect_test _ =
         let x0 = Var.create_ [%here] 13 in
