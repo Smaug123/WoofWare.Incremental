@@ -233,9 +233,9 @@ module TestVar =
 
         fix.Stabilize ()
         let rhs = rhs.Value
-        isValid rhs |> shouldEqual true
+        NodeHelpers.isValid rhs |> shouldEqual true
         I.Var.Set lhs 1
         fix.Stabilize ()
 
-        not (isValid rhs) |> shouldEqual useCurrentScope
+        not (NodeHelpers.isValid rhs) |> shouldEqual useCurrentScope
         Observer.valueThrowing o |> shouldEqual 1

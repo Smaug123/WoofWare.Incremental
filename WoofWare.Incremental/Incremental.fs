@@ -44,6 +44,7 @@ type IClock =
 
 type IVar =
     abstract Create<'a> : 'a -> Var<'a>
+    abstract Create'<'a> : useCurrentScope: bool -> 'a -> Var<'a>
     abstract Watch<'a> : Var<'a> -> Node<'a>
     abstract Set<'a> : Var<'a> -> 'a -> unit
     abstract Replace<'a> : Var<'a> -> ('a -> 'a) -> unit
@@ -73,6 +74,7 @@ type IncrementalImpl (state : State) =
     let var =
         { new IVar with
             member this.Create x = State.createVar state None x
+            member this.Create' useCurrentScope x = State.createVar state (Some useCurrentScope) x
             member this.Watch v = v.Watch
             member this.Set var a = State.setVar var a
 

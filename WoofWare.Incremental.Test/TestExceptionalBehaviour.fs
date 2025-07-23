@@ -10,14 +10,14 @@ module TestExceptionalBehaviour =
     let ``handling and rethrowing`` () =
         let I = Incremental.make ()
         let x = I.Var.Create ()
-        let y =
+        let y: Node<unit> =
             I.Var.Watch x
             |> I.Map (fun () ->
                 failwith "oh no!"
             )
         let o = I.Observe y
         expect' {
-            snapshotThrows "cannot stabilize -- stabilize previously raised"
+            snapshotThrows @"System.Exception: oh no!"
             return! fun () -> I.Stabilize ()
         }
         expect' {

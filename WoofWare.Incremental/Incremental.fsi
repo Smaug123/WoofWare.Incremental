@@ -31,6 +31,7 @@ type IClock =
 
 type IVar =
     abstract Create<'a> : 'a -> Var<'a>
+    abstract Create'<'a> : useCurrentScope: bool -> 'a -> Var<'a>
     abstract Watch<'a> : Var<'a> -> Node<'a>
     abstract Set<'a> : Var<'a> -> 'a -> unit
     abstract Replace<'a> : Var<'a> -> ('a -> 'a) -> unit
