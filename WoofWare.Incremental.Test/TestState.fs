@@ -1,49 +1,73 @@
 namespace WoofWare.Incremental.Test
 
+open System
 open NUnit.Framework
+open FsUnitTyped
 open WoofWare.Incremental
+open WoofWare.Expect
 
 [<TestFixture>]
 module TestState =
+    [<Test>]
+    let ``default max height`` () =
+      let I = Incremental.make ()
+      State.maxHeightAllowed I.State |> shouldEqual 128
 
-      module State = struct
-        open State
+    [<Test>]
+    let ``max height seen`` () =
+      let fix = IncrementalFixture.Make ()
+      // because of the Invalid we made
+      State.maxHeightSeen fix.I.State |> shouldEqual 3
 
-        type nonrec t = t [@@deriving sexp_of]
+    [<TestCase 1>]
+    [<TestCase 2>]
+    let ``can't set smaller height`` (height : int) =
+      let fix = IncrementalFixture.Make ()
+      expect' {
+          snapshotThrows ""
+          return! fun () -> State.setMaxHeightAllowed fix.I.State height
+      }
 
-        let invariant = invariant
-        let t = t
-        let%expect_test _ = invariant t
-        let max_height_allowed = max_height_allowed
+    [<Test>]
+    let ``max height setting`` () =
+      let fix = IncrementalFixture.Make ()
+      State.setMaxHeightAllowed fix.I.State 10
+      State.maxHeightAllowed fix.I.State |> shouldEqual 10
 
-        (* the default *)
-        let%test _ = max_height_allowed t = 128
-        let max_height_seen = max_height_seen
+    [<Test>]
+    let ``observe max height`` () =
+      let fix = IncrementalFixture.Make ()
+      let I = fix.I
 
-        (* because of [let invalid] above *)
-        let%test _ = max_height_seen t = 3
-        let set_max_height_allowed = set_max_height_allowed
+      State.setMaxHeightAllowed I.State 256
+      let rec loop n =
+        if n = 0 then
+            I.Return 0
+        else
+            loop (n - 1)
+        |> I.Map (fun i -> i + 1)
 
-        let%expect_test _ =
-          List.iter [ -1; 2 ] ~f:(fun height ->
-            assert (does_raise (fun () -> set_max_height_allowed t height)))
-        ;;
+      let o = I.Observe (loop (State.maxHeightAllowed I.State))
 
-        let%expect_test _ = set_max_height_allowed t 10
-        let%test _ = max_height_allowed t = 10
-        let%expect_test _ = set_max_height_allowed t 128
+      fix.Stabilize ()
+      Observer.valueThrowing o |> shouldEqual (State.maxHeightAllowed I.State)
 
-        let%expect_test _ =
-          set_max_height_allowed t 256;
-          let rec loop n = if n = 0 then return 0 else loop (n - 1) >>| fun i -> i + 1 in
-          let o = observe (loop (max_height_allowed t)) in
-          stabilize_ [%here];
-          assert (Observer.value_exn o = max_height_allowed t)
-        ;;
+      State.maxHeightAllowed I.State |> shouldEqual (State.maxHeightSeen I.State)
+      State.invariant I.State
 
-        let%test _ = max_height_allowed t = max_height_seen t
-        let%expect_test _ = invariant t
-        let num_active_observers = num_active_observers
+      do
+          GC.Collect ()
+          GC.WaitForPendingFinalizers ()
+          GC.Collect ()
+
+      fix.Stabilize ()
+
+      do
+          let n = State.numActiveObservers I.State
+          let o = I.Observe (I.Const 0)
+          Observer.disallowFutureUse o
+          State.numActiveObservers I.State |> shouldEqual n
+
 
         let%expect_test _ =
           Gc.full_major ();
@@ -146,9 +170,5 @@ module TestState =
           disallow_future_use o1;
           disallow_future_use o2
         ;;
-
-        module Stats = Stats
-
-        let stats = stats
       end
 

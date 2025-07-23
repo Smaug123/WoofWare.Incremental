@@ -9,13 +9,13 @@
     <ItemGroup>
         <Compile Include="Result.fs" />
         <Compile Include="TestObserver.fs" />
-        <Compile Include="TestState.fs" />
         <Compile Include="TestSurface.fs" />
         <Compile Include="TestConfig.fs" />
         <Compile Include="TestExceptionalBehaviour.fs" />
         <Compile Include="TestForAnalyzer.fs" />
         <Compile Include="TestGenerics.fs" />
         <Compile Include="Incremental.fs" />
+        <Compile Include="TestState.fs" />
         <Compile Include="TestIncremental.fs" />
         <Compile Include="TestJoin.fs" />
         <Compile Include="TestScope.fs" />
