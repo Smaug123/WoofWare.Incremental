@@ -1,40 +1,42 @@
 namespace WoofWare.Incremental.Test
 
+open FsUnitTyped
 open WoofWare.Incremental
+open NUnit.Framework
+open WoofWare.Expect
 
-      module Expert = Expert
-      module E = Expert
+// This tests add_dependency/remove_dependency, invalidity
+// (in particular a node becomes invalid before being replaced by a valid one).
+[<TestFixture>]
+module TestExpert =
+
+    let join<'a> (t : 'a Node Node) : 'a Node =
+        let mutable prevRhs = None
+        let join = Expert.Node.Create (fun () -> Expert.Dependency.value prevRhs.Value)
+        let lhsChange =
+            t
+            |> map (fun rhs ->
+                let rhsDep = Expert.Dependency.Create rhs
+                Expert.Node.addDependency join rhsDep
+                match prevRhs with
+                | None -> ()
+                | Some rhs -> Expert.Node.removeDependency join rhs
+                prevRhs <- Some rhsDep
+            )
+            Expert.Node.addDependency join (Expert.Dependency.Create lhsChange)
+            Expert.Node.watch join
+        failwith ""
+
+    [<Test>]
+    let ``plugging an already invalid incremental node makes the expert invalid`` () =
+      let fix = IncrementalFixture.Make ()
+      let I = fix.I
+      let t = I.Expert.Node.Create ignore
+      I.Expert.Node.addDependency t (I.Expert.Dependency.create fix.Invalid)
+      Expert.Node.watch t |> isInvalid |> shouldEqual true
+
 
       module _ = struct
-        (* This tests add_dependency/remove_dependency, invalidity (in particular a node
-             becomes invalid before being replaced by a valid one). *)
-        include Join (struct
-            let join : type a. a t t -> a t =
-              fun t ->
-              let prev_rhs = ref None in
-              let join =
-                E.Node.create (fun () -> E.Dependency.value (Option.value_exn !prev_rhs))
-              in
-              let lhs_change =
-                map t ~f:(fun rhs ->
-                  let rhs_dep = E.Dependency.create rhs in
-                  E.Node.add_dependency join rhs_dep;
-                  Option.iter !prev_rhs ~f:(fun v -> E.Node.remove_dependency join v);
-                  prev_rhs := Some rhs_dep)
-              in
-              E.Node.add_dependency join (E.Dependency.create lhs_change);
-              E.Node.watch join
-            ;;
-          end)
-
-        let%expect_test _ =
-          (* plugging an already invalid incremental node make
-               the expert node invalid *)
-          let t = E.Node.create ignore in
-          E.Node.add_dependency t (E.Dependency.create invalid);
-          assert (is_invalid (E.Node.watch t))
-        ;;
-
         let%expect_test _ =
           (* [invalidate] does invalidate *)
           let var = Var.create `Valid in
