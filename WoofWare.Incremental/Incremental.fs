@@ -88,6 +88,7 @@ type Incremental =
     abstract Bind<'a, 'b> : ('a -> Node<'b>) -> Node<'a> -> Node<'b>
     abstract Stabilize : unit -> unit
     abstract Observe<'a> : Node<'a> -> Observer<'a>
+    abstract Observe'<'a> : shouldFinalize : bool -> Node<'a> -> Observer<'a>
     abstract State : State
     abstract SaveDot' : renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
     abstract SaveDot : writeChunk : (string -> unit) -> unit
@@ -161,6 +162,10 @@ type IncrementalImpl (state : State) =
         member this.Var = var
         member this.Clock = clock
         member this.Observe n = State.createObserver None n |> Observer
+
+        member this.Observe' (shouldFinalize : bool) (n : Node<'a>) =
+            State.createObserver (Some shouldFinalize) n |> Observer
+
         member this.State = state
         member this.CurrentScope = state.CurrentScope
         member this.WithinScope scope f = State.withinScope state scope f

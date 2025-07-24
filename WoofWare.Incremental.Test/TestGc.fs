@@ -19,11 +19,6 @@ module TestGc =
 #endif
         ()
 
-    let forceGCAndFinalizers () =
-        GC.Collect ()
-        GC.WaitForPendingFinalizers ()
-        GC.Collect ()
-
     [<Test>]
     let ``Finalizer runs when target is collected`` () =
         let mutable finalizerRan = 0
@@ -39,7 +34,7 @@ module TestGc =
                     testResult <- t.Id
                 )
 
-        forceGCAndFinalizers ()
+        Gc.collect ()
 
         finalizerRan |> shouldEqual 1
         testResult |> shouldEqual 42
@@ -54,7 +49,7 @@ module TestGc =
 
         weakRef.IsAlive |> shouldEqual true
 
-        forceGCAndFinalizers ()
+        Gc.collect ()
 
         weakRef.IsAlive |> shouldEqual false
 
@@ -66,7 +61,7 @@ module TestGc =
             let target = TestObject 999
             Gc.addFinalizerIgnore target (fun t -> receivedId <- t.Id)
 
-        forceGCAndFinalizers ()
+        Gc.collect ()
 
         receivedId |> shouldEqual 999
 
@@ -77,7 +72,7 @@ module TestGc =
 
         Gc.addFinalizerIgnore target (fun _ -> Interlocked.Increment &finalizerRan |> ignore<int>)
 
-        forceGCAndFinalizers ()
+        Gc.collect ()
 
         finalizerRan |> shouldEqual 0
         // this keeps `target` alive
@@ -92,7 +87,7 @@ module TestGc =
             let target = TestObject 88
             Gc.addFinalizerIgnore target (fun _ -> finalizerThreadId <- Thread.CurrentThread.ManagedThreadId)
 
-        forceGCAndFinalizers ()
+        Gc.collect ()
 
         finalizerThreadId |> shouldNotEqual mainThreadId
 
@@ -104,7 +99,7 @@ module TestGc =
             let target = TestObject 42
             Gc.addFinalizerIgnore target (fun _ -> Interlocked.Increment &finalizerRan |> ignore)
 
-        forceGCAndFinalizers ()
+        Gc.collect ()
 
         finalizerRan |> shouldEqual 0
 
@@ -128,7 +123,7 @@ module TestGc =
                     lock finalizerCounts (fun () -> finalizerCounts.Add count)
                 )
 
-        forceGCAndFinalizers ()
+        Gc.collect ()
 
         // All objects should have been collected
         let aliveCount = collectableRefs |> Seq.filter (fun wr -> wr.IsAlive) |> Seq.length
@@ -158,7 +153,7 @@ module TestGc =
             let tupleTarget = (42, "test")
             Gc.addFinalizerIgnore tupleTarget (fun t -> lock results (fun () -> results.Add $"Tuple: %i{fst t}"))
 
-        forceGCAndFinalizers ()
+        Gc.collect ()
 
         results.Count |> shouldEqual 3
         // Check that we got results from all three types
@@ -186,6 +181,6 @@ module TestGc =
 
         // Force multiple GC cycles to ensure all finalizers run
         for _ = 1 to 5 do
-            forceGCAndFinalizers ()
+            Gc.collect ()
 
         finalizerCount |> shouldEqual expectedCount

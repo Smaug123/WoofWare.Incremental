@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="Result.fs"/>
+    <Compile Include="Gc.fs" />
     <Compile Include="TestSurface.fs"/>
     <Compile Include="TestConfig.fs"/>
     <Compile Include="TestExceptionalBehaviour.fs"/>
@@ -15,7 +16,7 @@
     <Compile Include="Incremental.fs"/>
     <None Include="TestGenerics.fs"/>
     <Compile Include="TestObserver.fs"/>
-    <None Include="TestState.fs"/>
+    <Compile Include="TestState.fs"/>
     <None Include="TestIncremental.fs"/>
     <Compile Include="TestJoin.fs"/>
     <Compile Include="TestScope.fs"/>

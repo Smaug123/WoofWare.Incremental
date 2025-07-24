@@ -26,6 +26,12 @@ type StepResult =
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module State =
+    let internal numNodesRecomputedDirectlyBecauseOneChild (t : State) =
+        t.NumNodesRecomputedDirectlyBecauseOneChild
+
+    let internal numNodesRecomputedDirectlyBecauseMinHeight (t : State) =
+        t.NumNodesRecomputedDirectlyBecauseMinHeight
+
     let numStabilizes (t : State) =
         StabilizationNum.toInt t.StabilizationNum
 
@@ -1059,8 +1065,8 @@ module State =
 
     // This gets called within a finalizer.
     let private observerFinalizer (t : State) =
-        Staged.stage (fun observer ->
-            let internalObserver = !observer
+        Staged.stage (fun (observer : _ ref) ->
+            let internalObserver = observer.Value
 
             t.FinalizedObservers
             |> ThreadSafeQueue.enqueue (InternalObserverCrate.make internalObserver)
@@ -1928,7 +1934,7 @@ module State =
 
         let currentlyRunningNodeThrowing state name =
             match state.OnlyInDebug.CurrentlyRunningNode with
-            | None -> failwith "can only call currentlyRunningNode during stabilization"
+            | None -> failwith $"can only call currentlyRunningNode during stabilization (%s{name})"
             | Some current -> current
 
         (* Note that the two following functions are not symmetric of one another: in [let y =

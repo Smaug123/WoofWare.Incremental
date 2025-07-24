@@ -10,11 +10,6 @@ open WoofWare.Expect
 [<TestFixture>]
 module TestObserver =
 
-    let collect () =
-        GC.Collect ()
-        GC.WaitForPendingFinalizers ()
-        GC.Collect ()
-
     [<Test>]
     let ``toString test`` () =
         let fix = IncrementalFixture.Make ()
@@ -134,7 +129,7 @@ module TestObserver =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
 
-        collect ()
+        Gc.collect ()
 
         fix.Stabilize ()
         let before = State.numActiveObservers I.State
@@ -147,11 +142,11 @@ module TestObserver =
         fix.Stabilize ()
         Observer.valueThrowing o |> shouldEqual 13
 
-        collect ()
+        Gc.collect ()
 
         State.numActiveObservers I.State |> shouldEqual (before + 1)
 
-        collect ()
+        Gc.collect ()
 
         State.numActiveObservers I.State |> shouldEqual before
 
@@ -169,7 +164,7 @@ module TestObserver =
         fix.Stabilize ()
         r |> shouldEqual 1
 
-        collect ()
+        Gc.collect ()
 
         I.Var.Set x 14
         fix.Stabilize ()
@@ -193,7 +188,7 @@ module TestObserver =
 
         GC.KeepAlive o
 
-        collect ()
+        Gc.collect ()
         fix.Stabilize ()
         check [ NodeUpdate.Unnecessary ]
 
@@ -208,7 +203,7 @@ module TestObserver =
         fix.Stabilize ()
 
         Observer.disallowFutureUse o
-        collect ()
+        Gc.collect ()
 
         fix.Stabilize ()
 
@@ -230,7 +225,7 @@ module TestObserver =
         // Assertion: since disallowFutureUse has already been called, the finalizer doesn't do
         // anything wrong.
 
-        collect ()
+        Gc.collect ()
         fix.Stabilize ()
 
     [<Test>]
@@ -248,7 +243,7 @@ module TestObserver =
         GC.KeepAlive o
         let mutable r = None
         Gc.addFinalizerIgnore o (fun o -> r <- Some o)
-        collect ()
+        Gc.collect ()
         fix.Stabilize ()
 
         let o = r.Value
@@ -543,7 +538,7 @@ module TestObserver =
         fix.Stabilize ()
         didRun |> shouldEqual true
 
-        collect ()
+        Gc.collect ()
         fix.Stabilize ()
 
     [<Test>]
@@ -767,7 +762,7 @@ module TestObserver =
             I.Var.Watch x
             |> I.Map (fun _ ->
                 I.Observe (I.Var.Watch x) |> ignore<Observer<_>>
-                collect ()
+                Gc.collect ()
                 0
             )
             |> I.Observe

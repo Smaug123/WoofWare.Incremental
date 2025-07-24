@@ -61,6 +61,7 @@ type Incremental =
     abstract Bind<'a, 'b> : ('a -> Node<'b>) -> Node<'a> -> Node<'b>
     abstract Stabilize : unit -> unit
     abstract Observe<'a> : Node<'a> -> Observer<'a>
+    abstract Observe'<'a> : shouldFinalize : bool -> Node<'a> -> Observer<'a>
     abstract State : State
     abstract SaveDot : writeChunk : (string -> unit) -> unit
     abstract SaveDot' : renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
