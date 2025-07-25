@@ -71,6 +71,10 @@ type Incremental =
     abstract OnUpdate<'a> : 'a Node -> (NodeUpdate<'a> -> unit) -> unit
     abstract SetCutoff<'a> : 'a Node -> 'a Cutoff -> unit
     abstract AmStabilizing : bool
+    abstract NecessaryIfAlive<'a> : 'a Node -> 'a Node
+    abstract Freeze<'a> : 'a Node -> 'a Node
+    abstract Freeze'<'a> : onlyWhen : ('a -> bool) -> 'a Node -> 'a Node
+    abstract DependOn<'a, 'b> : dependOn : 'a Node -> 'b Node -> 'b Node
 
     abstract Sum<'a, 'b> :
         fullComputeEveryNChanges : int option ->

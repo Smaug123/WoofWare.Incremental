@@ -98,6 +98,10 @@ type Incremental =
     abstract OnUpdate<'a> : 'a Node -> (NodeUpdate<'a> -> unit) -> unit
     abstract SetCutoff<'a> : 'a Node -> 'a Cutoff -> unit
     abstract AmStabilizing : bool
+    abstract NecessaryIfAlive<'a> : 'a Node -> 'a Node
+    abstract Freeze<'a> : 'a Node -> 'a Node
+    abstract Freeze'<'a> : onlyWhen : ('a -> bool) -> 'a Node -> 'a Node
+    abstract DependOn<'a, 'b> : dependOn : 'a Node -> 'b Node -> 'b Node
 
     abstract Sum<'a, 'b> :
         fullComputeEveryNChanges : int option ->
@@ -204,6 +208,12 @@ type IncrementalImpl (state : State) =
             State.sum state fullComputeEveryNChanges nodes zero add sub
 
         member this.If cond trueCase falseCase = State.if_ cond trueCase falseCase
+
+        member this.NecessaryIfAlive n = State.necessaryIfAlive n
+        member this.Freeze n = State.freeze n (fun _ -> true)
+        member this.Freeze' onlyWhen n = State.freeze n onlyWhen
+        member this.DependOn<'a, 'b> (dependOn : 'a Node) (n : 'b Node) =
+            State.dependOn n dependOn
 
 [<RequireQualifiedAccess>]
 module Incremental =

@@ -88,7 +88,7 @@ module Node =
         | Kind.Var node ->
             // A [Var] node is stale if it was set since it was recomputed.
             node.SetAt > t.RecomputedAt
-        (* Nodes that have children. *)
+        // Nodes that have children.
         | Kind.BindLhsChange _
         | Kind.IfTestChange _
         | Kind.JoinLhsChange _ -> StabilizationNum.isNone t.RecomputedAt || isStaleWithRespectToAChild t
