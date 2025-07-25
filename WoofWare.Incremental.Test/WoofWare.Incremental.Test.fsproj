@@ -1,0 +1,63 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Result.fs"/>
+    <Compile Include="Gc.fs" />
+    <Compile Include="TestGc.fs"/>
+    <Compile Include="TestList.fs"/>
+    <Compile Include="Incremental.fs"/>
+    <Compile Include="TestListFunctions.fs" />
+    <Compile Include="TestSurface.fs"/>
+    <Compile Include="TestConfig.fs"/>
+    <Compile Include="TestExceptionalBehaviour.fs"/>
+    <Compile Include="TestForAnalyzer.fs"/>
+    <None Include="TestGenerics.fs"/>
+    <Compile Include="TestObserver.fs"/>
+    <Compile Include="TestState.fs"/>
+    <Compile Include="TestTheFixture.fs" />
+    <Compile Include="TestIncremental.fs"/>
+    <Compile Include="TestBind.fs" />
+    <Compile Include="TestIf.fs" />
+    <Compile Include="TestMap.fs" />
+    <Compile Include="TestJoin.fs"/>
+    <Compile Include="TestScope.fs"/>
+    <Compile Include="TestCutoff.fs"/>
+    <Compile Include="TestVar.fs"/>
+    <Compile Include="TestIncrementalFailures.fs"/>
+    <None Include="TestExpert.fs"/>
+    <Compile Include="TestDot.fs"/>
+    <None Include="TestSyntax.fs"/>
+    <Compile Include="TestNonDebug.fs"/>
+    <Compile Include="TestSkeleton.fs"/>
+    <Compile Include="TestFreeze.fs" />
+    <Compile Include="TestDependOn.fs" />
+    <Compile Include="TestNecessaryIfAlive.fs" />
+    <Compile Include="TestOptUnorderedArrayFold.fs" />
+    <Compile Include="TestSum.fs" />
+    <None Include="TestUnorderedArrayFold.fs" />
+    <None Include="TestIncrementalStepFunction.fs" />
+    <None Include="TestClock.fs" />
+    <None Include="TestOnUpdate.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ApiSurface" Version="4.1.22"/>
+    <PackageReference Include="FsCheck" Version="3.3.0"/>
+    <PackageReference Include="FsUnit" Version="7.1.1"/>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1"/>
+    <PackageReference Include="NUnit" Version="4.3.2"/>
+    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0"/>
+    <PackageReference Include="WoofWare.Expect" Version="0.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WoofWare.Incremental\WoofWare.Incremental.fsproj"/>
+  </ItemGroup>
+
+</Project>

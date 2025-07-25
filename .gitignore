@@ -1,0 +1,15 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+.idea/
+.direnv/
+*.DotSettings.user
+result
+
+.fake
+.vscode/
+
+**/Generated*.fs
+incremental/
