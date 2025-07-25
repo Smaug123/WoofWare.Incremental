@@ -32,7 +32,7 @@ jobs:
     - name: Build
       run: nix develop --command dotnet build --no-restore --configuration Release
     - name: Test
-      run: nix develop --command dotnet test
+      run: nix develop --command dotnet test --configuration Release
 
   build-nix:
     runs-on: ubuntu-latest
