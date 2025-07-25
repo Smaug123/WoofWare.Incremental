@@ -10,7 +10,7 @@ module TestDot =
     let printNode (nodes : NodeCrate list) : string =
         let sb = StringBuilder ()
 
-        nodes |> NodeToDot.renderDot true (sb.Append >> ignore<StringBuilder>)
+        nodes |> NodeToDot.renderDot true true (sb.Append >> ignore<StringBuilder>)
 
         sb.ToString ()
 
@@ -23,7 +23,7 @@ module TestDot =
             snapshot
                 @"digraph G {
   rankdir = BT
-  n1 [shape=Mrecord label=""{{n1|Const|height=-1}}"" ]
+  n### [shape=Mrecord label=""{{n###|Const|height=-1}}"" ]
 }
 "
 
@@ -40,7 +40,7 @@ module TestDot =
             snapshot
                 @"digraph G {
   rankdir = BT
-  n1 [shape=Mrecord label=""{{hello\ world}|{n1|Const|height=-1}}"" ]
+  n### [shape=Mrecord label=""{{hello\ world}|{n###|Const|height=-1}}"" ]
 }
 "
 
@@ -53,11 +53,11 @@ module TestDot =
         let n = I.Return "hello"
         Node.appendUserInfoGraphviz n [ "hello" ; "world" ] (Map.ofList [ "fillcolor", "green" ])
 
-        expect' {
+        expect {
             snapshot
                 @"digraph G {
   rankdir = BT
-  n1 [shape=Mrecord label=""{{hello|world}|{n1|Const|height=-1}}""  ""fillcolor""=""green""]
+  n### [shape=Mrecord label=""{{hello|world}|{n###|Const|height=-1}}""  ""fillcolor""=""green""]
 }
 "
 

@@ -13,6 +13,15 @@ type Skeleton =
         NumStabilizes : int
     }
 
+    override this.ToString (): string =
+        let nodes =
+            this.Nodes
+            |> Seq.map string<Node>
+            |> String.concat "\n"
+        let seen = this.Seen |> Seq.sort |> Seq.map NodeId.toString |> String.concat " "
+
+        $"nodes:\n%s{nodes}\nseen: (%s{seen})\nnumStabilizes:%i{this.NumStabilizes}"
+
 type RenderTarget =
     | Dot
     | GraphEasy
@@ -127,7 +136,7 @@ module Skeleton =
     /// The parameters' names reflect the ordering of these nodes in the [Incr] graph where
     /// the children of a node are the inputs (e.g. a Var would be the child of a Map), but it
     /// seems more intuitive to visualize it in the opposite direction
-    let edge from to_ = "" // Text_block.textf {|%s -> %s|} (node_name to_) (node_name from)
+    let edge from to_ = $"%s{nodeName to_} -> %s{nodeName from}"
 
     let makeEdges (nodes : Node list) desiredNodes =
         nodes
@@ -236,7 +245,7 @@ module Skeleton =
             "digraph G {"
             "  rankdir = TB"
             "  bgcolor = transparent"
-            yield! nodes @ edges @ bindEdges
+            yield! (nodes @ edges @ bindEdges) |> Seq.map (fun s -> "  " + s)
             "}"
         ]
         |> String.concat "\n"

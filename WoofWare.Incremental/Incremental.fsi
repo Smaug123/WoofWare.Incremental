@@ -64,12 +64,13 @@ type Incremental =
     abstract Observe'<'a> : shouldFinalize : bool -> Node<'a> -> Observer<'a>
     abstract State : State
     abstract SaveDot : writeChunk : (string -> unit) -> unit
-    abstract SaveDot' : renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
+    abstract SaveDot' : stableNodeIds : bool -> renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
     abstract CurrentScope : Scope
     abstract Expert : IExpertIncremental
     abstract WithinScope : Scope -> (unit -> 'a) -> 'a
     abstract OnUpdate<'a> : 'a Node -> (NodeUpdate<'a> -> unit) -> unit
     abstract SetCutoff<'a> : 'a Node -> 'a Cutoff -> unit
+    abstract AmStabilizing : bool
 
 [<RequireQualifiedAccess>]
 module Incremental =

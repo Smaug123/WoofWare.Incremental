@@ -19,8 +19,9 @@ module NodeToDot =
 
         sprintf "%s\n" (DotUserInfo.toString "Mrecord" name (DotUserInfo.toDot info))
 
-    let renderDot (emitBindEdges : bool) (write : string -> unit) ts =
-        let nodeName id = "n" + NodeId.toString id
+    let renderDot (stableNodeIds : bool) (emitBindEdges : bool) (write : string -> unit) ts =
+        let nodeName =
+            if stableNodeIds then fun _ -> "n###" else fun id -> "n" + NodeId.toString id
         write "digraph G {\n"
         write "  rankdir = BT\n"
 
@@ -51,4 +52,4 @@ module NodeToDot =
     let saveDotToFile (emitBindEdges : bool) (filePath : string) ts =
         use f = File.Open (filePath, FileMode.OpenOrCreate)
         use writer = new StreamWriter (f)
-        renderDot emitBindEdges writer.Write ts
+        renderDot false emitBindEdges writer.Write ts

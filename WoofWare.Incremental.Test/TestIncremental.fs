@@ -98,7 +98,11 @@ module TestIncremental =
         isInvalidatedOnBindRhs fix (fun _ -> fix.I.Const 13)
         |> shouldEqual true
 
-      let%test _ = not (am_stabilizing ())
+
+    [<Test>]
+    let ``not stabilizing by default`` () =
+      let I = Incremental.make ()
+      I.AmStabilizing |> shouldEqual false
 
       let%expect_test _ =
         let x = Var.create_ [%here] 13 in

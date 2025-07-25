@@ -2,7 +2,12 @@ namespace WoofWare.Incremental
 
 open System.Threading
 
-type NodeId = private | NodeId of int
+type NodeId =
+    private
+    | NodeId of int
+    override this.ToString () =
+        match this with
+        | NodeId i -> $"%i{i}"
 
 [<RequireQualifiedAccess>]
 module NodeId =
@@ -17,7 +22,7 @@ module NodeId =
         if i < 1 then
             failwith "invariant failure"
 
-    let toString (NodeId n) = $"%i{n}"
+    let toString (n : NodeId) = n.ToString ()
 
     let internal toInt (NodeId i) = i
     let internal ofInt i = NodeId i

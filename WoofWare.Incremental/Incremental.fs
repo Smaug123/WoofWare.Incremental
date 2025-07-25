@@ -90,13 +90,14 @@ type Incremental =
     abstract Observe<'a> : Node<'a> -> Observer<'a>
     abstract Observe'<'a> : shouldFinalize : bool -> Node<'a> -> Observer<'a>
     abstract State : State
-    abstract SaveDot' : renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
+    abstract SaveDot' : stableNodeIds : bool -> renderBindEdges : bool -> writeChunk : (string -> unit) -> unit
     abstract SaveDot : writeChunk : (string -> unit) -> unit
     abstract CurrentScope : Scope
     abstract Expert : IExpertIncremental
     abstract WithinScope : Scope -> (unit -> 'a) -> 'a
     abstract OnUpdate<'a> : 'a Node -> (NodeUpdate<'a> -> unit) -> unit
     abstract SetCutoff<'a> : 'a Node -> 'a Cutoff -> unit
+    abstract AmStabilizing : bool
 
 type IncrementalImpl (state : State) =
     let var =
@@ -172,13 +173,15 @@ type IncrementalImpl (state : State) =
         member this.Expert = expert
         member this.SetCutoff node cutoff = Node.setCutoff node cutoff
 
-        member this.SaveDot' renderBindEdges writeChunk =
-            NodeToDot.renderDot renderBindEdges writeChunk (State.directlyObserved state)
+        member this.SaveDot' stableNodeIds renderBindEdges writeChunk =
+            NodeToDot.renderDot stableNodeIds renderBindEdges writeChunk (State.directlyObserved state)
 
         member this.SaveDot writeChunk =
-            (this :> Incremental).SaveDot' true writeChunk
+            (this :> Incremental).SaveDot' false true writeChunk
 
         member this.OnUpdate n f = State.nodeOnUpdate n f
+
+        member this.AmStabilizing = State.amStabilizing state
 
 
 [<RequireQualifiedAccess>]
