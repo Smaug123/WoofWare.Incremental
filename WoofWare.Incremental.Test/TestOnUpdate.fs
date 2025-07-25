@@ -3,6 +3,7 @@ namespace WoofWare.Incremental.Test
 open NUnit.Framework
 open WoofWare.Incremental
 
+(*
 [<TestFixture>]
 module TestOnUpdate =
 
@@ -265,3 +266,4 @@ module TestOnUpdate =
         disallow_future_use o
       ;;
 
+*)

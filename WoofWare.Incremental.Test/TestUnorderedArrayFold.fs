@@ -3,6 +3,7 @@ namespace WoofWare.Incremental.Test
 open NUnit.Framework
 open WoofWare.Incremental
 
+(*
 [<TestFixture>]
 module TestUnorderedArrayFold =
 
@@ -108,3 +109,4 @@ module TestUnorderedArrayFold =
         [%expect {| 3 |}]
       ;;
 
+*)

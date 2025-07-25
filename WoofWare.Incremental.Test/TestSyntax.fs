@@ -3,6 +3,8 @@ namespace WoofWare.Incremental.Test
 open WoofWare.Incremental
 open NUnit.Framework
 
+(*
+
 [<TestFixture>]
 module TestSyntax =
     open! Core
@@ -77,3 +79,5 @@ let%expect_test "simple example of using bind3 via [let%bindn]" =
   print_s [%message (Observer.value o : (int * int * int) Or_error.t)];
   [%expect {| ("Observer.value o" (Ok (100 42 12))) |}]
 ;;
+
+*)

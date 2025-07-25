@@ -3,6 +3,7 @@ namespace WoofWare.Incremental.Test
 open NUnit.Framework
 open WoofWare.Incremental
 
+(*
 [<TestFixture>]
 module TestIncrementalStepFunction =
 
@@ -228,3 +229,4 @@ module TestIncrementalStepFunction =
         disallow_future_use o
       ;;
 
+*)

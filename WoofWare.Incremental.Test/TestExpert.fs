@@ -5,6 +5,7 @@ open WoofWare.Incremental
 open NUnit.Framework
 open WoofWare.Expect
 
+(*
 // This tests add_dependency/remove_dependency, invalidity
 // (in particular a node becomes invalid before being replaced by a valid one).
 [<TestFixture>]
@@ -500,3 +501,5 @@ module TestExpert =
             disallow_future_use o1)
         ;;
       end
+
+*)

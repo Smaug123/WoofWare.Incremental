@@ -26,8 +26,7 @@ module TestIncrementalFailures =
     let ``setMaxHeightAllowed while stabilizing`` () =
         let i = Incremental.make ()
 
-        let o =
-            i.Observe (i.Const () |> i.Map (fun () -> i.SetMaxHeightAllowed 13))
+        let o = i.Observe (i.Const () |> i.Map (fun () -> i.SetMaxHeightAllowed 13))
 
         expect {
             snapshotThrows @"System.Exception: cannot set_max_height_allowed during stabilization"
