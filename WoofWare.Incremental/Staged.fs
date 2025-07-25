@@ -1,6 +1,6 @@
 namespace WoofWare.Incremental
 
-type Staged<'a, 'b> = | Staged of ('a -> 'b)
+type internal Staged<'a, 'b> = | Staged of ('a -> 'b)
 
 [<RequireQualifiedAccess>]
 module internal Staged =

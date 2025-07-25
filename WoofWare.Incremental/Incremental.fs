@@ -102,14 +102,57 @@ type Incremental =
     abstract Freeze<'a> : 'a Node -> 'a Node
     abstract Freeze'<'a> : onlyWhen : ('a -> bool) -> 'a Node -> 'a Node
     abstract DependOn<'a, 'b> : dependOn : 'a Node -> 'b Node -> 'b Node
+    abstract All<'a> : 'a Node list -> 'a list Node
+    abstract ForAll : bool Node[] -> bool Node
+    abstract Exists : bool Node[] -> bool Node
+    abstract SetMaxHeightAllowed : int -> unit
+    abstract MaxHeightAllowed : int
+
+    abstract OptUnorderedArrayFold<'a, 'acc> :
+        'a option Node[] ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        fInverse : ('acc -> 'a -> 'acc) ->
+            Node<'acc option>
+
+    abstract OptUnorderedArrayFold'<'a, 'acc> :
+        fullUpdateEveryNUpdates : int ->
+        'a option Node[] ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        fInverse : ('acc -> 'a -> 'acc) ->
+            Node<'acc option>
+
+    abstract VoptUnorderedArrayFold<'a, 'acc> :
+        'a voption Node[] ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        fInverse : ('acc -> 'a -> 'acc) ->
+            Node<'acc voption>
+
+    abstract VoptUnorderedArrayFold'<'a, 'acc> :
+        fullUpdateEveryNUpdates : int ->
+        'a voption Node[] ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        fInverse : ('acc -> 'a -> 'acc) ->
+            Node<'acc voption>
 
     abstract Sum<'a, 'b> :
         fullComputeEveryNChanges : int option ->
-        Node<'a>[] ->
         zero : 'b ->
         add : ('b -> 'a -> 'b) ->
         sub : ('b -> 'a -> 'b) ->
+        Node<'a>[] ->
             Node<'b>
+
+    abstract OptSum<'a, 'b> :
+        fullComputeEveryNChanges : int option ->
+        zero : 'b ->
+        add : ('b -> 'a -> 'b) ->
+        sub : ('b -> 'a -> 'b) ->
+        Node<'a voption>[] ->
+            Node<'b voption>
 
     abstract If<'a> : Node<bool> -> trueCase : Node<'a> -> falseCase : Node<'a> -> Node<'a>
 
@@ -199,21 +242,49 @@ type IncrementalImpl (state : State) =
 
         member this.Sum<'a, 'b>
             (fullComputeEveryNChanges : int option)
-            (nodes : Node<'a>[])
             (zero : 'b)
             (add : 'b -> 'a -> 'b)
             (sub : 'b -> 'a -> 'b)
+            (nodes : Node<'a>[])
             : Node<'b>
             =
             State.sum state fullComputeEveryNChanges nodes zero add sub
+
+        member this.OptSum<'a, 'b>
+            (fullComputeEveryNChanges : int option)
+            (zero : 'b)
+            (add : 'b -> 'a -> 'b)
+            (sub : 'b -> 'a -> 'b)
+            (nodes : Node<'a voption>[])
+            : Node<'b voption>
+            =
+            State.optSum state fullComputeEveryNChanges nodes zero add sub
 
         member this.If cond trueCase falseCase = State.if_ cond trueCase falseCase
 
         member this.NecessaryIfAlive n = State.necessaryIfAlive n
         member this.Freeze n = State.freeze n (fun _ -> true)
         member this.Freeze' onlyWhen n = State.freeze n onlyWhen
-        member this.DependOn<'a, 'b> (dependOn : 'a Node) (n : 'b Node) =
-            State.dependOn n dependOn
+        member this.DependOn<'a, 'b> (dependOn : 'a Node) (n : 'b Node) = State.dependOn n dependOn
+
+        member this.All nodes = State.all state nodes
+        member this.ForAll nodes = State.forAll state nodes
+        member this.Exists nodes = State.exists state nodes
+
+        member this.OptUnorderedArrayFold nodes init f fInverse =
+            State.optUnorderedArrayFold state None nodes init f fInverse
+
+        member this.OptUnorderedArrayFold' updateEvery nodes init f fInverse =
+            State.optUnorderedArrayFold state (Some updateEvery) nodes init f fInverse
+
+        member this.VoptUnorderedArrayFold nodes init f fInverse =
+            State.voptUnorderedArrayFold state None nodes init f fInverse
+
+        member this.VoptUnorderedArrayFold' updateEvery nodes init f fInverse =
+            State.voptUnorderedArrayFold state (Some updateEvery) nodes init f fInverse
+
+        member this.SetMaxHeightAllowed h = State.setMaxHeightAllowed state h
+        member this.MaxHeightAllowed = State.maxHeightAllowed state
 
 [<RequireQualifiedAccess>]
 module Incremental =

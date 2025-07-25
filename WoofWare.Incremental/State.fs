@@ -25,7 +25,7 @@ type StepResult =
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module State =
+module internal State =
     let internal numNodesRecomputedDirectlyBecauseOneChild (t : State) =
         t.NumNodesRecomputedDirectlyBecauseOneChild
 
@@ -1577,6 +1577,28 @@ module State =
         unorderedArrayFold t fullComputeEveryNChanges ts (init, 0) f (FoldUpdate.FInverse fInverse)
         |> map (fun (accum, numInvalid) -> if numInvalid = 0 then Some accum else None)
 
+    let voptUnorderedArrayFold
+        (t : State)
+        (fullComputeEveryNChanges : int option)
+        (ts : Node<'a voption> array)
+        (init : 'b)
+        (f : 'b -> 'a -> 'b)
+        (fInverse : 'b -> 'a -> 'b)
+        : Node<'b voption>
+        =
+        let f (accum, num_invalid) x =
+            match x with
+            | ValueNone -> accum, num_invalid + 1
+            | ValueSome x -> f accum x, num_invalid
+
+        let fInverse (accum, num_invalid) x =
+            match x with
+            | ValueNone -> accum, num_invalid - 1
+            | ValueSome x -> fInverse accum x, num_invalid
+
+        unorderedArrayFold t fullComputeEveryNChanges ts (init, 0) f (FoldUpdate.FInverse fInverse)
+        |> map (fun (accum, numInvalid) -> if numInvalid = 0 then ValueSome accum else ValueNone)
+
     let atLeastKOf (t : State) (nodes : Node<bool> array) (k : int) : Node<bool> =
         let boolToInt b = if b then 1 else 0
 
@@ -1590,7 +1612,7 @@ module State =
         |> map (fun i -> i >= k)
 
     let exists (t : State) (nodes : Node<bool> array) : Node<bool> = atLeastKOf t nodes 1
-    let forAll t nodes = atLeastKOf t nodes (Array.length nodes)
+    let forAll (t : State) (nodes : Node<bool> array) : Node<bool> = atLeastKOf t nodes (Array.length nodes)
 
     let sum
         (t : State)
@@ -1606,13 +1628,13 @@ module State =
     let optSum
         (t : State)
         (fullComputeEveryNChanges : int option)
-        (nodes : Node<'a option> array)
+        (nodes : Node<'a voption> array)
         (zero : 'b)
         (add : 'b -> 'a -> 'b)
         (sub : 'b -> 'a -> 'b)
-        : Node<'b option>
+        : Node<'b voption>
         =
-        optUnorderedArrayFold t fullComputeEveryNChanges nodes zero add sub
+        voptUnorderedArrayFold t fullComputeEveryNChanges nodes zero add sub
 
     let inline sum'<'T
         when 'T : (static member (+) : 'T * 'T -> 'T)

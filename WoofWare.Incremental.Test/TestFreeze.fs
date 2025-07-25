@@ -22,10 +22,7 @@ module TestFreeze =
         Node.isConst f |> shouldEqual true
 
         let u = I.Var.Create 1
-        let z =
-            I.Var.Watch u
-            |> I.Bind (fun _ -> I.Freeze (I.Var.Watch x))
-            |> I.Observe
+        let z = I.Var.Watch u |> I.Bind (fun _ -> I.Freeze (I.Var.Watch x)) |> I.Observe
         fix.Stabilize ()
 
         Observer.valueThrowing z |> shouldEqual 13
@@ -43,7 +40,7 @@ module TestFreeze =
         fix.Stabilize ()
         Observer.valueThrowing z |> shouldEqual 15
 
-      (*
+(*
       let%expect_test _ =
         let x = Var.create_ [%here] 13 in
         let o1 = observe (freeze (Var.watch x >>| Fn.id)) in

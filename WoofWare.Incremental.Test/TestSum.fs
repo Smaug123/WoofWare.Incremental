@@ -1,121 +1,134 @@
 namespace WoofWare.Incremental.Test
 
+open System.Threading
+open FsUnitTyped
 open NUnit.Framework
 open WoofWare.Incremental
 
 [<TestFixture>]
 module TestSum =
 
-      let sum = sum
+    [<Test>]
+    let ``empty sum`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-      let%expect_test _ =
-        (* empty *)
         let o =
-          observe
-            (sum [||] ~zero:13 ~add:(fun _ -> assert false) ~sub:(fun _ -> assert false))
-        in
-        stabilize_ [%here];
-        assert (value o = 13)
-      ;;
+            I.Sum<int, _> None 13 (fun _ -> failwith "should not call") (fun _ -> failwith "should not call") [||]
+            |> I.Observe
 
-      let%expect_test _ =
-        (* full recompute *)
-        let x = Var.create_ [%here] 13. in
-        let y = Var.create_ [%here] 15. in
-        let num_adds = ref 0 in
-        let add a b =
-          incr num_adds;
-          a +. b
-        in
-        let num_subs = ref 0 in
-        let sub a b =
-          incr num_subs;
-          a -. b
-        in
-        let z =
-          observe
-            (sum
-               [| watch x; watch y |]
-               ~zero:0.
-               ~add
-               ~sub
-               ~full_compute_every_n_changes:2)
-        in
-        stabilize_ [%here];
-        assert (!num_adds = 2);
-        assert (!num_subs = 0);
-        assert (Float.equal (value z) 28.);
-        Var.set x 17.;
-        stabilize_ [%here];
-        assert (!num_adds = 3);
-        assert (!num_subs = 1);
-        assert (Float.equal (value z) 32.);
-        Var.set y 19.;
-        stabilize_ [%here];
-        (* [num_adds] increases 2 for the full recompute.  [num_subs] doesn't change
-             because of the full recompute. *)
-        [%test_result: int] !num_adds ~expect:5;
-        [%test_result: int] !num_subs ~expect:1;
-        assert (Float.equal (value z) 36.)
-      ;;
+        fix.Stabilize ()
+        Observer.valueThrowing o |> shouldEqual 13
 
-      let opt_sum = opt_sum
+    [<Test>]
+    let ``full recompute`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-      let%expect_test _ =
-        let t =
-          observe
-            (opt_sum
-               [||]
-               ~zero:()
-               ~add:(fun _ -> assert false)
-               ~sub:(fun _ -> assert false))
-        in
-        stabilize_ [%here];
-        assert (is_some (value t))
-      ;;
+        let x = I.Var.Create 13.0
+        let y = I.Var.Create 15.0
 
-      let%expect_test _ =
-        let x = Var.create_ [%here] None in
-        let y = Var.create_ [%here] None in
-        let t = observe (opt_sum [| watch x; watch y |] ~zero:0 ~add:( + ) ~sub:( - )) in
-        let check where expect =
-          stabilize_ where;
-          [%test_eq: int option] (value t) expect
-        in
-        check [%here] None;
-        Var.set x (Some 13);
-        check [%here] None;
-        Var.set y (Some 14);
-        check [%here] (Some 27);
-        Var.set y None;
-        check [%here] None
-      ;;
+        let mutable numAdds = 0
 
-      let sum_int = sum_int
-      let sum_float = sum_float
+        let add (a : float) b =
+            Interlocked.Increment &numAdds |> ignore<int>
+            a + b
 
-      let test_sum (type a) sum (of_int : int -> a) equal =
-        let x = Var.create_ [%here] (of_int 13) in
-        let y = Var.create_ [%here] (of_int 15) in
-        let z = observe (sum [| watch x; watch y |]) in
-        stabilize_ [%here];
-        assert (equal (value z) (of_int 28));
-        stabilize_ [%here];
-        Var.set x (of_int 17);
-        stabilize_ [%here];
-        assert (equal (value z) (of_int 32));
-        Var.set x (of_int 19);
-        Var.set y (of_int 21);
-        stabilize_ [%here];
-        assert (equal (value z) (of_int 40))
-      ;;
+        let mutable numSubs = 0
 
-      let%expect_test _ = test_sum sum_int Fn.id Int.equal
-      let%expect_test _ = test_sum sum_float Float.of_int Float.equal
+        let sub (a : float) b =
+            Interlocked.Increment &numSubs |> ignore<int>
+            a - b
 
-      let%expect_test _ =
-        let o = observe (sum_float [||]) in
-        stabilize_ [%here];
-        [%test_result: Float.t] (value o) ~expect:0.
-      ;;
+        let z = I.Sum (Some 2) 0.0 add sub [| I.Var.Watch x ; I.Var.Watch y |] |> I.Observe
 
+        fix.Stabilize ()
+        numAdds |> shouldEqual 2
+        numSubs |> shouldEqual 0
+        Observer.valueThrowing z |> shouldEqual 28.0
+
+        I.Var.Set x 17.0
+        fix.Stabilize ()
+        numAdds |> shouldEqual 3
+        numSubs |> shouldEqual 1
+        Observer.valueThrowing z |> shouldEqual 32.0
+
+        I.Var.Set x 19.0
+        fix.Stabilize ()
+        // increases 2 for the full recompute
+        numAdds |> shouldEqual 5
+        numSubs |> shouldEqual 1
+        Observer.valueThrowing z |> shouldEqual 34.0
+
+    [<Test>]
+    let ``empty optSum`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let o =
+            I.OptSum<int, _> None () (fun _ -> failwith "should not call") (fun _ -> failwith "should not call") [||]
+            |> I.Observe
+
+        fix.Stabilize ()
+        Observer.valueThrowing(o).IsSome |> shouldEqual true
+
+    [<Test>]
+    let ``full recompute, opt`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let x = I.Var.Create ValueNone
+        let y = I.Var.Create ValueNone
+        let t = [| I.Var.Watch x ; I.Var.Watch y |] |> I.OptSum None 0 (+) (-) |> I.Observe
+
+        let check expect =
+            fix.Stabilize ()
+            Observer.valueThrowing t |> shouldEqual expect
+
+        check ValueNone
+        I.Var.Set x (ValueSome 13)
+        check ValueNone
+        I.Var.Set y (ValueSome 14)
+        check (ValueSome 27)
+        I.Var.Set y ValueNone
+        check ValueNone
+
+    let testSum<'a> (fix : IncrementalFixture) sum (ofInt : int -> 'a) (shouldEqual : 'a -> 'a -> unit) =
+        let I = fix.I
+
+        let x = I.Var.Create (ofInt 13)
+        let y = I.Var.Create (ofInt 15)
+        let z = I.Observe (sum [| I.Var.Watch x ; I.Var.Watch y |])
+        fix.Stabilize ()
+        shouldEqual (ofInt 28) (Observer.valueThrowing z)
+
+        fix.Stabilize ()
+        I.Var.Set x (ofInt 17)
+        fix.Stabilize ()
+        shouldEqual (ofInt 32) (Observer.valueThrowing z)
+
+        I.Var.Set x (ofInt 19)
+        I.Var.Set y (ofInt 21)
+        fix.Stabilize ()
+        shouldEqual (ofInt 40) (Observer.valueThrowing z)
+
+    [<Test>]
+    let ``test ints`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        testSum fix (I.Sum None 0 (+) (-)) id shouldEqual
+
+    [<Test>]
+    let ``test floats`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        testSum fix (I.Sum None 0.0 (+) (-)) float<int> shouldEqual
+
+    [<Test>]
+    let ``zero of floats`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let o = I.Observe (I.Sum None 0.0 (+) (-) [||])
+        fix.Stabilize ()
+        Observer.valueThrowing o |> shouldEqual 0.0

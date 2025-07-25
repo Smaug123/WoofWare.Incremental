@@ -5,7 +5,7 @@ open TypeEquality
 open WoofWare.TimingWheel
 open WoofWare.WeakHashTable
 
-type Status =
+type internal Status =
     | Stabilizing
     | Running_on_update_handlers
     | Not_stabilizing
@@ -17,7 +17,7 @@ type Status =
 /// and its ancestors as necessary in order to restore the height invariant. This is done
 /// by visiting ancestors in topological order, using the adjust-heights heap to visit
 /// them in increasing order of pre-adjusted height.
-type AdjustHeightsHeap =
+type internal AdjustHeightsHeap =
     {
         mutable Length : int
         mutable HeightLowerBound : int
@@ -25,26 +25,26 @@ type AdjustHeightsHeap =
         mutable NodesByHeight : NodeCrate voption array
     }
 
-and [<RequireQualifiedAccess>] AlarmValueAction =
+and [<RequireQualifiedAccess>] internal AlarmValueAction =
     | At of At
     | AtIntervals of AtIntervals
     | Snapshot of SnapshotCrate
     | StepFunction of StepFunctionNodeCrate
 
-and AlarmValue =
+and internal AlarmValue =
     {
         Action : AlarmValueAction
         mutable NextFired : AlarmValue voption
     }
 
-and ArrayFold<'a, 'acc> =
+and internal ArrayFold<'a, 'acc> =
     {
         Init : 'acc
         F : 'acc -> 'a -> 'acc
         Children : 'a Node[]
     }
 
-and At =
+and internal At =
     {
         Main : Node<BeforeOrAfter>
         At : TimeNs
@@ -52,7 +52,7 @@ and At =
         Clock : Clock
     }
 
-and AtIntervals =
+and internal AtIntervals =
     {
         Main : Node<unit>
         Base : TimeNs
@@ -61,7 +61,7 @@ and AtIntervals =
         Clock : Clock
     }
 
-and Bind<'a, 'b> =
+and internal Bind<'a, 'b> =
     {
         Main : Node<'b>
         /// [f] is the user-supplied function that we run each time [t.lhs] changes.  It is
@@ -81,34 +81,35 @@ and Bind<'a, 'b> =
     }
 
 and Clock =
-    {
-        /// We use [timing_wheel] for time-based incrementals.
-        TimingWheel : TimingWheel<ExternalEltValue<AlarmValue>>
-        /// A variable holding the current time.
-        Now : Var<TimeNs>
-        /// The closure passed to TimingWheel.advanceClock. It links all the fired alarm values into
-        /// FiredAlarmValues.
-        /// After TimingWheel.advanceClock returns, it then walks through the linked list and actually fires them.
-        /// This two-pass approach is necessary because one is not allowed to call TimingWheel functions from the
-        /// HandleFired that one passes to TimingWheel.advanceClock.
-        HandleFired : TimingWheel.Alarm -> unit
-        mutable FiredAlarmValues : AlarmValue voption
-    }
+    internal
+        {
+            /// We use [timing_wheel] for time-based incrementals.
+            TimingWheel : TimingWheel<ExternalEltValue<AlarmValue>>
+            /// A variable holding the current time.
+            Now : Var<TimeNs>
+            /// The closure passed to TimingWheel.advanceClock. It links all the fired alarm values into
+            /// FiredAlarmValues.
+            /// After TimingWheel.advanceClock returns, it then walks through the linked list and actually fires them.
+            /// This two-pass approach is necessary because one is not allowed to call TimingWheel functions from the
+            /// HandleFired that one passes to TimingWheel.advanceClock.
+            HandleFired : TimingWheel.Alarm -> unit
+            mutable FiredAlarmValues : AlarmValue voption
+        }
 
-and ExpertEdge<'a> =
+and internal ExpertEdge<'a> =
     {
         Child : 'a Node
         OnChange : 'a -> unit
         mutable Index : int voption
     }
 
-and ExpertEdgeEval<'ret> =
+and internal ExpertEdgeEval<'ret> =
     abstract Eval<'a> : 'a ExpertEdge -> 'ret
 
-and ExpertEdgeCrate =
+and internal ExpertEdgeCrate =
     abstract Apply : ExpertEdgeEval<'ret> -> 'ret
 
-and Expert<'a> =
+and internal Expert<'a> =
     {
         F : unit -> 'a
         /// bool is `is_now_observable`
@@ -120,14 +121,14 @@ and Expert<'a> =
         mutable WillFireAllCallbacks : bool
     }
 
-and Freeze<'a> =
+and internal Freeze<'a> =
     {
         Main : Node<'a>
         Child : Node<'a>
         OnlyFreezeWhen : 'a -> bool
     }
 
-and IfThenElse<'a> =
+and internal IfThenElse<'a> =
     {
         Main : Node<'a>
         Test : Node<bool>
@@ -137,13 +138,13 @@ and IfThenElse<'a> =
         Else : Node<'a>
     }
 
-and InternalObserverState =
+and internal InternalObserverState =
     | Created
     | InUse
     | Disallowed
     | Unlinked
 
-and InternalObserver<'a> =
+and internal InternalObserver<'a> =
     {
         mutable State : InternalObserverState
         Observing : Node<'a>
@@ -154,13 +155,13 @@ and InternalObserver<'a> =
         mutable NextInObserving : InternalObserver<'a> voption
     }
 
-and InternalObserverEval<'ret> =
+and internal InternalObserverEval<'ret> =
     abstract Eval<'a> : 'a InternalObserver -> 'ret
 
-and InternalObserverCrate =
+and internal InternalObserverCrate =
     abstract Apply : InternalObserverEval<'ret> -> 'ret
 
-and Join<'a> =
+and internal Join<'a> =
     {
         Main : 'a Node
         Lhs : 'a Node Node
@@ -168,55 +169,55 @@ and Join<'a> =
         mutable Rhs : 'a Node voption
     }
 
-and ArrayFoldEval<'a, 'ret> =
+and internal ArrayFoldEval<'a, 'ret> =
     abstract Eval<'b> : ArrayFold<'b, 'a> -> 'ret
 
-and ArrayFoldCrate<'a> =
+and internal ArrayFoldCrate<'a> =
     abstract Apply<'ret> : ArrayFoldEval<'a, 'ret> -> 'ret
 
-and BindEval<'ret> =
+and internal BindEval<'ret> =
     abstract Eval<'a, 'b> : Bind<'a, 'b> -> 'ret
 
-and BindCrate =
+and internal BindCrate =
     abstract Apply<'ret> : BindEval<'ret> -> 'ret
 
-and BindMainEval<'a, 'ret> =
+and internal BindMainEval<'a, 'ret> =
     abstract Eval<'b> : Bind<'b, 'a> -> 'ret
 
-and BindMainCrate<'a> =
+and internal BindMainCrate<'a> =
     abstract Apply<'ret> : BindMainEval<'a, 'ret> -> 'ret
 
-and IfThenElseEval<'ret> =
+and internal IfThenElseEval<'ret> =
     abstract Eval<'a> : IfThenElse<'a> -> 'ret
 
-and IfThenElseCrate =
+and internal IfThenElseCrate =
     abstract Apply<'ret> : IfThenElseEval<'ret> -> 'ret
 
-and JoinEval<'ret> =
+and internal JoinEval<'ret> =
     abstract Eval<'a> : Join<'a> -> 'ret
 
-and JoinCrate =
+and internal JoinCrate =
     abstract Apply<'ret> : JoinEval<'ret> -> 'ret
 
-and MapEval<'a, 'ret> =
+and internal MapEval<'a, 'ret> =
     abstract Eval<'a1> : ('a1 -> 'a) * 'a1 Node -> 'ret
 
-and MapCrate<'a> =
+and internal MapCrate<'a> =
     abstract Apply<'ret> : MapEval<'a, 'ret> -> 'ret
 
-and UnorderedArrayFoldEval<'a, 'ret> =
+and internal UnorderedArrayFoldEval<'a, 'ret> =
     abstract Eval<'b> : UnorderedArrayFold<'b, 'a> -> 'ret
 
-and UnorderedArrayFoldCrate<'a> =
+and internal UnorderedArrayFoldCrate<'a> =
     abstract Apply<'ret> : UnorderedArrayFoldEval<'a, 'ret> -> 'ret
 
-and Map2Eval<'a, 'ret> =
+and internal Map2Eval<'a, 'ret> =
     abstract Eval<'a1, 'a2> : ('a1 -> 'a2 -> 'a) * 'a1 Node * 'a2 Node -> 'ret
 
-and Map2Crate<'a> =
+and internal Map2Crate<'a> =
     abstract Apply<'ret> : Map2Eval<'a, 'ret> -> 'ret
 
-and Kind<'a> =
+and internal Kind<'a> =
     | ArrayFold of ArrayFoldCrate<'a>
     | At of At * Teq<'a, BeforeOrAfter>
     | AtIntervals of AtIntervals * Teq<'a, unit>
@@ -340,30 +341,31 @@ and NodeEval<'ret> =
 and NodeCrate =
     abstract Apply<'ret> : NodeEval<'ret> -> 'ret
 
-and Observer'<'a> = 'a InternalObserver ref
+and internal Observer'<'a> = 'a InternalObserver ref
 
 /// Extra state kept only when [Debug.globalFlag] for the purpose of writing assertions.
-and OnlyInDebug =
+and internal OnlyInDebug =
     {
         mutable CurrentlyRunningNode : NodeCrate option
         mutable ExpertNodesCreatedByCurrentNode : NodeCrate list
     }
 
-and RecomputeHeap =
+and internal RecomputeHeap =
     {
         mutable Length : int
         mutable HeightLowerBound : int
         mutable NodesByHeight : NodeCrate voption[]
     }
 
-and RunOnUpdateHandlersEval<'ret> =
+and internal RunOnUpdateHandlersEval<'ret> =
     abstract Eval<'a> : 'a Node -> 'a NodeUpdate -> 'ret
 
-and RunOnUpdateHandlers =
+and internal RunOnUpdateHandlers =
     abstract Apply<'ret> : RunOnUpdateHandlersEval<'ret> -> 'ret
 
 /// `Scope`'s equality instance is a kind of reference equality.
 and [<CustomEquality ; NoComparison>] Scope =
+    internal
     | Top
     | Bind of BindCrate
 
@@ -387,7 +389,7 @@ and [<CustomEquality ; NoComparison>] Scope =
 
     override this.GetHashCode () = failwith "Scope is not hashable"
 
-and Snapshot<'a> =
+and internal Snapshot<'a> =
     {
         Main : 'a Node
         At : TimeNs
@@ -396,10 +398,10 @@ and Snapshot<'a> =
         Clock : Clock
     }
 
-and SnapshotEval<'ret> =
+and internal SnapshotEval<'ret> =
     abstract Eval<'a> : Snapshot<'a> -> 'ret
 
-and SnapshotCrate =
+and internal SnapshotCrate =
     abstract Apply<'ret> : SnapshotEval<'ret> -> 'ret
 
 and State =
@@ -407,7 +409,7 @@ and State =
         {
             mutable Status : Status
             BindLhsChangeShouldInvalidateRhs : bool
-            /// Starts at zer, and is incremented at the end of each stabilization.
+            /// Starts at zero, and is incremented at the end of each stabilization.
             mutable StabilizationNum : StabilizationNum
             mutable CurrentScope : Scope
             RecomputeHeap : RecomputeHeap
@@ -479,7 +481,7 @@ and State =
             mutable NumVarSets : int
         }
 
-and StepFunctionNode<'a> =
+and internal StepFunctionNode<'a> =
     {
         Main : 'a Node
         mutable Child : 'a StepFunction Node voption
@@ -491,13 +493,13 @@ and StepFunctionNode<'a> =
         Clock : Clock
     }
 
-and StepFunctionNodeEval<'ret> =
+and internal StepFunctionNodeEval<'ret> =
     abstract Eval<'a> : StepFunctionNode<'a> -> 'ret
 
-and StepFunctionNodeCrate =
+and internal StepFunctionNodeCrate =
     abstract Apply<'ret> : StepFunctionNodeEval<'ret> -> 'ret
 
-and UnorderedArrayFold<'a, 'acc> =
+and internal UnorderedArrayFold<'a, 'acc> =
     {
         Main : 'acc Node
         Init : 'acc
@@ -511,21 +513,22 @@ and UnorderedArrayFold<'a, 'acc> =
     }
 
 and Var<'a> =
-    {
-        mutable Value : 'a
-        mutable ValueSetDuringStabilization : 'a option
-        mutable SetAt : StabilizationNum
-        Watch : 'a Node
-    }
+    internal
+        {
+            mutable Value : 'a
+            mutable ValueSetDuringStabilization : 'a option
+            mutable SetAt : StabilizationNum
+            Watch : 'a Node
+        }
 
-and VarEval<'ret> =
+and internal VarEval<'ret> =
     abstract Eval<'a> : Var<'a> -> 'ret
 
-and VarCrate =
+and internal VarCrate =
     abstract Apply<'ret> : VarEval<'ret> -> 'ret
 
 [<RequireQualifiedAccess>]
-module BindCrate =
+module internal BindCrate =
     let make (bind : Bind<'a, 'b>) =
         { new BindCrate with
             member _.Apply e = e.Eval bind
@@ -540,82 +543,83 @@ module CrateExtensions =
             }
 
     type InternalObserverCrate with
-        static member make (i : InternalObserver<'a>) : InternalObserverCrate =
+        static member internal make (i : InternalObserver<'a>) : InternalObserverCrate =
             { new InternalObserverCrate with
                 member _.Apply e = e.Eval i
             }
 
 [<RequireQualifiedAccess>]
-module VarCrate =
+module internal VarCrate =
     let make (v : Var<'a>) : VarCrate =
         { new VarCrate with
             member _.Apply e = e.Eval v
         }
 
 [<RequireQualifiedAccess>]
-module MapCrate =
+module internal MapCrate =
     let make (f : 'a -> 'b) (n : Node<'a>) : MapCrate<'b> =
         { new MapCrate<_> with
             member _.Apply e = e.Eval (f, n)
         }
 
 [<RequireQualifiedAccess>]
-module Map2Crate =
+module internal Map2Crate =
     let make (f : 'a -> 'b -> 'c) (n1 : Node<'a>) (n2 : Node<'b>) : Map2Crate<'c> =
         { new Map2Crate<_> with
             member _.Apply e = e.Eval (f, n1, n2)
         }
 
 [<RequireQualifiedAccess>]
-module BindMainCrate =
+module internal BindMainCrate =
     let make (f : Bind<'b, 'a>) : BindMainCrate<'a> =
         { new BindMainCrate<_> with
             member _.Apply e = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
-module JoinCrate =
+module internal JoinCrate =
     let make (f : Join<'a>) : JoinCrate =
         { new JoinCrate with
             member _.Apply e = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
-module IfThenElseCrate =
+module internal IfThenElseCrate =
     let make (f : IfThenElse<'a>) : IfThenElseCrate =
         { new IfThenElseCrate with
             member _.Apply e = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
-module ArrayFoldCrate =
+module internal ArrayFoldCrate =
     let make (f : ArrayFold<'a, 'b>) : ArrayFoldCrate<'b> =
         { new ArrayFoldCrate<_> with
             member _.Apply e = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
-module UnorderedArrayFoldCrate =
+module internal UnorderedArrayFoldCrate =
     let make (f : UnorderedArrayFold<'a, 'b>) : UnorderedArrayFoldCrate<'b> =
         { new UnorderedArrayFoldCrate<_> with
             member _.Apply e = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
-module SnapshotCrate =
+module internal SnapshotCrate =
     let make (f : Snapshot<'a>) : SnapshotCrate =
         { new SnapshotCrate with
             member _.Apply e = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
-module StepFunctionNodeCrate =
+module internal StepFunctionNodeCrate =
     let make (f : StepFunctionNode<'a>) : StepFunctionNodeCrate =
         { new StepFunctionNodeCrate with
             member _.Apply e = e.Eval f
         }
 
-module ExpertEdgeCrate =
+[<RequireQualifiedAccess>]
+module internal ExpertEdgeCrate =
     let make (f : ExpertEdge<'a>) : ExpertEdgeCrate =
         { new ExpertEdgeCrate with
             member _.Apply e = e.Eval f

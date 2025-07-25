@@ -120,7 +120,7 @@ module TestIncremental =
             |> I.Bind (fun (ibmMult, msftMult) ->
                 let x = I.Var.Watch ibm |> I.Map (fun ibm -> ibm * ibmMult)
                 let y = I.Var.Watch msft |> I.Map (fun msft -> msft * msftMult)
-                I.Sum None [| x ; y |] 0.0 (+) (-)
+                I.Sum None 0.0 (+) (-) [| x ; y |]
             )
             |> I.Observe
 
@@ -162,27 +162,7 @@ module TestIncremental =
         Observer.disallowFutureUse o
 
 (*
-      let test q list_f =
-        for num_vars = 0 to 3 do
-          let vars = List.init num_vars ~f:(fun _ -> Var.create_ [%here] true) in
-          let q = observe (q (Array.of_list_map vars ~f:watch)) in
-          let all = observe (all (List.map vars ~f:watch)) in
-          let rec loop vars =
-            match vars with
-            | [] ->
-              stabilize_ [%here];
-              [%test_eq: Bool.t] (value q) (list_f (value all) ~f:Fn.id)
-            | var :: vars ->
-              List.iter [ false; true ] ~f:(fun b ->
-                Var.set var b;
-                loop vars)
-          in
-          loop vars
-        done
-      ;;
 
-      let%expect_test _ = test exists List.exists
-      let%expect_test _ = test for_all List.for_all
       let array_fold = array_fold
 
       let%expect_test _ =

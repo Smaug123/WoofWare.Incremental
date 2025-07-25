@@ -4,7 +4,7 @@ open System
 open TypeEquality
 
 [<RequireQualifiedAccess>]
-module Node =
+module internal Node =
 
     let nodeIsInjective<'a, 'b> (t : Teq<'a Node, 'b Node>) : Teq<'a, 'b> = Teq.Cong.believeMe t
 
@@ -705,7 +705,7 @@ module Node =
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module NodeCrate =
+module internal NodeCrate =
     open System.Collections.Generic
 
     let invariant (t : NodeCrate) =

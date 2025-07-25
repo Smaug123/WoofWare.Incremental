@@ -1,7 +1,7 @@
 namespace WoofWare.Incremental
 
 [<RequireQualifiedAccess>]
-module NodesByHeight =
+module internal NodesByHeight =
     let private asAdjustHeightsList : NodeCrate.AsList =
         {
             Next = NodeCrate.nextInAdjustHeightsHeap

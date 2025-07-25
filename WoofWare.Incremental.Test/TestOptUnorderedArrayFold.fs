@@ -1,45 +1,48 @@
 namespace WoofWare.Incremental.Test
 
+open FsUnitTyped
 open NUnit.Framework
 open WoofWare.Incremental
 
 [<TestFixture>]
 module TestOptUnorderedArrayFold =
 
-      let%expect_test _ =
+    [<Test>]
+    let ``can observe fold on empty arr`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
         let o =
-          observe
-            (opt_unordered_array_fold
-               [||]
-               ~init:()
-               ~f:(fun _ -> assert false)
-               ~f_inverse:(fun _ -> assert false))
-        in
-        stabilize_ [%here];
-        assert (is_some (value o))
-      ;;
+            I.OptUnorderedArrayFold<int, _>
+                [||]
+                ()
+                (fun _ -> failwith "should not call")
+                (fun _ -> failwith "should not call")
+            |> I.Observe
 
-      let%expect_test _ =
-        let x = Var.create_ [%here] None in
-        let y = Var.create_ [%here] None in
+        fix.Stabilize ()
+        Observer.valueThrowing(o).IsSome |> shouldEqual true
+
+    [<Test>]
+    let ``non-empty arr`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let x = I.Var.Create None
+        let y = I.Var.Create None
+
         let t =
-          observe
-            (opt_unordered_array_fold
-               [| watch x; watch y |]
-               ~init:0
-               ~f:( + )
-               ~f_inverse:( - ))
-        in
-        let check where expect =
-          stabilize_ where;
-          [%test_eq: int option] (value t) expect
-        in
-        check [%here] None;
-        Var.set x (Some 13);
-        check [%here] None;
-        Var.set y (Some 14);
-        check [%here] (Some 27);
-        Var.set y None;
-        check [%here] None
-      ;;
+            I.OptUnorderedArrayFold [| I.Var.Watch x ; I.Var.Watch y |] 0 (+) (-)
+            |> I.Observe
 
+        let check expect =
+            fix.Stabilize ()
+            Observer.valueThrowing t |> shouldEqual expect
+
+        check None
+        I.Var.Set x (Some 13)
+        check None
+        I.Var.Set y (Some 14)
+        check (Some 27)
+        I.Var.Set y None
+        check None

@@ -26,21 +26,21 @@ module TestState =
 
         expect {
             snapshotThrows @"System.Exception: cannot set_max_height_allowed less than the max height already seen"
-            return! fun () -> State.setMaxHeightAllowed fix.I.State height
+            return! fun () -> fix.I.SetMaxHeightAllowed height
         }
 
     [<Test>]
     let ``max height setting`` () =
         let fix = IncrementalFixture.Make ()
-        State.setMaxHeightAllowed fix.I.State 10
-        State.maxHeightAllowed fix.I.State |> shouldEqual 10
+        fix.I.SetMaxHeightAllowed 10
+        fix.I.MaxHeightAllowed |> shouldEqual 10
 
     [<Test>]
     let ``observe max height`` () =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
 
-        State.setMaxHeightAllowed I.State 256
+        I.SetMaxHeightAllowed 256
 
         let rec loop n =
             if n = 0 then
@@ -53,7 +53,7 @@ module TestState =
         fix.Stabilize ()
         Observer.valueThrowing o |> shouldEqual (State.maxHeightAllowed I.State)
 
-        State.maxHeightAllowed I.State |> shouldEqual (State.maxHeightSeen I.State)
+        I.MaxHeightAllowed |> shouldEqual (State.maxHeightSeen I.State)
         State.invariant I.State
 
         do

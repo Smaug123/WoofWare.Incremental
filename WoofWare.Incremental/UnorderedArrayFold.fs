@@ -19,7 +19,15 @@ module FoldUpdate =
 module internal UnorderedArrayFold =
     let same (t1 : UnorderedArrayFold<'a, 'b>) (t2 : UnorderedArrayFold<'c, 'd>) : bool = Type.referenceEqual' t1 t2
 
-    let create init f update fullComputeEveryNChanges children main =
+    let create
+        (init : 'acc)
+        (f : 'acc -> 'a -> 'acc)
+        (update : FoldUpdate<'a, 'acc>)
+        (fullComputeEveryNChanges : int)
+        (children : Node<'a> array)
+        (main : Node<'acc>)
+        : UnorderedArrayFold<'a, 'acc>
+        =
         {
             Init = init
             F = f
@@ -28,8 +36,8 @@ module internal UnorderedArrayFold =
             Children = children
             Main = main
             FoldValue = ValueNone
-            (* We make [num_changes_since_last_full_compute = full_compute_every_n_changes]
-     so that there will be a full computation the next time the node is computed. *)
+            // We make [num_changes_since_last_full_compute = full_compute_every_n_changes]
+            // so that there will be a full computation the next time the node is computed.
             NumChangesSinceLastFullCompute = fullComputeEveryNChanges
         }
 

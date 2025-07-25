@@ -1,0 +1,512 @@
+WoofWare.Incremental.BeforeOrAfter inherit obj, implements WoofWare.Incremental.BeforeOrAfter System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.BeforeOrAfter System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 2 cases
+WoofWare.Incremental.BeforeOrAfter+Tags inherit obj
+WoofWare.Incremental.BeforeOrAfter+Tags.After [static field]: int = 1
+WoofWare.Incremental.BeforeOrAfter+Tags.Before [static field]: int = 0
+WoofWare.Incremental.BeforeOrAfter.After [static property]: [read-only] WoofWare.Incremental.BeforeOrAfter
+WoofWare.Incremental.BeforeOrAfter.Before [static property]: [read-only] WoofWare.Incremental.BeforeOrAfter
+WoofWare.Incremental.BeforeOrAfter.Equals [method]: (WoofWare.Incremental.BeforeOrAfter, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.BeforeOrAfter.get_After [static method]: unit -> WoofWare.Incremental.BeforeOrAfter
+WoofWare.Incremental.BeforeOrAfter.get_Before [static method]: unit -> WoofWare.Incremental.BeforeOrAfter
+WoofWare.Incremental.BeforeOrAfter.get_IsAfter [method]: unit -> bool
+WoofWare.Incremental.BeforeOrAfter.get_IsBefore [method]: unit -> bool
+WoofWare.Incremental.BeforeOrAfter.get_Tag [method]: unit -> int
+WoofWare.Incremental.BeforeOrAfter.IsAfter [property]: [read-only] bool
+WoofWare.Incremental.BeforeOrAfter.IsBefore [property]: [read-only] bool
+WoofWare.Incremental.BeforeOrAfter.Tag [property]: [read-only] int
+WoofWare.Incremental.Clock inherit obj
+WoofWare.Incremental.CrateExtensions inherit obj
+WoofWare.Incremental.CrateExtensions.NodeCrate.make.Static [static method]: 'a WoofWare.Incremental.Node -> WoofWare.Incremental.NodeCrate
+WoofWare.Incremental.Cutoff inherit obj
+WoofWare.Incremental.Cutoff.always [static method]: unit -> 'a WoofWare.Incremental.Cutoff
+WoofWare.Incremental.Cutoff.create [static method]: ('a -> 'a -> bool) -> 'a WoofWare.Incremental.Cutoff
+WoofWare.Incremental.Cutoff.never [static method]: unit -> 'a WoofWare.Incremental.Cutoff
+WoofWare.Incremental.Cutoff.ofCompare [static method]: ('a -> 'a -> int) -> 'a WoofWare.Incremental.Cutoff
+WoofWare.Incremental.Cutoff.ofEqual [static method]: ('a -> 'a -> bool) -> 'a WoofWare.Incremental.Cutoff
+WoofWare.Incremental.Cutoff.physEqual [static method]: unit -> 'a WoofWare.Incremental.Cutoff
+WoofWare.Incremental.Cutoff.polyEqual [static method]: unit -> 'a WoofWare.Incremental.Cutoff
+WoofWare.Incremental.Cutoff.shouldCutoff [static method]: 'a WoofWare.Incremental.Cutoff -> 'a -> 'a -> bool
+WoofWare.Incremental.Cutoff`1 inherit obj
+WoofWare.Incremental.Debug inherit obj
+WoofWare.Incremental.Debug.get_globalFlag [static method]: unit -> bool
+WoofWare.Incremental.Debug.globalFlag [static property]: bool
+WoofWare.Incremental.Debug.set_globalFlag [static method]: bool -> unit
+WoofWare.Incremental.DotUserInfo inherit obj, implements WoofWare.Incremental.DotUserInfo System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.DotUserInfo System.IComparable, System.IComparable, System.Collections.IStructuralComparable
+WoofWare.Incremental.DotUserInfo.Equals [method]: (WoofWare.Incremental.DotUserInfo, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.Expert1Dependency inherit obj
+WoofWare.Incremental.Expert1Dependency.create [static method]: ('a -> unit) option -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Expert1Dependency
+WoofWare.Incremental.Expert1Dependency.value [static method]: 'a WoofWare.Incremental.Expert1Dependency -> 'a
+WoofWare.Incremental.Expert1Dependency`1 inherit obj
+WoofWare.Incremental.Expert1Node inherit obj
+WoofWare.Incremental.Expert1Node.addDependency [static method]: 'a WoofWare.Incremental.Expert1Node -> 'b WoofWare.Incremental.Expert1Dependency -> unit
+WoofWare.Incremental.Expert1Node.create [static method]: WoofWare.Incremental.State -> (bool -> unit) option -> (unit -> 'a) -> 'a WoofWare.Incremental.Expert1Node
+WoofWare.Incremental.Expert1Node.invalidate [static method]: 'a WoofWare.Incremental.Expert1Node -> unit
+WoofWare.Incremental.Expert1Node.makeStale [static method]: 'a WoofWare.Incremental.Expert1Node -> unit
+WoofWare.Incremental.Expert1Node.removeDependency [static method]: 'a WoofWare.Incremental.Expert1Node -> 'b WoofWare.Incremental.Expert1Dependency -> unit
+WoofWare.Incremental.Expert1Node.watch [static method]: 'a WoofWare.Incremental.Expert1Node -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Expert1Node`1 inherit obj
+WoofWare.Incremental.ForAnalyzer inherit obj
+WoofWare.Incremental.ForAnalyzer+Cutoff inherit obj, implements WoofWare.Incremental.ForAnalyzer+Cutoff System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.ForAnalyzer+Cutoff System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 6 cases
+WoofWare.Incremental.ForAnalyzer+Cutoff+Tags inherit obj
+WoofWare.Incremental.ForAnalyzer+Cutoff+Tags.Always [static field]: int = 0
+WoofWare.Incremental.ForAnalyzer+Cutoff+Tags.Compare [static field]: int = 3
+WoofWare.Incremental.ForAnalyzer+Cutoff+Tags.Equal [static field]: int = 4
+WoofWare.Incremental.ForAnalyzer+Cutoff+Tags.F [static field]: int = 5
+WoofWare.Incremental.ForAnalyzer+Cutoff+Tags.Never [static field]: int = 1
+WoofWare.Incremental.ForAnalyzer+Cutoff+Tags.PhysEqual [static field]: int = 2
+WoofWare.Incremental.ForAnalyzer+Cutoff.Always [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.Compare [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.Equal [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.Equals [method]: (WoofWare.Incremental.ForAnalyzer+Cutoff, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.F [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_Always [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_Compare [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_Equal [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_F [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_IsAlways [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_IsCompare [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_IsEqual [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_IsF [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_IsNever [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_IsPhysEqual [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_Never [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_PhysEqual [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.get_Tag [method]: unit -> int
+WoofWare.Incremental.ForAnalyzer+Cutoff.IsAlways [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.IsCompare [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.IsEqual [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.IsF [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.IsNever [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.IsPhysEqual [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Cutoff.Never [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.PhysEqual [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.ForAnalyzer+Cutoff.Tag [property]: [read-only] int
+WoofWare.Incremental.ForAnalyzer+CutoffModule inherit obj
+WoofWare.Incremental.ForAnalyzer+CutoffModule.toString [static method]: WoofWare.Incremental.ForAnalyzer+Cutoff -> string
+WoofWare.Incremental.ForAnalyzer+Kind inherit obj, implements WoofWare.Incremental.ForAnalyzer+Kind System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.ForAnalyzer+Kind System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 20 cases
+WoofWare.Incremental.ForAnalyzer+Kind+At inherit WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind+At.get_Item [method]: unit -> System.Int64
+WoofWare.Incremental.ForAnalyzer+Kind+At.Item [property]: [read-only] System.Int64
+WoofWare.Incremental.ForAnalyzer+Kind+AtIntervals inherit WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind+AtIntervals.base' [property]: [read-only] System.Int64
+WoofWare.Incremental.ForAnalyzer+Kind+AtIntervals.get_base' [method]: unit -> System.Int64
+WoofWare.Incremental.ForAnalyzer+Kind+AtIntervals.get_interval [method]: unit -> System.Int64
+WoofWare.Incremental.ForAnalyzer+Kind+AtIntervals.interval [property]: [read-only] System.Int64
+WoofWare.Incremental.ForAnalyzer+Kind+Snapshot inherit WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind+Snapshot.at [property]: [read-only] System.Int64
+WoofWare.Incremental.ForAnalyzer+Kind+Snapshot.get_at [method]: unit -> System.Int64
+WoofWare.Incremental.ForAnalyzer+Kind+Tags inherit obj
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.ArrayFold [static field]: int = 0
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.At [static field]: int = 1
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.AtIntervals [static field]: int = 2
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.BindLhsChange [static field]: int = 3
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.BindMain [static field]: int = 4
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.Const [static field]: int = 5
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.Expert [static field]: int = 6
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.Freeze [static field]: int = 7
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.IfTestChange [static field]: int = 8
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.IfThenElse [static field]: int = 9
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.Invalid [static field]: int = 10
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.JoinLhsChange [static field]: int = 11
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.JoinMain [static field]: int = 12
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.Map [static field]: int = 13
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.Map2 [static field]: int = 19
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.Snapshot [static field]: int = 14
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.StepFunction [static field]: int = 15
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.Uninitialized [static field]: int = 16
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.UnorderedArrayFold [static field]: int = 17
+WoofWare.Incremental.ForAnalyzer+Kind+Tags.Var [static field]: int = 18
+WoofWare.Incremental.ForAnalyzer+Kind.ArrayFold [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.BindLhsChange [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.BindMain [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.Const [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.Equals [method]: (WoofWare.Incremental.ForAnalyzer+Kind, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.Expert [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.Freeze [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_ArrayFold [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_BindLhsChange [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_BindMain [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_Const [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_Expert [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_Freeze [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_IfTestChange [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_IfThenElse [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_Invalid [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsArrayFold [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsAt [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsAtIntervals [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsBindLhsChange [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsBindMain [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsConst [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsExpert [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsFreeze [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsIfTestChange [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsIfThenElse [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsInvalid [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsJoinLhsChange [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsJoinMain [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsMap [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsMap2 [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsSnapshot [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsStepFunction [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsUninitialized [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsUnorderedArrayFold [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_IsVar [method]: unit -> bool
+WoofWare.Incremental.ForAnalyzer+Kind.get_JoinLhsChange [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_JoinMain [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_Map [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_Map2 [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_StepFunction [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_Tag [method]: unit -> int
+WoofWare.Incremental.ForAnalyzer+Kind.get_Uninitialized [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_UnorderedArrayFold [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.get_Var [static method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.IfTestChange [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.IfThenElse [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.Invalid [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.IsArrayFold [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsAt [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsAtIntervals [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsBindLhsChange [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsBindMain [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsConst [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsExpert [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsFreeze [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsIfTestChange [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsIfThenElse [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsInvalid [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsJoinLhsChange [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsJoinMain [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsMap [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsMap2 [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsSnapshot [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsStepFunction [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsUninitialized [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsUnorderedArrayFold [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.IsVar [property]: [read-only] bool
+WoofWare.Incremental.ForAnalyzer+Kind.JoinLhsChange [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.JoinMain [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.Map [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.Map2 [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.NewAt [static method]: System.Int64 -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.NewAtIntervals [static method]: (System.Int64, System.Int64) -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.NewSnapshot [static method]: System.Int64 -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.StepFunction [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.Tag [property]: [read-only] int
+WoofWare.Incremental.ForAnalyzer+Kind.Uninitialized [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.UnorderedArrayFold [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+Kind.Var [static property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.ForAnalyzer+KindModule inherit obj
+WoofWare.Incremental.ForAnalyzer+KindModule.toString [static method]: WoofWare.Incremental.ForAnalyzer+Kind -> string
+WoofWare.Incremental.ForAnalyzer.directlyObserved [static method]: WoofWare.Incremental.State -> WoofWare.Incremental.NodeCrate list
+WoofWare.Incremental.ForAnalyzer.traverse [static method]: WoofWare.Incremental.NodeCrate list -> (WoofWare.Incremental.NodeId -> WoofWare.Incremental.ForAnalyzer+Kind -> WoofWare.Incremental.ForAnalyzer+Cutoff -> WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList -> WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList -> WoofWare.Incremental.DotUserInfo option -> int -> int -> int -> unit) -> unit
+WoofWare.Incremental.IClock - interface with 9 member(s)
+WoofWare.Incremental.IClock.AdvanceClock [method]: WoofWare.Incremental.Clock -> System.Int64 -> unit
+WoofWare.Incremental.IClock.AdvanceClockBy [method]: WoofWare.Incremental.Clock -> System.Int64 -> unit
+WoofWare.Incremental.IClock.At [method]: WoofWare.Incremental.Clock -> System.Int64 -> WoofWare.Incremental.BeforeOrAfter WoofWare.Incremental.Node
+WoofWare.Incremental.IClock.AtIntervals [method]: WoofWare.Incremental.Clock -> System.Int64 -> unit WoofWare.Incremental.Node
+WoofWare.Incremental.IClock.Create [method]: System.Int64 -> WoofWare.Incremental.Clock
+WoofWare.Incremental.IClock.Create' [method]: WoofWare.TimingWheel.TimingWheelConfig -> System.Int64 -> WoofWare.Incremental.Clock
+WoofWare.Incremental.IClock.DefaultTimingWheelConfig [property]: [read-only] WoofWare.TimingWheel.TimingWheelConfig
+WoofWare.Incremental.IClock.get_DefaultTimingWheelConfig [method]: unit -> WoofWare.TimingWheel.TimingWheelConfig
+WoofWare.Incremental.IClock.Snapshot [method]: WoofWare.Incremental.Clock -> 'a WoofWare.Incremental.Node -> System.Int64 -> 'a -> Microsoft.FSharp.Core.FSharpResult<'a WoofWare.Incremental.Node, string>
+WoofWare.Incremental.IExpertIncremental - interface with 1 member(s)
+WoofWare.Incremental.IExpertIncremental.DoOneStepOfStabilize [method]: unit -> WoofWare.Incremental.StepResult
+WoofWare.Incremental.Incremental - interface with 42 member(s)
+WoofWare.Incremental.Incremental.All [method]: 'a WoofWare.Incremental.Node list -> 'a list WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.AmStabilizing [property]: [read-only] bool
+WoofWare.Incremental.Incremental.Bind [method]: ('a -> 'b WoofWare.Incremental.Node) -> 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Both [method]: 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node -> ('a * 'b) WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Clock [property]: [read-only] WoofWare.Incremental.IClock
+WoofWare.Incremental.Incremental.Const [method]: 'a -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.CurrentScope [property]: [read-only] WoofWare.Incremental.Scope
+WoofWare.Incremental.Incremental.DependOn [method]: 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Exists [method]: bool WoofWare.Incremental.Node [] -> bool WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Expert [property]: [read-only] WoofWare.Incremental.IExpertIncremental
+WoofWare.Incremental.Incremental.ForAll [method]: bool WoofWare.Incremental.Node [] -> bool WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Freeze [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Freeze' [method]: ('a -> bool) -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.get_AmStabilizing [method]: unit -> bool
+WoofWare.Incremental.Incremental.get_Clock [method]: unit -> WoofWare.Incremental.IClock
+WoofWare.Incremental.Incremental.get_CurrentScope [method]: unit -> WoofWare.Incremental.Scope
+WoofWare.Incremental.Incremental.get_Expert [method]: unit -> WoofWare.Incremental.IExpertIncremental
+WoofWare.Incremental.Incremental.get_State [method]: unit -> WoofWare.Incremental.State
+WoofWare.Incremental.Incremental.get_Var [method]: unit -> WoofWare.Incremental.IVar
+WoofWare.Incremental.Incremental.If [method]: bool WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Join [method]: 'a WoofWare.Incremental.Node WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Map [method]: ('a -> 'b) -> 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Map2 [method]: ('a -> 'b -> 'c) -> 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node -> 'c WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.NecessaryIfAlive [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Observe [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Observer
+WoofWare.Incremental.Incremental.Observe' [method]: bool -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Observer
+WoofWare.Incremental.Incremental.OnUpdate [method]: 'a WoofWare.Incremental.Node -> ('a WoofWare.Incremental.NodeUpdate -> unit) -> unit
+WoofWare.Incremental.Incremental.OptSum [method]: int option -> 'b -> ('b -> 'a -> 'b) -> ('b -> 'a -> 'b) -> 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'b Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.OptUnorderedArrayFold [method]: 'a option WoofWare.Incremental.Node [] -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'acc option WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.OptUnorderedArrayFold' [method]: int -> 'a option WoofWare.Incremental.Node [] -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'acc option WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Pack [method]: 'a WoofWare.Incremental.Node -> WoofWare.Incremental.NodeCrate
+WoofWare.Incremental.Incremental.Return [method]: 'a -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.SaveDot [method]: (string -> unit) -> unit
+WoofWare.Incremental.Incremental.SaveDot' [method]: bool -> bool -> (string -> unit) -> unit
+WoofWare.Incremental.Incremental.SetCutoff [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Cutoff -> unit
+WoofWare.Incremental.Incremental.Stabilize [method]: unit -> unit
+WoofWare.Incremental.Incremental.State [property]: [read-only] WoofWare.Incremental.State
+WoofWare.Incremental.Incremental.Sum [method]: int option -> 'b -> ('b -> 'a -> 'b) -> ('b -> 'a -> 'b) -> 'a WoofWare.Incremental.Node [] -> 'b WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.Var [property]: [read-only] WoofWare.Incremental.IVar
+WoofWare.Incremental.Incremental.VoptUnorderedArrayFold [method]: 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'acc Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.VoptUnorderedArrayFold' [method]: int -> 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'acc Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.WithinScope [method]: WoofWare.Incremental.Scope -> (unit -> 'a) -> 'a
+WoofWare.Incremental.IncrementalModule inherit obj
+WoofWare.Incremental.IncrementalModule.make [static method]: unit -> WoofWare.Incremental.Incremental
+WoofWare.Incremental.IVar - interface with 7 member(s)
+WoofWare.Incremental.IVar.Create [method]: 'a -> 'a WoofWare.Incremental.Var
+WoofWare.Incremental.IVar.Create' [method]: bool -> 'a -> 'a WoofWare.Incremental.Var
+WoofWare.Incremental.IVar.LatestValue [method]: 'a WoofWare.Incremental.Var -> 'a
+WoofWare.Incremental.IVar.Replace [method]: 'a WoofWare.Incremental.Var -> ('a -> 'a) -> unit
+WoofWare.Incremental.IVar.Set [method]: 'a WoofWare.Incremental.Var -> 'a -> unit
+WoofWare.Incremental.IVar.Value [method]: 'a WoofWare.Incremental.Var -> 'a
+WoofWare.Incremental.IVar.Watch [method]: 'a WoofWare.Incremental.Var -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Node`1 inherit obj
+WoofWare.Incremental.NodeCrate - interface with 1 member(s)
+WoofWare.Incremental.NodeCrate.Apply [method]: 'ret WoofWare.Incremental.NodeEval -> 'ret
+WoofWare.Incremental.NodeEval`1 - interface with 1 member(s)
+WoofWare.Incremental.NodeEval`1.Eval [method]: 'a WoofWare.Incremental.Node -> 'ret
+WoofWare.Incremental.NodeId inherit obj, implements WoofWare.Incremental.NodeId System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.NodeId System.IComparable, System.IComparable, System.Collections.IStructuralComparable
+WoofWare.Incremental.NodeId.Equals [method]: (WoofWare.Incremental.NodeId, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.NodeIdModule inherit obj
+WoofWare.Incremental.NodeIdModule.invariant [static method]: WoofWare.Incremental.NodeId -> unit
+WoofWare.Incremental.NodeIdModule.next [static method]: unit -> WoofWare.Incremental.NodeId
+WoofWare.Incremental.NodeIdModule.toString [static method]: WoofWare.Incremental.NodeId -> string
+WoofWare.Incremental.NodeToDot inherit obj
+WoofWare.Incremental.NodeToDot.renderDot [static method]: bool -> bool -> (string -> unit) -> WoofWare.Incremental.NodeCrate list -> unit
+WoofWare.Incremental.NodeToDot.saveDotToFile [static method]: bool -> string -> WoofWare.Incremental.NodeCrate list -> unit
+WoofWare.Incremental.NodeUpdate`1 inherit obj, implements 'a WoofWare.Incremental.NodeUpdate System.IEquatable, System.Collections.IStructuralEquatable, 'a WoofWare.Incremental.NodeUpdate System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 4 cases
+WoofWare.Incremental.NodeUpdate`1+Changed inherit 'a WoofWare.Incremental.NodeUpdate
+WoofWare.Incremental.NodeUpdate`1+Changed.get_Item1 [method]: unit -> 'a
+WoofWare.Incremental.NodeUpdate`1+Changed.get_Item2 [method]: unit -> 'a
+WoofWare.Incremental.NodeUpdate`1+Changed.Item1 [property]: [read-only] 'a
+WoofWare.Incremental.NodeUpdate`1+Changed.Item2 [property]: [read-only] 'a
+WoofWare.Incremental.NodeUpdate`1+Necessary inherit 'a WoofWare.Incremental.NodeUpdate
+WoofWare.Incremental.NodeUpdate`1+Necessary.get_Item [method]: unit -> 'a
+WoofWare.Incremental.NodeUpdate`1+Necessary.Item [property]: [read-only] 'a
+WoofWare.Incremental.NodeUpdate`1+Tags inherit obj
+WoofWare.Incremental.NodeUpdate`1+Tags.Changed [static field]: int = 1
+WoofWare.Incremental.NodeUpdate`1+Tags.Invalidated [static field]: int = 2
+WoofWare.Incremental.NodeUpdate`1+Tags.Necessary [static field]: int = 0
+WoofWare.Incremental.NodeUpdate`1+Tags.Unnecessary [static field]: int = 3
+WoofWare.Incremental.NodeUpdate`1.Equals [method]: ('a WoofWare.Incremental.NodeUpdate, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.NodeUpdate`1.get_Invalidated [static method]: unit -> 'a WoofWare.Incremental.NodeUpdate
+WoofWare.Incremental.NodeUpdate`1.get_IsChanged [method]: unit -> bool
+WoofWare.Incremental.NodeUpdate`1.get_IsInvalidated [method]: unit -> bool
+WoofWare.Incremental.NodeUpdate`1.get_IsNecessary [method]: unit -> bool
+WoofWare.Incremental.NodeUpdate`1.get_IsUnnecessary [method]: unit -> bool
+WoofWare.Incremental.NodeUpdate`1.get_Tag [method]: unit -> int
+WoofWare.Incremental.NodeUpdate`1.get_Unnecessary [static method]: unit -> 'a WoofWare.Incremental.NodeUpdate
+WoofWare.Incremental.NodeUpdate`1.Invalidated [static property]: [read-only] 'a WoofWare.Incremental.NodeUpdate
+WoofWare.Incremental.NodeUpdate`1.IsChanged [property]: [read-only] bool
+WoofWare.Incremental.NodeUpdate`1.IsInvalidated [property]: [read-only] bool
+WoofWare.Incremental.NodeUpdate`1.IsNecessary [property]: [read-only] bool
+WoofWare.Incremental.NodeUpdate`1.IsUnnecessary [property]: [read-only] bool
+WoofWare.Incremental.NodeUpdate`1.NewChanged [static method]: ('a, 'a) -> 'a WoofWare.Incremental.NodeUpdate
+WoofWare.Incremental.NodeUpdate`1.NewNecessary [static method]: 'a -> 'a WoofWare.Incremental.NodeUpdate
+WoofWare.Incremental.NodeUpdate`1.Tag [property]: [read-only] int
+WoofWare.Incremental.NodeUpdate`1.Unnecessary [static property]: [read-only] 'a WoofWare.Incremental.NodeUpdate
+WoofWare.Incremental.Observer inherit obj
+WoofWare.Incremental.Observer+Update`1 inherit obj, implements 'a WoofWare.Incremental.Observer+Update System.IEquatable, System.Collections.IStructuralEquatable, 'a WoofWare.Incremental.Observer+Update System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 3 cases
+WoofWare.Incremental.Observer+Update`1+Changed inherit 'a WoofWare.Incremental.Observer+Update
+WoofWare.Incremental.Observer+Update`1+Changed.get_Item1 [method]: unit -> 'a
+WoofWare.Incremental.Observer+Update`1+Changed.get_Item2 [method]: unit -> 'a
+WoofWare.Incremental.Observer+Update`1+Changed.Item1 [property]: [read-only] 'a
+WoofWare.Incremental.Observer+Update`1+Changed.Item2 [property]: [read-only] 'a
+WoofWare.Incremental.Observer+Update`1+Initialized inherit 'a WoofWare.Incremental.Observer+Update
+WoofWare.Incremental.Observer+Update`1+Initialized.get_Item [method]: unit -> 'a
+WoofWare.Incremental.Observer+Update`1+Initialized.Item [property]: [read-only] 'a
+WoofWare.Incremental.Observer+Update`1+Tags inherit obj
+WoofWare.Incremental.Observer+Update`1+Tags.Changed [static field]: int = 1
+WoofWare.Incremental.Observer+Update`1+Tags.Initialized [static field]: int = 0
+WoofWare.Incremental.Observer+Update`1+Tags.Invalidated [static field]: int = 2
+WoofWare.Incremental.Observer+Update`1.Equals [method]: ('a WoofWare.Incremental.Observer+Update, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.Observer+Update`1.get_Invalidated [static method]: unit -> 'a WoofWare.Incremental.Observer+Update
+WoofWare.Incremental.Observer+Update`1.get_IsChanged [method]: unit -> bool
+WoofWare.Incremental.Observer+Update`1.get_IsInitialized [method]: unit -> bool
+WoofWare.Incremental.Observer+Update`1.get_IsInvalidated [method]: unit -> bool
+WoofWare.Incremental.Observer+Update`1.get_Tag [method]: unit -> int
+WoofWare.Incremental.Observer+Update`1.Invalidated [static property]: [read-only] 'a WoofWare.Incremental.Observer+Update
+WoofWare.Incremental.Observer+Update`1.IsChanged [property]: [read-only] bool
+WoofWare.Incremental.Observer+Update`1.IsInitialized [property]: [read-only] bool
+WoofWare.Incremental.Observer+Update`1.IsInvalidated [property]: [read-only] bool
+WoofWare.Incremental.Observer+Update`1.NewChanged [static method]: ('a, 'a) -> 'a WoofWare.Incremental.Observer+Update
+WoofWare.Incremental.Observer+Update`1.NewInitialized [static method]: 'a -> 'a WoofWare.Incremental.Observer+Update
+WoofWare.Incremental.Observer+Update`1.Tag [property]: [read-only] int
+WoofWare.Incremental.Observer.disallowFutureUse [static method]: 'a WoofWare.Incremental.Observer -> unit
+WoofWare.Incremental.Observer.observing [static method]: 'a WoofWare.Incremental.Observer -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Observer.onUpdateThrowing [static method]: 'a WoofWare.Incremental.Observer -> ('a WoofWare.Incremental.Observer+Update -> unit) -> unit
+WoofWare.Incremental.Observer.toString [static method]: 'a WoofWare.Incremental.Observer -> string
+WoofWare.Incremental.Observer.useIsAllowed [static method]: 'a WoofWare.Incremental.Observer -> bool
+WoofWare.Incremental.Observer.value [static method]: 'a WoofWare.Incremental.Observer -> Microsoft.FSharp.Core.FSharpResult<'a, System.Exception>
+WoofWare.Incremental.Observer.valueThrowing [static method]: 'a WoofWare.Incremental.Observer -> 'a
+WoofWare.Incremental.Observer`1 inherit obj
+WoofWare.Incremental.OnUpdateHandler inherit obj
+WoofWare.Incremental.OnUpdateHandler.create [static method]: ('a WoofWare.Incremental.NodeUpdate -> unit) -> int -> 'a WoofWare.Incremental.OnUpdateHandler
+WoofWare.Incremental.OnUpdateHandler.run [static method]: 'a WoofWare.Incremental.OnUpdateHandler -> 'a WoofWare.Incremental.NodeUpdate -> int -> unit
+WoofWare.Incremental.OnUpdateHandler`1 inherit obj
+WoofWare.Incremental.RaisedException inherit obj, implements WoofWare.Incremental.RaisedException System.IEquatable, System.Collections.IStructuralEquatable
+WoofWare.Incremental.RaisedException..ctor [constructor]: (System.Exception, System.Runtime.ExceptionServices.ExceptionDispatchInfo)
+WoofWare.Incremental.RaisedException.Backtrace [property]: [read-only] System.Runtime.ExceptionServices.ExceptionDispatchInfo
+WoofWare.Incremental.RaisedException.Equals [method]: (WoofWare.Incremental.RaisedException, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.RaisedException.Exn [property]: [read-only] System.Exception
+WoofWare.Incremental.RaisedException.get_Backtrace [method]: unit -> System.Runtime.ExceptionServices.ExceptionDispatchInfo
+WoofWare.Incremental.RaisedException.get_Exn [method]: unit -> System.Exception
+WoofWare.Incremental.RaisedExceptionModule inherit obj
+WoofWare.Incremental.RaisedExceptionModule.create [static method]: System.Exception -> WoofWare.Incremental.RaisedException
+WoofWare.Incremental.RaisedExceptionModule.reraise [static method]: WoofWare.Incremental.RaisedException -> 'a
+WoofWare.Incremental.RaisedExceptionModule.reraiseWithMessage [static method]: WoofWare.Incremental.RaisedException -> string -> 'a
+WoofWare.Incremental.Scope inherit obj
+WoofWare.Incremental.Sequence inherit obj
+WoofWare.Incremental.Sequence.empty [static method]: unit -> 'a WoofWare.Incremental.Sequence
+WoofWare.Incremental.Sequence.fold [static method]: 'acc -> ('acc -> 'a -> 'acc) -> 'a WoofWare.Incremental.Sequence -> 'acc
+WoofWare.Incremental.Sequence.head [static method]: 'a WoofWare.Incremental.Sequence -> 'a option
+WoofWare.Incremental.Sequence.next [static method]: 'a WoofWare.Incremental.Sequence -> ('a * 'a WoofWare.Incremental.Sequence) option
+WoofWare.Incremental.Sequence.ofList [static method]: 'a list -> 'a WoofWare.Incremental.Sequence
+WoofWare.Incremental.Sequence.unfold [static method]: 'state -> ('state -> ('a * 'state) option) -> 'a WoofWare.Incremental.Sequence
+WoofWare.Incremental.Sequence`1 inherit obj, implements 'a WoofWare.Incremental.Sequence System.IEquatable, System.Collections.IStructuralEquatable
+WoofWare.Incremental.Sequence`1.Equals [method]: ('a WoofWare.Incremental.Sequence, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.Skeleton.Node inherit obj, implements WoofWare.Incremental.Skeleton.Node System.IEquatable, System.Collections.IStructuralEquatable
+WoofWare.Incremental.Skeleton.Node..ctor [constructor]: (WoofWare.Incremental.NodeId, WoofWare.Incremental.ForAnalyzer+Kind, WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList, WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList, WoofWare.Incremental.DotUserInfo option, int, WoofWare.Incremental.ForAnalyzer+Cutoff, int, int)
+WoofWare.Incremental.Skeleton.Node.BindChildren [property]: [read-only] WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList
+WoofWare.Incremental.Skeleton.Node.ChangedAt [property]: [read-only] int
+WoofWare.Incremental.Skeleton.Node.Children [property]: [read-only] WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList
+WoofWare.Incremental.Skeleton.Node.Cutoff [property]: [read-only] WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.Skeleton.Node.Equals [method]: (WoofWare.Incremental.Skeleton.Node, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.Skeleton.Node.get_BindChildren [method]: unit -> WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList
+WoofWare.Incremental.Skeleton.Node.get_ChangedAt [method]: unit -> int
+WoofWare.Incremental.Skeleton.Node.get_Children [method]: unit -> WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList
+WoofWare.Incremental.Skeleton.Node.get_Cutoff [method]: unit -> WoofWare.Incremental.ForAnalyzer+Cutoff
+WoofWare.Incremental.Skeleton.Node.get_Height [method]: unit -> int
+WoofWare.Incremental.Skeleton.Node.get_Id [method]: unit -> WoofWare.Incremental.NodeId
+WoofWare.Incremental.Skeleton.Node.get_Kind [method]: unit -> WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.Skeleton.Node.get_RecomputedAt [method]: unit -> int
+WoofWare.Incremental.Skeleton.Node.get_UserInfo [method]: unit -> WoofWare.Incremental.DotUserInfo option
+WoofWare.Incremental.Skeleton.Node.Height [property]: [read-only] int
+WoofWare.Incremental.Skeleton.Node.Id [property]: [read-only] WoofWare.Incremental.NodeId
+WoofWare.Incremental.Skeleton.Node.Kind [property]: [read-only] WoofWare.Incremental.ForAnalyzer+Kind
+WoofWare.Incremental.Skeleton.Node.RecomputedAt [property]: [read-only] int
+WoofWare.Incremental.Skeleton.Node.UserInfo [property]: [read-only] WoofWare.Incremental.DotUserInfo option
+WoofWare.Incremental.Skeleton.RenderRelation inherit obj, implements WoofWare.Incremental.Skeleton.RenderRelation System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.Skeleton.RenderRelation System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 4 cases
+WoofWare.Incremental.Skeleton.RenderRelation+Tags inherit obj
+WoofWare.Incremental.Skeleton.RenderRelation+Tags.All [static field]: int = 0
+WoofWare.Incremental.Skeleton.RenderRelation+Tags.Ancestors [static field]: int = 1
+WoofWare.Incremental.Skeleton.RenderRelation+Tags.Both [static field]: int = 3
+WoofWare.Incremental.Skeleton.RenderRelation+Tags.Descendants [static field]: int = 2
+WoofWare.Incremental.Skeleton.RenderRelation.All [static property]: [read-only] WoofWare.Incremental.Skeleton.RenderRelation
+WoofWare.Incremental.Skeleton.RenderRelation.Ancestors [static property]: [read-only] WoofWare.Incremental.Skeleton.RenderRelation
+WoofWare.Incremental.Skeleton.RenderRelation.Both [static property]: [read-only] WoofWare.Incremental.Skeleton.RenderRelation
+WoofWare.Incremental.Skeleton.RenderRelation.Descendants [static property]: [read-only] WoofWare.Incremental.Skeleton.RenderRelation
+WoofWare.Incremental.Skeleton.RenderRelation.Equals [method]: (WoofWare.Incremental.Skeleton.RenderRelation, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.Skeleton.RenderRelation.get_All [static method]: unit -> WoofWare.Incremental.Skeleton.RenderRelation
+WoofWare.Incremental.Skeleton.RenderRelation.get_Ancestors [static method]: unit -> WoofWare.Incremental.Skeleton.RenderRelation
+WoofWare.Incremental.Skeleton.RenderRelation.get_Both [static method]: unit -> WoofWare.Incremental.Skeleton.RenderRelation
+WoofWare.Incremental.Skeleton.RenderRelation.get_Descendants [static method]: unit -> WoofWare.Incremental.Skeleton.RenderRelation
+WoofWare.Incremental.Skeleton.RenderRelation.get_IsAll [method]: unit -> bool
+WoofWare.Incremental.Skeleton.RenderRelation.get_IsAncestors [method]: unit -> bool
+WoofWare.Incremental.Skeleton.RenderRelation.get_IsBoth [method]: unit -> bool
+WoofWare.Incremental.Skeleton.RenderRelation.get_IsDescendants [method]: unit -> bool
+WoofWare.Incremental.Skeleton.RenderRelation.get_Tag [method]: unit -> int
+WoofWare.Incremental.Skeleton.RenderRelation.IsAll [property]: [read-only] bool
+WoofWare.Incremental.Skeleton.RenderRelation.IsAncestors [property]: [read-only] bool
+WoofWare.Incremental.Skeleton.RenderRelation.IsBoth [property]: [read-only] bool
+WoofWare.Incremental.Skeleton.RenderRelation.IsDescendants [property]: [read-only] bool
+WoofWare.Incremental.Skeleton.RenderRelation.Tag [property]: [read-only] int
+WoofWare.Incremental.Skeleton.RenderTarget inherit obj, implements WoofWare.Incremental.Skeleton.RenderTarget System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.Skeleton.RenderTarget System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 2 cases
+WoofWare.Incremental.Skeleton.RenderTarget+Tags inherit obj
+WoofWare.Incremental.Skeleton.RenderTarget+Tags.Dot [static field]: int = 0
+WoofWare.Incremental.Skeleton.RenderTarget+Tags.GraphEasy [static field]: int = 1
+WoofWare.Incremental.Skeleton.RenderTarget.Dot [static property]: [read-only] WoofWare.Incremental.Skeleton.RenderTarget
+WoofWare.Incremental.Skeleton.RenderTarget.Equals [method]: (WoofWare.Incremental.Skeleton.RenderTarget, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.Skeleton.RenderTarget.get_Dot [static method]: unit -> WoofWare.Incremental.Skeleton.RenderTarget
+WoofWare.Incremental.Skeleton.RenderTarget.get_GraphEasy [static method]: unit -> WoofWare.Incremental.Skeleton.RenderTarget
+WoofWare.Incremental.Skeleton.RenderTarget.get_IsDot [method]: unit -> bool
+WoofWare.Incremental.Skeleton.RenderTarget.get_IsGraphEasy [method]: unit -> bool
+WoofWare.Incremental.Skeleton.RenderTarget.get_Tag [method]: unit -> int
+WoofWare.Incremental.Skeleton.RenderTarget.GraphEasy [static property]: [read-only] WoofWare.Incremental.Skeleton.RenderTarget
+WoofWare.Incremental.Skeleton.RenderTarget.IsDot [property]: [read-only] bool
+WoofWare.Incremental.Skeleton.RenderTarget.IsGraphEasy [property]: [read-only] bool
+WoofWare.Incremental.Skeleton.RenderTarget.Tag [property]: [read-only] int
+WoofWare.Incremental.Skeleton.Skeleton inherit obj, implements WoofWare.Incremental.Skeleton.Skeleton System.IEquatable, System.Collections.IStructuralEquatable
+WoofWare.Incremental.Skeleton.Skeleton..ctor [constructor]: (WoofWare.Incremental.Skeleton.Node System.Collections.Generic.IReadOnlyList, WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlySet, int)
+WoofWare.Incremental.Skeleton.Skeleton.Equals [method]: (WoofWare.Incremental.Skeleton.Skeleton, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.Skeleton.Skeleton.get_Nodes [method]: unit -> WoofWare.Incremental.Skeleton.Node System.Collections.Generic.IReadOnlyList
+WoofWare.Incremental.Skeleton.Skeleton.get_NumStabilizes [method]: unit -> int
+WoofWare.Incremental.Skeleton.Skeleton.get_Seen [method]: unit -> WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlySet
+WoofWare.Incremental.Skeleton.Skeleton.Nodes [property]: [read-only] WoofWare.Incremental.Skeleton.Node System.Collections.Generic.IReadOnlyList
+WoofWare.Incremental.Skeleton.Skeleton.NumStabilizes [property]: [read-only] int
+WoofWare.Incremental.Skeleton.Skeleton.Seen [property]: [read-only] WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlySet
+WoofWare.Incremental.Skeleton.SkeletonModule inherit obj
+WoofWare.Incremental.Skeleton.SkeletonModule.snapshot [static method]: bool option -> WoofWare.Incremental.State -> WoofWare.Incremental.Skeleton.Skeleton
+WoofWare.Incremental.Skeleton.SkeletonModule.toDot [static method]: (WoofWare.Incremental.Skeleton.Node -> WoofWare.Incremental.DotUserInfo option) option -> WoofWare.Incremental.Skeleton.RenderTarget option -> WoofWare.Incremental.Skeleton.Node list option -> WoofWare.Incremental.Skeleton.RenderRelation option -> WoofWare.Incremental.Skeleton.Skeleton -> string
+WoofWare.Incremental.stab inherit obj
+WoofWare.Incremental.StabilizationNumModule inherit obj
+WoofWare.Incremental.StabilizationNumModule.add1 [static method]: int -> int
+WoofWare.Incremental.StabilizationNumModule.get_none [static method]: unit -> int
+WoofWare.Incremental.StabilizationNumModule.get_zero [static method]: unit -> int
+WoofWare.Incremental.StabilizationNumModule.invariant [static method]: int -> unit
+WoofWare.Incremental.StabilizationNumModule.isNone [static method]: int -> bool
+WoofWare.Incremental.StabilizationNumModule.isSome [static method]: int -> bool
+WoofWare.Incremental.StabilizationNumModule.none [static property]: [read-only] int
+WoofWare.Incremental.StabilizationNumModule.toInt [static method]: int -> int
+WoofWare.Incremental.StabilizationNumModule.zero [static property]: [read-only] int
+WoofWare.Incremental.State inherit obj, implements WoofWare.Incremental.State System.IEquatable, System.Collections.IStructuralEquatable
+WoofWare.Incremental.State.Equals [method]: (WoofWare.Incremental.State, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.StepFunction inherit obj
+WoofWare.Incremental.StepFunction.constant [static method]: 'a -> 'a WoofWare.Incremental.StepFunction
+WoofWare.Incremental.StepFunction.create [static method]: 'a -> (System.Int64 * 'a) list -> 'a WoofWare.Incremental.StepFunction
+WoofWare.Incremental.StepFunction.createFromSequence [static method]: 'a -> (System.Int64 * 'a) WoofWare.Incremental.Sequence -> 'a WoofWare.Incremental.StepFunction
+WoofWare.Incremental.StepFunction.init [static method]: 'a WoofWare.Incremental.StepFunction -> 'a
+WoofWare.Incremental.StepFunction.steps [static method]: 'a WoofWare.Incremental.StepFunction -> (System.Int64 * 'a) WoofWare.Incremental.Sequence
+WoofWare.Incremental.StepFunction.value [static method]: 'a WoofWare.Incremental.StepFunction -> System.Int64 -> 'a
+WoofWare.Incremental.StepFunction`1 inherit obj
+WoofWare.Incremental.StepResult inherit obj, implements WoofWare.Incremental.StepResult System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.StepResult System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 2 cases
+WoofWare.Incremental.StepResult+Tags inherit obj
+WoofWare.Incremental.StepResult+Tags.Done [static field]: int = 1
+WoofWare.Incremental.StepResult+Tags.KeepGoing [static field]: int = 0
+WoofWare.Incremental.StepResult.Done [static property]: [read-only] WoofWare.Incremental.StepResult
+WoofWare.Incremental.StepResult.Equals [method]: (WoofWare.Incremental.StepResult, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.StepResult.get_Done [static method]: unit -> WoofWare.Incremental.StepResult
+WoofWare.Incremental.StepResult.get_IsDone [method]: unit -> bool
+WoofWare.Incremental.StepResult.get_IsKeepGoing [method]: unit -> bool
+WoofWare.Incremental.StepResult.get_KeepGoing [static method]: unit -> WoofWare.Incremental.StepResult
+WoofWare.Incremental.StepResult.get_Tag [method]: unit -> int
+WoofWare.Incremental.StepResult.IsDone [property]: [read-only] bool
+WoofWare.Incremental.StepResult.IsKeepGoing [property]: [read-only] bool
+WoofWare.Incremental.StepResult.KeepGoing [static property]: [read-only] WoofWare.Incremental.StepResult
+WoofWare.Incremental.StepResult.Tag [property]: [read-only] int
+WoofWare.Incremental.Update`1 inherit obj, implements 'a WoofWare.Incremental.Update System.IEquatable, System.Collections.IStructuralEquatable, 'a WoofWare.Incremental.Update System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 4 cases
+WoofWare.Incremental.Update`1+Changed inherit 'a WoofWare.Incremental.Update
+WoofWare.Incremental.Update`1+Changed.get_Item1 [method]: unit -> 'a
+WoofWare.Incremental.Update`1+Changed.get_Item2 [method]: unit -> 'a
+WoofWare.Incremental.Update`1+Changed.Item1 [property]: [read-only] 'a
+WoofWare.Incremental.Update`1+Changed.Item2 [property]: [read-only] 'a
+WoofWare.Incremental.Update`1+Necessary inherit 'a WoofWare.Incremental.Update
+WoofWare.Incremental.Update`1+Necessary.get_Item [method]: unit -> 'a
+WoofWare.Incremental.Update`1+Necessary.Item [property]: [read-only] 'a
+WoofWare.Incremental.Update`1+Tags inherit obj
+WoofWare.Incremental.Update`1+Tags.Changed [static field]: int = 1
+WoofWare.Incremental.Update`1+Tags.Invalidated [static field]: int = 2
+WoofWare.Incremental.Update`1+Tags.Necessary [static field]: int = 0
+WoofWare.Incremental.Update`1+Tags.Unnecessary [static field]: int = 3
+WoofWare.Incremental.Update`1.Equals [method]: ('a WoofWare.Incremental.Update, System.Collections.IEqualityComparer) -> bool
+WoofWare.Incremental.Update`1.get_Invalidated [static method]: unit -> 'a WoofWare.Incremental.Update
+WoofWare.Incremental.Update`1.get_IsChanged [method]: unit -> bool
+WoofWare.Incremental.Update`1.get_IsInvalidated [method]: unit -> bool
+WoofWare.Incremental.Update`1.get_IsNecessary [method]: unit -> bool
+WoofWare.Incremental.Update`1.get_IsUnnecessary [method]: unit -> bool
+WoofWare.Incremental.Update`1.get_Tag [method]: unit -> int
+WoofWare.Incremental.Update`1.get_Unnecessary [static method]: unit -> 'a WoofWare.Incremental.Update
+WoofWare.Incremental.Update`1.Invalidated [static property]: [read-only] 'a WoofWare.Incremental.Update
+WoofWare.Incremental.Update`1.IsChanged [property]: [read-only] bool
+WoofWare.Incremental.Update`1.IsInvalidated [property]: [read-only] bool
+WoofWare.Incremental.Update`1.IsNecessary [property]: [read-only] bool
+WoofWare.Incremental.Update`1.IsUnnecessary [property]: [read-only] bool
+WoofWare.Incremental.Update`1.NewChanged [static method]: ('a, 'a) -> 'a WoofWare.Incremental.Update
+WoofWare.Incremental.Update`1.NewNecessary [static method]: 'a -> 'a WoofWare.Incremental.Update
+WoofWare.Incremental.Update`1.Tag [property]: [read-only] int
+WoofWare.Incremental.Update`1.Unnecessary [static property]: [read-only] 'a WoofWare.Incremental.Update
+WoofWare.Incremental.Var`1 inherit obj

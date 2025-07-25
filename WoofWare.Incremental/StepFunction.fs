@@ -28,9 +28,9 @@ module StepFunction =
             Steps = Sequence.empty ()
         }
 
-    let createExn (init : 'a) (steps : (TimeNs * 'a) list) =
+    let create (init : 'a) (steps : (TimeNs * 'a) list) =
         if not (List.isSortedBy fst steps) then
-            failwith "createExn got unsorted times"
+            failwith "create got unsorted times"
 
         {
             Init = init

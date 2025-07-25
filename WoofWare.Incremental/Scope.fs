@@ -1,7 +1,7 @@
 namespace WoofWare.Incremental
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Scope =
+module internal Scope =
 
     let top = Scope.Top
 

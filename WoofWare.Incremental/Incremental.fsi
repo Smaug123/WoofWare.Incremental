@@ -9,8 +9,10 @@ type Update<'a> =
     | Invalidated
     | Unnecessary
 
+/// An entity which is observing a node in an Incremental graph, and can tell you e.g. the value of the node.
 type Observer<'a>
 
+/// An entity which is observing a node in an Incremental graph, and can tell you e.g. the value of the node.
 [<RequireQualifiedAccess>]
 module Observer =
     type Update<'a> =
@@ -75,17 +77,61 @@ type Incremental =
     abstract Freeze<'a> : 'a Node -> 'a Node
     abstract Freeze'<'a> : onlyWhen : ('a -> bool) -> 'a Node -> 'a Node
     abstract DependOn<'a, 'b> : dependOn : 'a Node -> 'b Node -> 'b Node
+    abstract All<'a> : 'a Node list -> 'a list Node
+    abstract ForAll : bool Node[] -> bool Node
+    abstract Exists : bool Node[] -> bool Node
+    abstract SetMaxHeightAllowed : int -> unit
+    abstract MaxHeightAllowed : int
+
+    abstract OptUnorderedArrayFold<'a, 'acc> :
+        'a option Node[] ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        fInverse : ('acc -> 'a -> 'acc) ->
+            Node<'acc option>
+
+    abstract OptUnorderedArrayFold'<'a, 'acc> :
+        fullUpdateEveryNUpdates : int ->
+        'a option Node[] ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        fInverse : ('acc -> 'a -> 'acc) ->
+            Node<'acc option>
+
+    abstract VoptUnorderedArrayFold<'a, 'acc> :
+        'a voption Node[] ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        fInverse : ('acc -> 'a -> 'acc) ->
+            Node<'acc voption>
+
+    abstract VoptUnorderedArrayFold'<'a, 'acc> :
+        fullUpdateEveryNUpdates : int ->
+        'a voption Node[] ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        fInverse : ('acc -> 'a -> 'acc) ->
+            Node<'acc voption>
 
     abstract Sum<'a, 'b> :
         fullComputeEveryNChanges : int option ->
-        Node<'a>[] ->
         zero : 'b ->
         add : ('b -> 'a -> 'b) ->
         sub : ('b -> 'a -> 'b) ->
+        Node<'a>[] ->
             Node<'b>
+
+    abstract OptSum<'a, 'b> :
+        fullComputeEveryNChanges : int option ->
+        zero : 'b ->
+        add : ('b -> 'a -> 'b) ->
+        sub : ('b -> 'a -> 'b) ->
+        Node<'a voption>[] ->
+            Node<'b voption>
 
     abstract If<'a> : Node<bool> -> trueCase : Node<'a> -> falseCase : Node<'a> -> Node<'a>
 
 [<RequireQualifiedAccess>]
 module Incremental =
+    /// Create the empty Incremental graph.
     val make : unit -> Incremental

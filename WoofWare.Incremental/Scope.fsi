@@ -2,7 +2,7 @@ namespace WoofWare.Incremental
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 [<RequireQualifiedAccess>]
-module Scope =
+module internal Scope =
     val top : Scope
     val isTop : Scope -> bool
     val height : Scope -> int

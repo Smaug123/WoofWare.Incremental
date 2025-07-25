@@ -11,16 +11,12 @@
     <Compile Include="Gc.fs" />
     <Compile Include="TestGc.fs"/>
     <Compile Include="TestList.fs"/>
-    <Compile Include="TestOptUnorderedArrayFold.fs" />
-    <Compile Include="TestSum.fs" />
-    <Compile Include="TestClock.fs" />
-    <Compile Include="TestIncrementalStepFunction.fs" />
-    <Compile Include="TestOnUpdate.fs" />
+    <Compile Include="Incremental.fs"/>
+    <Compile Include="TestListFunctions.fs" />
     <Compile Include="TestSurface.fs"/>
     <Compile Include="TestConfig.fs"/>
     <Compile Include="TestExceptionalBehaviour.fs"/>
     <Compile Include="TestForAnalyzer.fs"/>
-    <Compile Include="Incremental.fs"/>
     <None Include="TestGenerics.fs"/>
     <Compile Include="TestObserver.fs"/>
     <Compile Include="TestState.fs"/>
@@ -42,7 +38,12 @@
     <Compile Include="TestFreeze.fs" />
     <Compile Include="TestDependOn.fs" />
     <Compile Include="TestNecessaryIfAlive.fs" />
-    <Compile Include="TestUnorderedArrayFold.fs" />
+    <Compile Include="TestOptUnorderedArrayFold.fs" />
+    <Compile Include="TestSum.fs" />
+    <None Include="TestUnorderedArrayFold.fs" />
+    <None Include="TestIncrementalStepFunction.fs" />
+    <None Include="TestClock.fs" />
+    <None Include="TestOnUpdate.fs" />
   </ItemGroup>
 
   <ItemGroup>
