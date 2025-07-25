@@ -211,7 +211,7 @@ WoofWare.Incremental.IClock.get_DefaultTimingWheelConfig [method]: unit -> WoofW
 WoofWare.Incremental.IClock.Snapshot [method]: WoofWare.Incremental.Clock -> 'a WoofWare.Incremental.Node -> System.Int64 -> 'a -> Microsoft.FSharp.Core.FSharpResult<'a WoofWare.Incremental.Node, string>
 WoofWare.Incremental.IExpertIncremental - interface with 1 member(s)
 WoofWare.Incremental.IExpertIncremental.DoOneStepOfStabilize [method]: unit -> WoofWare.Incremental.StepResult
-WoofWare.Incremental.Incremental - interface with 42 member(s)
+WoofWare.Incremental.Incremental - interface with 45 member(s)
 WoofWare.Incremental.Incremental.All [method]: 'a WoofWare.Incremental.Node list -> 'a list WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.AmStabilizing [property]: [read-only] bool
 WoofWare.Incremental.Incremental.Bind [method]: ('a -> 'b WoofWare.Incremental.Node) -> 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node
@@ -229,12 +229,14 @@ WoofWare.Incremental.Incremental.get_AmStabilizing [method]: unit -> bool
 WoofWare.Incremental.Incremental.get_Clock [method]: unit -> WoofWare.Incremental.IClock
 WoofWare.Incremental.Incremental.get_CurrentScope [method]: unit -> WoofWare.Incremental.Scope
 WoofWare.Incremental.Incremental.get_Expert [method]: unit -> WoofWare.Incremental.IExpertIncremental
+WoofWare.Incremental.Incremental.get_MaxHeightAllowed [method]: unit -> int
 WoofWare.Incremental.Incremental.get_State [method]: unit -> WoofWare.Incremental.State
 WoofWare.Incremental.Incremental.get_Var [method]: unit -> WoofWare.Incremental.IVar
 WoofWare.Incremental.Incremental.If [method]: bool WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Join [method]: 'a WoofWare.Incremental.Node WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Map [method]: ('a -> 'b) -> 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Map2 [method]: ('a -> 'b -> 'c) -> 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node -> 'c WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.MaxHeightAllowed [property]: [read-only] int
 WoofWare.Incremental.Incremental.NecessaryIfAlive [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Observe [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Observer
 WoofWare.Incremental.Incremental.Observe' [method]: bool -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Observer
@@ -247,6 +249,7 @@ WoofWare.Incremental.Incremental.Return [method]: 'a -> 'a WoofWare.Incremental.
 WoofWare.Incremental.Incremental.SaveDot [method]: (string -> unit) -> unit
 WoofWare.Incremental.Incremental.SaveDot' [method]: bool -> bool -> (string -> unit) -> unit
 WoofWare.Incremental.Incremental.SetCutoff [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Cutoff -> unit
+WoofWare.Incremental.Incremental.SetMaxHeightAllowed [method]: int -> unit
 WoofWare.Incremental.Incremental.Stabilize [method]: unit -> unit
 WoofWare.Incremental.Incremental.State [property]: [read-only] WoofWare.Incremental.State
 WoofWare.Incremental.Incremental.Sum [method]: int option -> 'b -> ('b -> 'a -> 'b) -> ('b -> 'a -> 'b) -> 'a WoofWare.Incremental.Node [] -> 'b WoofWare.Incremental.Node
