@@ -53,8 +53,8 @@ module TestIncrementalFailures =
 
         i.Var.Set x 0
 
-        expect' {
-            snapshotThrows @"<no exception raised>"
+        expect {
+            snapshotThrows @"System.Exception: adding edge made graph cyclic"
             return! fun () -> i.Stabilize ()
         }
 
@@ -116,7 +116,7 @@ module TestIncrementalFailures =
         I.Var.Set x s
 
         expect {
-            snapshotThrows @"System.Exception: attempt to get value of an invalid node"
+            snapshotThrows @"System.Exception: adding edge made graph cyclic"
             return! fun () -> I.Stabilize ()
         }
 
@@ -137,8 +137,8 @@ module TestIncrementalFailures =
         let o2 = I.Observe s
         fix.Stabilize ()
         // advanceClock throws because the snapshot's valueAt depends on the snapshot itself.
-        expect' {
-            snapshotThrows @"<no exception raised>"
+        expect {
+            snapshotThrows @"System.Exception: adding edge made graph cyclic"
             return! fun () -> I.Clock.AdvanceClock clock (TimeNs.add (Clock.now clock) (TimeNs.Span.ofSec 2.0))
         }
 
@@ -191,8 +191,8 @@ module TestIncrementalFailures =
         I.Var.Set w (I.Const 3)
         I.Var.Set v b
 
-        expect' {
-            snapshotThrows ""
+        expect {
+            snapshotThrows @"System.Exception: adding edge made graph cyclic"
             return! fun () -> I.Stabilize ()
         }
 
@@ -231,7 +231,7 @@ module TestIncrementalFailures =
         I.Var.Set w a
 
         expect {
-            snapshotThrows @"System.Exception: attempt to get value of an invalid node"
+            snapshotThrows @"System.Exception: adding edge made graph cyclic"
             return! fun () -> I.Stabilize ()
         }
 
@@ -253,8 +253,8 @@ module TestIncrementalFailures =
 
         I.Var.Set v false
 
-        expect' {
-            snapshotThrows ""
+        expect {
+            snapshotThrows @"System.Exception: adding edge made graph cyclic"
             return! fun () -> I.Stabilize ()
         }
 

@@ -28,8 +28,6 @@ module Cutoff =
     val physEqual<'a> : 'a Cutoff
     val polyEqual<'a when 'a : equality> : 'a Cutoff
 
-    val internal equal<'a> : 'a Cutoff -> 'a Cutoff -> bool
-
     val shouldCutoff<'a> : 'a Cutoff -> old : 'a -> newValue : 'a -> bool
 
     val internal invariant<'a> : ('a -> unit) -> 'a Cutoff -> unit

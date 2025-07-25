@@ -31,21 +31,6 @@ module Cutoff =
         | Cutoff.Equal f -> f old newValue
         | Cutoff.F f -> f old newValue
 
-    let equal (t1 : 'a Cutoff) (t2 : 'a Cutoff) =
-        match t1, t2 with
-        | Cutoff.Always, Cutoff.Always -> true
-        | Cutoff.Always, _ -> false
-        | Cutoff.Never, Cutoff.Never -> true
-        | Cutoff.Never, _ -> false
-        | Cutoff.PhysEqual, Cutoff.PhysEqual -> true
-        | Cutoff.PhysEqual, _ -> false
-        | Cutoff.Compare f1, Cutoff.Compare f2 -> Type.referenceEqual f1 f2
-        | Cutoff.Compare _, _ -> false
-        | Cutoff.Equal f1, Cutoff.Equal f2 -> Type.referenceEqual f1 f2
-        | Cutoff.Equal _, _ -> false
-        | Cutoff.F f1, F f2 -> Type.referenceEqual f1 f2
-        | Cutoff.F _, _ -> false
-
     let physEqual<'a> = Cutoff<'a>.PhysEqual
 
     let invariant<'a> (_inv : 'a -> unit) (c : 'a Cutoff) =

@@ -144,11 +144,3 @@ module TestCutoff =
             r |> shouldEqual expect
 
         Observer.disallowFutureUse o
-
-    [<Test>]
-    let ``never is never`` () =
-        Cutoff.equal Cutoff.never Cutoff.never<int> |> shouldEqual true
-
-    [<Test>]
-    let ``never isn't always`` () =
-        Cutoff.equal Cutoff.never Cutoff.always<int> |> shouldEqual false

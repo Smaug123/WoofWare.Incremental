@@ -1,7 +1,6 @@
 namespace WoofWare.Incremental
 
 open WoofWare.TimingWheel
-open System
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

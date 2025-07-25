@@ -65,3 +65,5 @@ module Scope =
             }
             |> bind.Apply
             |> FakeUnit.toUnit
+
+    let equal (s1 : Scope) (s2 : Scope) = s1.Equals s2

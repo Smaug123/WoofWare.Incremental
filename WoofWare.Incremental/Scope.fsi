@@ -11,3 +11,5 @@ module Scope =
     val addNode : Scope -> _ Node -> unit
 
     val internal invariant : Scope -> unit
+
+    val internal equal : Scope -> Scope -> bool

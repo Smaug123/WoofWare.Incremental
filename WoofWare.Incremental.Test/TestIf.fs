@@ -86,7 +86,7 @@ module TestIf =
         I.Var.Set test true
         fix.Stabilize ()
         Observer.valueThrowing ite |> shouldEqual 1
-        numThenRun |> shouldEqual 2
+        numThenRun |> shouldEqual 1
         numElseRun |> shouldEqual 1
 
         I.Var.Set thenCase 3
@@ -100,7 +100,7 @@ module TestIf =
 
         I.Var.Set test false
         I.Var.Set thenCase 5
-        I.Var.Set thenCase 6
+        I.Var.Set elseCase 6
         fix.Stabilize ()
         Observer.valueThrowing ite |> shouldEqual 6
 

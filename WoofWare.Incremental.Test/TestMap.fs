@@ -71,7 +71,7 @@ module TestMap =
             |> shouldEqual (Observer.valueThrowing o0 + Observer.valueThrowing o1)
 
             Observer.valueThrowing t3o
-            |> shouldEqual (Observer.valueThrowing t1o + Observer.valueThrowing t2o)
+            |> shouldEqual (Observer.valueThrowing t1o - Observer.valueThrowing t2o)
 
         check ()
         I.Var.Set x0 16

@@ -104,10 +104,10 @@ module internal AdjustHeightsHeap =
                 if height > maxHeightAllowed t then
                     failwith "processing node with higher height than allowed"
 
-                node.HeightInAdjustHeightsHeap <- height
-                t.Length <- t.Length + 1
-                node.NextInAdjustHeightsHeap <- t.NodesByHeight.[height]
-                t.NodesByHeight.[height] <- ValueSome (NodeCrate.make node)
+            node.HeightInAdjustHeightsHeap <- height
+            t.Length <- t.Length + 1
+            node.NextInAdjustHeightsHeap <- t.NodesByHeight.[height]
+            t.NodesByHeight.[height] <- ValueSome (NodeCrate.make node)
 
     let removeMinThrowing (t : AdjustHeightsHeap) : NodeCrate =
         if Debug.globalFlag && isEmpty t then

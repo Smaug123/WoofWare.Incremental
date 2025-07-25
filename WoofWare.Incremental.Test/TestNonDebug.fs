@@ -30,6 +30,7 @@ module TestNonDebug =
     // Debug-enabled incremental allocates a bunch of words during stabilization,
     // so we only run this test for non-debug incremental.
     [<Test>]
+    [<NonParallelizable>]
     let ``Stabilization propagating values through an existing graph should not allocate`` () =
         let I = Incremental.make ()
         let v' = I.Var.Create 0

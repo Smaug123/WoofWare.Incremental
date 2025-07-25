@@ -1,7 +1,5 @@
 ﻿namespace WoofWare.Incremental
 
-open System
-
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Var =

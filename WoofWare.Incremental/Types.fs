@@ -362,9 +362,30 @@ and RunOnUpdateHandlersEval<'ret> =
 and RunOnUpdateHandlers =
     abstract Apply<'ret> : RunOnUpdateHandlersEval<'ret> -> 'ret
 
-and Scope =
+/// `Scope`'s equality instance is a kind of reference equality.
+and [<CustomEquality ; NoComparison>] Scope =
     | Top
     | Bind of BindCrate
+
+    override this.Equals (other : obj) =
+        match other with
+        | :? Scope as other ->
+            match this, other with
+            | Scope.Top, Scope.Top -> true
+            | Scope.Top, Scope.Bind _
+            | Scope.Bind _, Scope.Top -> false
+            | Scope.Bind this, Scope.Bind other ->
+                { new BindEval<_> with
+                    member _.Eval this =
+                        { new BindEval<_> with
+                            member _.Eval other = Type.referenceEqual' this other
+                        }
+                        |> other.Apply
+                }
+                |> this.Apply
+        | _ -> failwith "bad equality comparison"
+
+    override this.GetHashCode () = failwith "Scope is not hashable"
 
 and Snapshot<'a> =
     {

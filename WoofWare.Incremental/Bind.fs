@@ -57,7 +57,7 @@ module Bind =
             (fun node ->
                 { new NodeEval<_> with
                     member _.Eval node =
-                        if not (Type.referenceEqual node.CreatedIn t.RhsScope) then
+                        if not ((node.CreatedIn : Scope).Equals (t.RhsScope : Scope)) then
                             failwith "invariant failed"
 
                         if NodeHelpers.isNecessary node then
@@ -71,7 +71,7 @@ module Bind =
             )
 
         do
-            if not (Type.referenceEqual t.LhsChange.CreatedIn t.Main.CreatedIn) then
+            if not ((t.LhsChange.CreatedIn : Scope).Equals (t.Main.CreatedIn : Scope)) then
                 failwith "invariant failed"
 
             match t.LhsChange.Kind with

@@ -613,7 +613,7 @@ module State =
         match oldChild with
         | ValueNone -> addParent newChild parent childIndex
         | ValueSome oldChild ->
-            if not (Type.referenceEqual oldChild newChild) then
+            if oldChild.Id <> newChild.Id then
                 // We remove [old_child] before adding [new_child], because they share the same child index.
                 Node.removeParent oldChild parent childIndex
                 // We force [old_child] to temporarily be necessary so that [add_parent] can't
