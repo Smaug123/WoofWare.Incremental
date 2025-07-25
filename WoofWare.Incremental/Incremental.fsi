@@ -72,6 +72,16 @@ type Incremental =
     abstract SetCutoff<'a> : 'a Node -> 'a Cutoff -> unit
     abstract AmStabilizing : bool
 
+    abstract Sum<'a, 'b> :
+        fullComputeEveryNChanges : int option ->
+        Node<'a>[] ->
+        zero : 'b ->
+        add : ('b -> 'a -> 'b) ->
+        sub : ('b -> 'a -> 'b) ->
+            Node<'b>
+
+    abstract If<'a> : Node<bool> -> trueCase : Node<'a> -> falseCase : Node<'a> -> Node<'a>
+
 [<RequireQualifiedAccess>]
 module Incremental =
     val make : unit -> Incremental

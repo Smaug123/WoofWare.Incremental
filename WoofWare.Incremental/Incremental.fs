@@ -99,6 +99,16 @@ type Incremental =
     abstract SetCutoff<'a> : 'a Node -> 'a Cutoff -> unit
     abstract AmStabilizing : bool
 
+    abstract Sum<'a, 'b> :
+        fullComputeEveryNChanges : int option ->
+        Node<'a>[] ->
+        zero : 'b ->
+        add : ('b -> 'a -> 'b) ->
+        sub : ('b -> 'a -> 'b) ->
+            Node<'b>
+
+    abstract If<'a> : Node<bool> -> trueCase : Node<'a> -> falseCase : Node<'a> -> Node<'a>
+
 type IncrementalImpl (state : State) =
     let var =
         { new IVar with
@@ -183,6 +193,17 @@ type IncrementalImpl (state : State) =
 
         member this.AmStabilizing = State.amStabilizing state
 
+        member this.Sum<'a, 'b>
+            (fullComputeEveryNChanges : int option)
+            (nodes : Node<'a>[])
+            (zero : 'b)
+            (add : 'b -> 'a -> 'b)
+            (sub : 'b -> 'a -> 'b)
+            : Node<'b>
+            =
+            State.sum state fullComputeEveryNChanges nodes zero add sub
+
+        member this.If cond trueCase falseCase = State.if_ cond trueCase falseCase
 
 [<RequireQualifiedAccess>]
 module Incremental =

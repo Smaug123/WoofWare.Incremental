@@ -16,13 +16,7 @@ module TestSkeleton =
 
         let res =
             n1
-            |> I.Bind (fun n1 ->
-                if n1 % 2 = 0 then
-                    n2
-                    |> I.Map (fun n2 -> n1 * n2)
-                else
-                    n2
-            )
+            |> I.Bind (fun n1 -> if n1 % 2 = 0 then n2 |> I.Map (fun n2 -> n1 * n2) else n2)
 
         let obs = I.Observe res
         I.Stabilize ()
@@ -31,8 +25,10 @@ module TestSkeleton =
         result |> shouldEqual 2
 
         let skeleton = Skeleton.snapshot (Some true) I.State
+
         expect {
-            snapshot @"nodes:
+            snapshot
+                @"nodes:
 {
   id: 4
   kind: BindMain
@@ -66,6 +62,7 @@ module TestSkeleton =
 }
 seen: (1 2 3 4)
 numStabilizes:1"
+
             return skeleton
         }
 
@@ -73,7 +70,8 @@ numStabilizes:1"
         let graphEasy = Skeleton.toDot None (Some RenderTarget.GraphEasy) None None skeleton
 
         expect {
-            snapshot @"  digraph G {
+            snapshot
+                @"  digraph G {
     rankdir = TB
     bgcolor = transparent
 -     n4 [shape=Mrecord label=""{{n4|BindMain|height=2}}""  ""fontname""=""Sans Serif""]
@@ -88,16 +86,14 @@ numStabilizes:1"
     n2 -> n4
     n1 -> n3
   }"
-            return
-                Diff.patience dot graphEasy |> Diff.format
+
+            return Diff.patience dot graphEasy |> Diff.format
         }
 
     [<Test>]
     let ``no binds`` () =
         let I = Incremental.make ()
-        let node =
-            I.Return "hello"
-            |> I.Map (fun x -> x + "!")
+        let node = I.Return "hello" |> I.Map (fun x -> x + "!")
         let result = I.Observe node
         I.Stabilize ()
 
@@ -105,8 +101,10 @@ numStabilizes:1"
         result |> shouldEqual "hello!"
 
         let skeleton = Skeleton.snapshot (Some true) I.State
+
         expect {
-            snapshot @"nodes:
+            snapshot
+                @"nodes:
 {
   id: 2
   kind: Map
@@ -124,24 +122,29 @@ numStabilizes:1"
 }
 seen: (1 2)
 numStabilizes:1"
+
             return skeleton
         }
 
         let dot = Skeleton.toDot None (Some RenderTarget.GraphEasy) None None skeleton
+
         expect {
-            snapshot @"digraph G {
+            snapshot
+                @"digraph G {
   rankdir = TB
   bgcolor = transparent
     n2 [shape=box label=""{{n2|Map|height=1}}"" ]
     n1 [shape=box label=""{{n1|Const|height=0}}"" ]
   n1 -> n2
 }"
+
             return dot
         }
 
-    [<Test; Explicit "requires graph-easy">]
+    [<Test ; Explicit "requires graph-easy">]
     let ``The render from No Binds`` () =
-        let s = """digraph G {
+        let s =
+            """digraph G {
   rankdir = TB
   bgcolor = transparent
     n2 [shape=box label="{{n2|Map|height=1}}" ]
@@ -150,7 +153,8 @@ numStabilizes:1"
 }"""
 
         expect {
-            snapshot @"
+            snapshot
+                @"
 ┌───────────────────────┐
 │ {{n1|Const|height=0}} │
 └───────────────────────┘
@@ -161,12 +165,14 @@ numStabilizes:1"
 │  {{n2|Map|height=1}}  │
 └───────────────────────┘
 "
+
             return Dot.render s
         }
 
     [<Test>]
     let ``with binds`` () =
         let I = Incremental.make ()
+
         let mkIncr i =
             let v = I.Var.Create i
             I.Var.Watch v, v
@@ -176,14 +182,9 @@ numStabilizes:1"
         let c, _ci = mkIncr 4
 
         let node =
-            let isEven =
-                a |> I.Map (fun a -> a % 2 = 0)
+            let isEven = a |> I.Map (fun a -> a % 2 = 0)
 
-            isEven
-            |> I.Bind (fun isEven ->
-                if isEven then I.Return 0 else
-                I.Map2 (*) b c
-            )
+            isEven |> I.Bind (fun isEven -> if isEven then I.Return 0 else I.Map2 (*) b c)
 
         let observer = I.Observe node
         I.Stabilize ()
@@ -192,8 +193,10 @@ numStabilizes:1"
         result |> shouldEqual 0
 
         let skeleton = Skeleton.snapshot (Some true) I.State
+
         expect {
-            snapshot @"nodes:
+            snapshot
+                @"nodes:
 {
   id: 6
   kind: BindMain
@@ -236,6 +239,7 @@ numStabilizes:1"
 }
 seen: (1 4 5 6 7)
 numStabilizes:1"
+
             return skeleton
         }
 
@@ -246,7 +250,8 @@ numStabilizes:1"
         let newSkeleton = Skeleton.snapshot (Some true) I.State
 
         expect' {
-            snapshot @"  nodes:
+            snapshot
+                @"  nodes:
   {
     id: 6
     kind: BindMain
@@ -320,11 +325,12 @@ numStabilizes:1"
 + }
 + seen: (1 2 3 4 5 6 8)
 + numStabilizes:2"
+
             withFormat Diff.format
             return Diff.patience (skeleton.ToString ()) (newSkeleton.ToString ())
         }
 
-(*
+    (*
          (height                      (height
     -     4                      +     5
          ))                           ))
@@ -450,14 +456,13 @@ numStabilizes:1"
     [<Test>]
     let ``unobserved incr graph`` () =
         let I = Incremental.make ()
-        let node =
-            I.Return "hello"
-            |> I.Map (fun x -> x + "!")
+        let node = I.Return "hello" |> I.Map (fun x -> x + "!")
         let result = I.Observe node
         I.Stabilize ()
 
         expect {
-            snapshot @"nodes:
+            snapshot
+                @"nodes:
 {
   id: 2
   kind: Map
@@ -475,6 +480,7 @@ numStabilizes:1"
 }
 seen: (1 2)
 numStabilizes:1"
+
             return Skeleton.snapshot (Some true) I.State
         }
 
@@ -482,9 +488,11 @@ numStabilizes:1"
         I.Stabilize ()
 
         expect {
-            snapshot @"nodes:
+            snapshot
+                @"nodes:
 
 seen: ()
 numStabilizes:2"
+
             return Skeleton.snapshot (Some true) I.State
         }

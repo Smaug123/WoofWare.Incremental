@@ -21,7 +21,11 @@ module NodeToDot =
 
     let renderDot (stableNodeIds : bool) (emitBindEdges : bool) (write : string -> unit) ts =
         let nodeName =
-            if stableNodeIds then fun _ -> "n###" else fun id -> "n" + NodeId.toString id
+            if stableNodeIds then
+                fun _ -> "n###"
+            else
+                fun id -> "n" + NodeId.toString id
+
         write "digraph G {\n"
         write "  rankdir = BT\n"
 

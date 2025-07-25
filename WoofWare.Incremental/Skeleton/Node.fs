@@ -21,6 +21,7 @@ type Node =
     override this.ToString () =
         let children = this.Children |> Seq.map NodeId.toString |> String.concat " "
         let bindChildren = this.BindChildren |> Seq.map NodeId.toString |> String.concat " "
+
         [
             yield "{"
             yield $"  id: %O{this.Id}"

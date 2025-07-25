@@ -17,7 +17,11 @@
     <None Include="TestGenerics.fs"/>
     <Compile Include="TestObserver.fs"/>
     <Compile Include="TestState.fs"/>
+    <Compile Include="TestTheFixture.fs" />
     <Compile Include="TestIncremental.fs"/>
+    <Compile Include="TestBind.fs" />
+    <Compile Include="TestIf.fs" />
+    <Compile Include="TestMap.fs" />
     <Compile Include="TestJoin.fs"/>
     <Compile Include="TestScope.fs"/>
     <Compile Include="TestCutoff.fs"/>

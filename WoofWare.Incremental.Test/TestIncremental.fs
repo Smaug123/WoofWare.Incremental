@@ -1,5 +1,6 @@
 namespace WoofWare.Incremental.Test
 
+open System
 open System.Diagnostics
 open System.Threading
 open System.IO
@@ -14,709 +15,153 @@ module TestIncremental =
 
     [<Test>]
     let ``test 1`` () =
-      let fix = IncrementalFixture.Make ()
-      let I = fix.I
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-      State.invariant I.State
-      let i = 13
-      let t = I.Const i
-      let o = I.Observe t
-      fix.Stabilize ()
-
-      Var.toString t
-      |> shouldEqual (string<int> i)
-      Observer.disallowFutureUse o
-
-    let isInvalid (fix : IncrementalFixture) (t : Node<'a>) =
-        let o = fix.I.Observe t
+        State.invariant I.State
+        let i = 13
+        let t = I.Const i
+        let o = I.Observe t
         fix.Stabilize ()
-        let result = Observer.value o |> Result.isError
+
+        Observer.valueThrowing o |> shouldEqual i
         Observer.disallowFutureUse o
-
-        result
-
-    let isInvalidatedOnBindRhs (fix : IncrementalFixture) (f : int -> Node<'a>) : bool =
-        let x = fix.I.Var.Create 13
-        let r = ref None
-        let o1 =
-            fix.I.Var.Watch x
-            |> fix.I.Bind (fun i ->
-                r.Value <- Some (f i)
-                fix.I.Return ()
-            )
-            |> fix.I.Observe
-        fix.Stabilize ()
-        let t = r.Value.Value
-        let o2 = fix.I.Observe t
-        fix.I.Var.Set x 14
-        fix.Stabilize ()
-        let result = isInvalid fix t
-        Observer.disallowFutureUse o1
-        Observer.disallowFutureUse o2
-        result
-
-    [<Test>]
-    let ``invalid is invalid`` () =
-      let fix = IncrementalFixture.Make ()
-      isInvalid fix fix.Invalid
-      |> shouldEqual true
-
-      fix.Invalid
-      |> NodeHelpers.isValid
-      |> shouldEqual false
 
     [<Test>]
     let ``const is valid`` () =
-      let I = Incremental.make ()
-      I.Const 3
-      |> NodeHelpers.isValid
-      |> shouldEqual true
+        let I = Incremental.make ()
+        I.Const 3 |> NodeHelpers.isValid |> shouldEqual true
 
     [<TestCase true>]
     [<TestCase false>]
     let ``const and return`` (useConst : bool) =
-      let fix = IncrementalFixture.Make ()
-      let I = fix.I
-
-      let i =
-          if useConst then I.Const 13 else I.Return 13
-      Node.isConst i |> shouldEqual true
-      NodeHelpers.isNecessary i |> shouldEqual false
-
-      let o = I.Observe i
-      NodeHelpers.isNecessary i |> shouldEqual false
-
-      fix.Stabilize ()
-
-      NodeHelpers.isNecessary i |> shouldEqual true
-      Observer.valueThrowing o |> shouldEqual 13
-      Node.isConst i |> shouldEqual true
-
-    [<Test>]
-    let ``Test isInvalidatedOnBindRhs`` () =
         let fix = IncrementalFixture.Make ()
-        isInvalidatedOnBindRhs fix (fun _ -> fix.I.Const 13)
-        |> shouldEqual true
+        let I = fix.I
 
+        let i = if useConst then I.Const 13 else I.Return 13
+        Node.isConst i |> shouldEqual true
+        NodeHelpers.isNecessary i |> shouldEqual false
+
+        let o = I.Observe i
+        NodeHelpers.isNecessary i |> shouldEqual false
+
+        fix.Stabilize ()
+
+        NodeHelpers.isNecessary i |> shouldEqual true
+        Observer.valueThrowing o |> shouldEqual 13
+        Node.isConst i |> shouldEqual true
 
     [<Test>]
     let ``not stabilizing by default`` () =
-      let I = Incremental.make ()
-      I.AmStabilizing |> shouldEqual false
+        let I = Incremental.make ()
+        I.AmStabilizing |> shouldEqual false
 
-      let%expect_test _ =
-        let x = Var.create_ [%here] 13 in
-        let o = observe (map (watch x) ~f:(fun _ -> assert (am_stabilizing ()))) in
-        stabilize_ [%here];
-        disallow_future_use o
-      ;;
+    [<Test>]
+    let ``am stabilizing within observation`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let x = I.Var.Create 13
 
-      let test_map n (mapN : int t -> int t) =
-        let o = observe (mapN (const 1)) in
-        stabilize_ [%here];
-        assert (value o = n);
-        let x = Var.create_ [%here] 1 in
-        let o = observe (mapN (watch x)) in
-        stabilize_ [%here];
-        assert (value o = n);
-        Var.set x 0;
-        stabilize_ [%here];
-        assert (value o = 0);
-        Var.set x 2;
-        stabilize_ [%here];
-        assert (value o = 2 * n);
-        assert (is_invalid (mapN invalid));
-        assert (is_invalidated_on_bind_rhs (fun i -> mapN (const i)))
-      ;;
+        let o =
+            I.Var.Watch x
+            |> I.Map (fun _ -> I.AmStabilizing |> shouldEqual true)
+            |> I.Observe
 
-      let%expect_test _ = test_map 1 (fun i -> i >>| fun a1 -> a1)
-      let%expect_test _ = test_map 1 (fun i -> map i ~f:(fun a1 -> a1))
-      let%expect_test _ = test_map 2 (fun i -> map2 i i ~f:(fun a1 a2 -> a1 + a2))
+        fix.Stabilize ()
+        Observer.disallowFutureUse o
 
-      let%expect_test _ =
-        let x0 = Var.create_ [%here] 13 in
-        let o0 = observe (watch x0) in
-        let t1 = map (watch x0) ~f:(fun x -> x + 1) in
-        let t1_o = observe t1 in
-        stabilize_ [%here];
-        assert (value t1_o = value o0 + 1);
-        Var.set x0 14;
-        stabilize_ [%here];
-        assert (value t1_o = value o0 + 1);
-        let x1 = Var.create_ [%here] 15 in
-        let o1 = observe (watch x1) in
-        let t2 = map2 (watch x0) (watch x1) ~f:(fun x y -> x + y) in
-        let t2_o = observe t2 in
-        let t3 = map2 t1 t2 ~f:(fun x y -> x - y) in
-        let t3_o = observe t3 in
-        let check () =
-          stabilize_ [%here];
-          assert (value t1_o = value o0 + 1);
-          assert (value t2_o = value o0 + value o1);
-          assert (value t3_o = value t1_o - value t2_o)
-        in
-        check ();
-        Var.set x0 16;
-        check ();
-        Var.set x1 17;
-        check ();
-        Var.set x0 18;
-        Var.set x1 19;
-        check ()
-      ;;
+    [<Test>]
+    let ``walking chains of maps is not allowed to cross scopes`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-      let%expect_test _ =
-        (* deep *)
-        let rec loop i t =
-          if i = 0 then t else loop (i - 1) (map t ~f:(fun x -> x + 1))
-        in
-        let x0 = Var.create_ [%here] 0 in
-        let n = 100 in
-        let o = observe (loop n (watch x0)) in
-        stabilize_ [%here];
-        assert (value o = n);
-        Var.set x0 1;
-        stabilize_ [%here];
-        assert (value o = n + 1);
-        disallow_future_use o;
-        stabilize_ [%here]
-      ;;
+        let x0 = I.Var.Create 0
+        let x1 = I.Var.Create 1
+        let mutable r = 0
 
-      let bind = bind
-      let ( >>= ) = ( >>= )
-
-      let%expect_test _ =
-        (* [bind] of a constant *)
-        stabilize_ [%here];
-        let o = observe (const 13 >>= const) in
-        stabilize_ [%here];
-        assert (value o = 13)
-      ;;
-
-      let%test _ =
-        is_invalidated_on_bind_rhs (fun i -> bind (const i) ~f:(fun _ -> const i))
-      ;;
-
-      let%expect_test _ =
-        (* bind created with an invalid rhs *)
-        let o = observe (const () >>= fun () -> invalid) in
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid (Observer.observing o)))
-      ;;
-
-      let%expect_test _ =
-        (* bind created with an rhs that becomes invalid *)
-        let b = Var.create true in
-        let o = observe (Var.watch b >>= fun b -> if b then const 13 else invalid) in
-        stabilize_ [%here];
-        Var.set b false;
-        assert (is_valid (Observer.observing o));
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid (Observer.observing o)))
-      ;;
-
-      let%expect_test _ =
-        (* an invalid node created on the rhs of a valid bind, later invalidated *)
-        let x = Var.create_ [%here] 13 in
-        let r = ref None in
-        let o1 =
-          observe
-            (bind (Var.watch x) ~f:(fun _ ->
-               r := Some (map invalid ~f:Fn.id);
-               return ()))
-        in
-        stabilize_ [%here];
-        let o2 = observe (Option.value_exn !r) in
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid (Observer.observing o2)));
-        Var.set x 14;
-        stabilize_ [%here];
-        disallow_future_use o1;
-        disallow_future_use o2
-      ;;
-
-      let%expect_test _ =
-        (* invariants blow up here if we don't make sure that we first make the
-             lhs-change node of binds necessary and only then the rhs necessary. *)
-        let node1 = const () >>= return in
-        let o = observe node1 in
-        stabilize_ [%here];
-        disallow_future_use o;
-        stabilize_ [%here];
-        let o = observe node1 in
-        stabilize_ [%here];
-        disallow_future_use o
-      ;;
-
-      let%expect_test _ =
-        let v1 = Var.create_ [%here] 0 in
-        let i1 = Var.watch v1 in
-        let i2 = i1 >>| fun x -> x + 1 in
-        let i3 = i1 >>| fun x -> x + 2 in
-        let i4 = i2 >>= fun x1 -> i3 >>= fun x2 -> const (x1 + x2) in
-        let o4 = observe i4 in
-        List.iter (List.init 20 ~f:Fn.id) ~f:(fun x ->
-          Gc.full_major ();
-          Var.set v1 x;
-          stabilize_ [%here];
-          assert (Observer.value_exn o4 = (2 * x) + 3))
-      ;;
-
-      let%expect_test _ =
-        (* graph changes only *)
-        let x = Var.create_ [%here] true in
-        let a = const 3 in
-        let b = const 4 in
-        let o = observe (bind (watch x) ~f:(fun bool -> if bool then a else b)) in
-        let check where expect =
-          stabilize_ where;
-          [%test_eq: int] (value o) expect
-        in
-        check [%here] 3;
-        Var.set x false;
-        check [%here] 4;
-        Var.set x true;
-        check [%here] 3
-      ;;
-
-      let%expect_test _ =
-        let x0 = Var.create_ [%here] 13 in
-        let o0 = observe (watch x0) in
-        let x1 = Var.create_ [%here] 15 in
-        let o1 = observe (watch x1) in
-        let x2 = Var.create_ [%here] true in
-        let o2 = observe (watch x2) in
-        let t = bind (watch x2) ~f:(fun b -> if b then watch x0 else watch x1) in
-        let t_o = observe t in
-        let check () =
-          stabilize_ [%here];
-          assert (value t_o = value (if value o2 then o0 else o1))
-        in
-        check ();
-        Var.set x0 17;
-        check ();
-        Var.set x1 19;
-        check ();
-        Var.set x2 false;
-        check ();
-        Var.set x0 21;
-        Var.set x2 true;
-        check ()
-      ;;
-
-      let%expect_test _ =
-        (* walking chains of maps is not allowed to cross scopes *)
-        let x0 = Var.create_ [%here] 0 in
-        let x1 = Var.create_ [%here] 1 in
-        let r = ref 0 in
         let i2 =
-          observe
-            (Var.watch x0
-             >>= fun i ->
-             Var.watch x1
-             >>| fun _ ->
-             incr r;
-             i)
-        in
-        assert (!r = 0);
-        stabilize_ [%here];
-        assert (!r = 1);
-        assert (value i2 = 0);
-        Var.set x0 10;
-        Var.set x1 11;
-        stabilize_ [%here];
-        assert (!r = 2);
-        assert (value i2 = 10)
-      ;;
+            I.Var.Watch x0
+            |> I.Bind (fun i ->
+                I.Var.Watch x1
+                |> I.Map (fun _ ->
+                    Interlocked.Increment &r |> ignore<int>
+                    i
+                )
+            )
+            |> I.Observe
 
-      let%expect_test _ =
-        let v1 = Var.create_ [%here] 0 in
-        let i1 = Var.watch v1 in
-        let o1 = observe i1 in
-        Var.set v1 1;
-        let i2 = i1 >>= fun _ -> i1 in
-        let o2 = observe i2 in
-        stabilize_ [%here];
-        Var.set v1 2;
-        stabilize_ [%here];
-        Gc.keep_alive (i1, i2, o1, o2)
-      ;;
+        r |> shouldEqual 0
+        fix.Stabilize ()
+        r |> shouldEqual 1
+        Observer.valueThrowing i2 |> shouldEqual 0
 
-      let%expect_test _ =
-        (* topological overload many *)
-        let rec copy_true c1 = bind c1 ~f:(fun x -> if x then c1 else copy_false c1)
-        and copy_false c1 = bind c1 ~f:(fun x -> if x then copy_true c1 else c1) in
-        let x1 = Var.create_ [%here] false in
-        let rec loop cur i =
-          if i > 1000 then cur else loop (copy_true (copy_false cur)) (i + 1)
-        in
-        let hold = loop (Var.watch x1) 0 in
-        let rec set_loop at i =
-          if i < 5
-          then (
-            Var.set x1 at;
-            stabilize_ [%here];
-            set_loop (not at) (i + 1))
-        in
-        set_loop true 0;
-        Gc.keep_alive hold
-      ;;
+        I.Var.Set x0 10
+        I.Var.Set x1 11
+        fix.Stabilize ()
+        r |> shouldEqual 2
+        Observer.valueThrowing i2 |> shouldEqual 10
 
-      let%expect_test _ =
-        (* nested var sets *)
-        (* We model a simple ETF that initially consists of 100 shares of IBM and
-             200 shares of microsoft with an implicit divisor of 1. *)
-        (* the last trade prices of two stocks *)
-        let ibm = Var.create_ [%here] 50. in
-        let msft = Var.create_ [%here] 20. in
-        (* .5 shares of IBM, .5 shares of MSFT.  Divisor implicitly 1. *)
-        let cfg = Var.create_ [%here] (0.5, 0.5) in
+    [<Test>]
+    let ``nested var sets`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        // we model a simple ETF that initially consists of 100 shares of IBM and
+        // 200 shares of Microsoft with an implicit divisor of 1
+
+        // the last trade prices of two stocks
+        let ibm = I.Var.Create 50.0
+        let msft = I.Var.Create 20.0
+
+        // .5 shares of IBM, .5 shares of MSFT, divisor implicitly 1
+        let cfg = I.Var.Create (0.5, 0.5)
+
         let nav =
-          observe
-            (bind (Var.watch cfg) ~f:(fun (ibm_mult, msft_mult) ->
-               let x = map (Var.watch ibm) ~f:(fun ibm -> ibm *. ibm_mult) in
-               let y = map (Var.watch msft) ~f:(fun msft -> msft *. msft_mult) in
-               sum [| x; y |] ~zero:0. ~add:( +. ) ~sub:( -. )))
-        in
-        stabilize_ [%here];
-        assert (value nav =. (0.5 *. 50.) +. (0.5 *. 20.));
-        Var.set cfg (0.6, 0.4);
-        stabilize_ [%here];
-        assert (value nav =. (0.6 *. 50.) +. (0.4 *. 20.))
-      ;;
+            I.Var.Watch cfg
+            |> I.Bind (fun (ibmMult, msftMult) ->
+                let x = I.Var.Watch ibm |> I.Map (fun ibm -> ibm * ibmMult)
+                let y = I.Var.Watch msft |> I.Map (fun msft -> msft * msftMult)
+                I.Sum None [| x ; y |] 0.0 (+) (-)
+            )
+            |> I.Observe
 
-      let%expect_test _ =
-        (* adjust heights *)
-        let x = Var.create_ [%here] 0 in
-        let rec chain i = if i = 0 then watch x else chain (i - 1) >>| fun i -> i + 1 in
-        let b = bind (watch x) ~f:chain in
+        fix.Stabilize ()
+        Observer.valueThrowing nav |> shouldEqual ((0.5 * 50.0) + (0.5 * 20.0))
+
+        I.Var.Set cfg (0.6, 0.4)
+        fix.Stabilize ()
+        Observer.valueThrowing nav |> shouldEqual ((0.6 * 50.0) + (0.4 * 20.0))
+
+    [<Test>]
+    let ``adjust heights`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let x = I.Var.Create 0
+
+        let rec chain i =
+            if i = 0 then
+                I.Var.Watch x
+            else
+                chain (i - 1) |> I.Map (fun i -> i + 1)
+
+        let b = I.Var.Watch x |> I.Bind chain
+
         let rec dag i =
-          if i = 0
-          then b
-          else (
-            let t = dag (i - 1) in
-            map2 t t ~f:( + ))
-        in
-        let o = observe (dag 20) in
+            if i = 0 then
+                b
+            else
+                let t = dag (i - 1)
+                I.Map2 (+) t t
+
+        let o = I.Observe (dag 20)
+
         for i = 1 to 10 do
-          Var.set x i;
-          stabilize_ [%here]
-        done;
-        disallow_future_use o
-      ;;
+            I.Var.Set x i
+            fix.Stabilize ()
 
-      let%expect_test _ =
-        (* an invalid unused rhs doesn't invalidate the [bind] *)
-        let r = ref None in
-        let lhs = Var.create_ [%here] 1 in
-        let o1 =
-          observe
-            (bind (watch lhs) ~f:(fun i ->
-               r := Some (const i);
-               return ()))
-        in
-        stabilize_ [%here];
-        let else_ = Option.value_exn !r in
-        let test = Var.create_ [%here] false in
-        let o2 =
-          observe
-            (bind
-               (make_high (watch test))
-               ~f:(fun test -> if test then const 13 else else_))
-        in
-        stabilize_ [%here];
-        Var.set lhs 2;
-        (* invalidates [else_]. *)
-        Var.set test true;
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid else_));
-        assert (value o2 = 13);
-        disallow_future_use o1;
-        disallow_future_use o2
-      ;;
+        Observer.disallowFutureUse o
 
-      let%expect_test _ =
-        (* plugging an invalid node in a bind can invalidate the bind (though
-             not always) *)
-        let x = Var.create 4 in
-        let r = ref (const (-1)) in
-        let o =
-          observe
-            (Var.watch x
-             >>= fun i ->
-             r := const i;
-             const ())
-        in
-        stabilize_ [%here];
-        let escaped = !r in
-        let escaped_o = observe escaped in
-        stabilize_ [%here];
-        assert (Observer.value_exn escaped_o = 4);
-        Var.set x 5;
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid escaped));
-        disallow_future_use o;
-        let o = observe (Var.watch x >>= fun _ -> escaped) in
-        stabilize_ [%here];
-        disallow_future_use o;
-        disallow_future_use escaped_o
-      ;;
-
-      let%expect_test _ =
-        (* changing the rhs from a node to its ancestor, which causes problems if
-             we leave the node with a broken invariant while adding the ancestor. *)
-        let lhs_var = Var.create false in
-        let num_calls = ref 0 in
-        let rhs_var = Var.create 13 in
-        let rhs_false =
-          map (watch rhs_var) ~f:(fun i ->
-            incr num_calls;
-            i + 1)
-        in
-        let rhs_true = map rhs_false ~f:(fun i -> i + 1) in
-        let o =
-          observe (bind (watch lhs_var) ~f:(fun b -> if b then rhs_true else rhs_false))
-        in
-        stabilize_ [%here];
-        [%test_result: int] !num_calls ~expect:1;
-        Var.set lhs_var true;
-        stabilize_ [%here];
-        [%test_result: int] !num_calls ~expect:1;
-        disallow_future_use o;
-        stabilize_ [%here];
-        Var.set rhs_var 14;
-        stabilize_ [%here];
-        [%test_result: int] !num_calls ~expect:1
-      ;;
-
-      let bind2 = bind2
-      let bind3 = bind3
-      let bind4 = bind4
-
-      let%expect_test _ =
-        let v1 = Var.create_ [%here] 1 in
-        let v2 = Var.create_ [%here] 2 in
-        let v3 = Var.create_ [%here] 3 in
-        let v4 = Var.create_ [%here] 4 in
-        let o =
-          observe
-            (bind4 (watch v1) (watch v2) (watch v3) (watch v4) ~f:(fun x1 x2 x3 x4 ->
-               bind3 (watch v2) (watch v3) (watch v4) ~f:(fun y2 y3 y4 ->
-                 bind2 (watch v3) (watch v4) ~f:(fun z3 z4 ->
-                   bind (watch v4) ~f:(fun w4 ->
-                     return (x1 + x2 + x3 + x4 + y2 + y3 + y4 + z3 + z4 + w4))))))
-        in
-        let check where =
-          stabilize_ where;
-          [%test_result: int]
-            (value o)
-            ~expect:
-              (Var.value v1 + (2 * Var.value v2) + (3 * Var.value v3) + (4 * Var.value v4))
-        in
-        check [%here];
-        Var.set v4 5;
-        check [%here];
-        Var.set v3 6;
-        check [%here];
-        Var.set v2 7;
-        check [%here];
-        Var.set v1 8;
-        check [%here];
-        Var.set v1 9;
-        Var.set v2 10;
-        Var.set v3 11;
-        Var.set v4 12;
-        check [%here]
-      ;;
-
-      let if_ = if_
-
-      let%expect_test _ =
-        (* [if_ true] *)
-        let o = observe (if_ (const true) ~then_:(const 13) ~else_:(const 14)) in
-        stabilize_ [%here];
-        assert (value o = 13)
-      ;;
-
-      let%expect_test _ =
-        (* [if_ false] *)
-        let o = observe (if_ (const false) ~then_:(const 13) ~else_:(const 14)) in
-        stabilize_ [%here];
-        assert (value o = 14)
-      ;;
-
-      let%expect_test _ =
-        (* graph changes only *)
-        let x = Var.create_ [%here] true in
-        let o = observe (if_ (watch x) ~then_:(const 3) ~else_:(const 4)) in
-        let check where expect =
-          stabilize_ where;
-          [%test_eq: int] (value o) expect
-        in
-        check [%here] 3;
-        Var.set x false;
-        check [%here] 4;
-        Var.set x true;
-        check [%here] 3;
-        Var.set x false;
-        check [%here] 4
-      ;;
-
-      let%expect_test _ =
-        let test = Var.create_ [%here] true in
-        let then_ = Var.create_ [%here] 1 in
-        let else_ = Var.create_ [%here] 2 in
-        let num_then_run = ref 0 in
-        let num_else_run = ref 0 in
-        let ite =
-          observe
-            (if_
-               (Var.watch test)
-               ~then_:
-                 (Var.watch then_
-                  >>| fun i ->
-                  incr num_then_run;
-                  i)
-               ~else_:
-                 (Var.watch else_
-                  >>| fun i ->
-                  incr num_else_run;
-                  i))
-        in
-        stabilize_ [%here];
-        assert (Observer.value_exn ite = 1);
-        assert (!num_then_run = 1);
-        assert (!num_else_run = 0);
-        Var.set test false;
-        stabilize_ [%here];
-        assert (Observer.value_exn ite = 2);
-        Var.set test true;
-        stabilize_ [%here];
-        assert (Observer.value_exn ite = 1);
-        Var.set then_ 3;
-        Var.set else_ 4;
-        let ntr = !num_then_run in
-        let ner = !num_else_run in
-        stabilize_ [%here];
-        assert (Observer.value_exn ite = 3);
-        assert (!num_then_run = ntr + 1);
-        assert (!num_else_run = ner);
-        Var.set test false;
-        Var.set then_ 5;
-        Var.set else_ 6;
-        stabilize_ [%here];
-        assert (Observer.value_exn ite = 6)
-      ;;
-
-      let%expect_test _ =
-        (* an invalid unused branch doesn't invalidate the [if_] *)
-        let r = ref None in
-        let lhs = Var.create_ [%here] 1 in
-        let o1 =
-          observe
-            (bind (watch lhs) ~f:(fun i ->
-               r := Some (const i);
-               return ()))
-        in
-        stabilize_ [%here];
-        let else_ = Option.value_exn !r in
-        let test = Var.create_ [%here] false in
-        let o2 = observe (if_ (make_high (watch test)) ~then_:(const 13) ~else_) in
-        stabilize_ [%here];
-        Var.set lhs 2;
-        (* invalidates [else_]. *)
-        Var.set test true;
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid else_));
-        assert (value o2 = 13);
-        disallow_future_use o1;
-        disallow_future_use o2
-      ;;
-
-      let%expect_test _ =
-        (* if-then-else created with an invalid test *)
-        let o =
-          observe (if_ (invalid >>| fun _ -> true) ~then_:(const ()) ~else_:(const ()))
-        in
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid (Observer.observing o)))
-      ;;
-
-      let%expect_test _ =
-        (* if-then-else created with an invalid branch *)
-        let o = observe (if_ (const true) ~then_:invalid ~else_:(const 13)) in
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid (Observer.observing o)))
-      ;;
-
-      let%expect_test _ =
-        (* if-then-else switching to an invalid branch *)
-        let b = Var.create false in
-        let o = observe (if_ (Var.watch b) ~then_:invalid ~else_:(const 13)) in
-        stabilize_ [%here];
-        assert (is_valid (Observer.observing o));
-        Var.set b true;
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid (Observer.observing o)))
-      ;;
-
-      let%expect_test _ =
-        (* if-then-else switching to an invalid branch via a map *)
-        let b = Var.create false in
-        let o =
-          observe (if_ (Var.watch b) ~then_:(invalid >>| fun _ -> 13) ~else_:(const 13))
-        in
-        stabilize_ [%here];
-        assert (is_valid (Observer.observing o));
-        Var.set b true;
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid (Observer.observing o)))
-      ;;
-
-      let%expect_test _ =
-        (* if-then-else switching to an invalid test *)
-        let b = Var.create false in
-        let o =
-          observe
-            (if_
-               (if_ (Var.watch b) ~then_:(invalid >>| fun _ -> true) ~else_:(const true))
-               ~then_:(const 13)
-               ~else_:(const 15))
-        in
-        stabilize_ [%here];
-        assert (is_valid (Observer.observing o));
-        Var.set b true;
-        stabilize_ [%here];
-        assert (skip_invalidity_check || not (is_valid (Observer.observing o)))
-      ;;
-
-      let%expect_test _ =
-        (* changing branches from a node to its ancestor, which causes problems if
-             we leave the node with a broken invariant while adding the ancestor. *)
-        let test_var = Var.create false in
-        let num_calls = ref 0 in
-        let branch_var = Var.create 13 in
-        let else_ =
-          map (watch branch_var) ~f:(fun i ->
-            incr num_calls;
-            i + 1)
-        in
-        let then_ = map else_ ~f:(fun i -> i + 1) in
-        let o = observe (if_ (watch test_var) ~then_ ~else_) in
-        stabilize_ [%here];
-        [%test_result: int] !num_calls ~expect:1;
-        Var.set test_var true;
-        stabilize_ [%here];
-        [%test_result: int] !num_calls ~expect:1;
-        disallow_future_use o;
-        stabilize_ [%here];
-        Var.set branch_var 14;
-        stabilize_ [%here];
-        [%test_result: int] !num_calls ~expect:1
-      ;;
-
-      let freeze = freeze
-
+(*
       let%expect_test _ =
         let x = Var.create_ [%here] 13 in
         let f = freeze (Var.watch x) in
@@ -2856,3 +2301,5 @@ module TestIncremental =
       ;;
 
     end :
+
+*)

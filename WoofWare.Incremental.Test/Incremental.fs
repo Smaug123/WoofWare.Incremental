@@ -68,3 +68,33 @@ module Utils =
 
     let inline onObserverUpdateQueue () = onUpdateQueue'<Observer.Update<int>> ()
     let inline onUpdateQueue () = onUpdateQueue'<NodeUpdate<int>> ()
+
+    let isInvalid (fix : IncrementalFixture) (t : Node<'a>) =
+        let o = fix.I.Observe t
+        fix.Stabilize ()
+        let result = Observer.value o |> Result.isError
+        Observer.disallowFutureUse o
+
+        result
+
+    let isInvalidatedOnBindRhs (fix : IncrementalFixture) (f : int -> Node<'a>) : bool =
+        let x = fix.I.Var.Create 13
+        let r = ref None
+
+        let o1 =
+            fix.I.Var.Watch x
+            |> fix.I.Bind (fun i ->
+                r.Value <- Some (f i)
+                fix.I.Return ()
+            )
+            |> fix.I.Observe
+
+        fix.Stabilize ()
+        let t = r.Value.Value
+        let o2 = fix.I.Observe t
+        fix.I.Var.Set x 14
+        fix.Stabilize ()
+        let result = isInvalid fix t
+        Observer.disallowFutureUse o1
+        Observer.disallowFutureUse o2
+        result

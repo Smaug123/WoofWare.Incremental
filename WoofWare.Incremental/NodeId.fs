@@ -5,6 +5,7 @@ open System.Threading
 type NodeId =
     private
     | NodeId of int
+
     override this.ToString () =
         match this with
         | NodeId i -> $"%i{i}"
