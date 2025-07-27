@@ -96,7 +96,7 @@ module TestDependOn =
 
         let v1 = I.Var.Create ()
         let v2 = I.Var.Create 1
-        I.SetCutoff (I.Var.Watch v1) Cutoff.never
+        I.Var.Watch v1 |> I.SetCutoff Cutoff.never
 
         let o = I.Var.Watch v1 |> I.DependOn (I.Var.Watch v2) |> I.Observe
 

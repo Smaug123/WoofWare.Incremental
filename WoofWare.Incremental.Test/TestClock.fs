@@ -464,13 +464,6 @@ module TestClock =
         // 5 snapshots that became freeze, plus the const
         i2 |> shouldEqual (i1 + 6)
 
-    let relativeStepFunction (clock : Clock) (init : 'a) (steps : (int * 'a) list) : StepFunction<'a> =
-        let now = Clock.now clock
-
-        steps
-        |> List.map (fun (after, a) -> TimeNs.add now (TimeNs.Span.ofSec (float<int> after)), a)
-        |> StepFunction.create init
-
     let relativeStepFunctionIncr (I : Incremental) (clock : Clock) (init : 'a) (steps : (int * 'a) list) : Node<'a> =
         steps
         |> List.map (fun (after, a) -> TimeNs.add (Clock.now clock) (TimeNs.Span.ofSec (float<int> after)), a)

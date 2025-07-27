@@ -69,6 +69,7 @@ type IClock =
     abstract WatchNow : Clock -> Node<TimeNs>
     abstract AlarmPrecision : Clock -> TimeNs.Span
     abstract StepFunction : Clock -> init : 'a -> (TimeNs * 'a) list -> Node<'a>
+    abstract IncrementalStepFunction<'a> : Clock -> StepFunction<'a> Node -> 'a Node
 
 type IVar =
     abstract Create<'a> : 'a -> Var<'a>
@@ -100,7 +101,8 @@ type Incremental =
     abstract Expert : IExpertIncremental
     abstract WithinScope : Scope -> (unit -> 'a) -> 'a
     abstract OnUpdate<'a> : 'a Node -> (NodeUpdate<'a> -> unit) -> unit
-    abstract SetCutoff<'a> : 'a Node -> 'a Cutoff -> unit
+    abstract GetCutoff<'a> : 'a Node -> 'a Cutoff
+    abstract SetCutoff<'a> : 'a Cutoff -> 'a Node -> unit
     abstract AmStabilizing : bool
     abstract NecessaryIfAlive<'a> : 'a Node -> 'a Node
     abstract Freeze<'a> : 'a Node -> 'a Node
@@ -175,6 +177,8 @@ type Incremental =
 
     abstract ReduceBalanced<'a, 'b> : ('a -> 'b) -> ('b -> 'b -> 'b) -> Node<'a>[] -> Node<'b> option
 
+    abstract LazyFromFun<'a> : (unit -> 'a) -> 'a Lazy
+
 type IncrementalImpl (state : State) =
     let var =
         { new IVar with
@@ -235,6 +239,9 @@ type IncrementalImpl (state : State) =
                 StepFunction.create init steps
                 |> State.konst (Clock.incrState clock)
                 |> State.incrementalStepFunction clock
+
+            member _.IncrementalStepFunction clock node =
+                State.incrementalStepFunction clock node
         }
 
     interface Incremental with
@@ -258,7 +265,8 @@ type IncrementalImpl (state : State) =
         member this.CurrentScope = state.CurrentScope
         member this.WithinScope scope f = State.withinScope state scope f
         member this.Expert = expert
-        member this.SetCutoff node cutoff = Node.setCutoff node cutoff
+        member this.GetCutoff node = Node.getCutoff node
+        member this.SetCutoff node cutoff = Node.setCutoff cutoff node
 
         member this.SaveDot' stableNodeIds renderBindEdges writeChunk =
             NodeToDot.renderDot stableNodeIds renderBindEdges writeChunk (State.directlyObserved state)
@@ -326,6 +334,8 @@ type IncrementalImpl (state : State) =
 
         member this.SetMaxHeightAllowed h = State.setMaxHeightAllowed state h
         member this.MaxHeightAllowed = State.maxHeightAllowed state
+
+        member this.LazyFromFun f = State.lazyFromFun state f
 
 [<RequireQualifiedAccess>]
 module Incremental =

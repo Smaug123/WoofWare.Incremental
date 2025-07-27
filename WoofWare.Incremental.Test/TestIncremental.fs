@@ -158,59 +158,35 @@ module TestIncremental =
 
         Observer.disallowFutureUse o
 
-(*
-      let get_cutoff = get_cutoff
-      let set_cutoff = set_cutoff
+    [<Test>]
+    let ``test laziness`` () =
+        let I = Incremental.make ()
 
-      let%expect_test _ =
-        let i = Var.watch (Var.create_ [%here] 0) in
-        assert (Cutoff.equal (get_cutoff i) Cutoff.phys_equal);
-        set_cutoff i Cutoff.never;
-        assert (Cutoff.equal (get_cutoff i) Cutoff.never)
-      ;;
+        let mutable r = 0
+        let l = I.LazyFromFun (fun () -> Interlocked.Increment &r |> ignore<int>)
+        r |> shouldEqual 0
+        l.Force ()
+        r |> shouldEqual 1
+        l.Force ()
+        r |> shouldEqual 1
 
-      let%expect_test _ =
-        let a = Var.create_ [%here] 0 in
-        let n = map ~f:Fn.id (watch a) in
-        set_cutoff
-          n
-          (Cutoff.create (fun ~old_value ~new_value -> abs (old_value - new_value) <= 1));
-        let a' = observe n in
-        stabilize_ [%here];
-        assert (value a' = 0);
-        List.iter
-          [ 1, 0; 2, 2; 2, 2 ]
-          ~f:(fun (v, expect) ->
-            Var.set a v;
-            stabilize_ [%here];
-            assert (value a' = expect))
-      ;;
+    [<Test>]
+    let ``nodes created when forcing are in the right scope`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
-      let lazy_from_fun = lazy_from_fun
+        let l = I.LazyFromFun (fun () -> I.Const 13)
+        let x = I.Var.Create 13
+        let o = I.Var.Watch x |> I.Bind (fun _ -> l.Force ()) |> I.Observe
 
-      let%expect_test _ =
-        (* laziness *)
-        let r = ref 0 in
-        let l = lazy_from_fun (fun () -> incr r) in
-        assert (!r = 0);
-        force l;
-        assert (!r = 1);
-        force l;
-        assert (!r = 1)
-      ;;
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 13
 
-      let%expect_test _ =
-        (* nodes created when forcing are in the right scope *)
-        let l = lazy_from_fun (fun () -> const 13) in
-        let x = Var.create_ [%here] 13 in
-        let o = observe (bind (watch x) ~f:(fun _i -> force l)) in
-        stabilize_ [%here];
-        assert (value o = 13);
-        Var.set x 14;
-        stabilize_ [%here];
-        assert (value o = 13)
-      ;;
+        I.Var.Set x 14
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 13
 
+    (*
       let default_hash_table_initial_size = default_hash_table_initial_size
       let memoize_fun = memoize_fun
       let memoize_fun_by_key = memoize_fun_by_key
@@ -360,59 +336,25 @@ module TestIncremental =
           done
       ;;
 
-      let%expect_test _ =
-        (* Deleting a parent from a child in such a way that it is replaced by a
-             second parent, and the two parents have different child_indexes for the
-             child. *)
-        let c1 = const 12 in
-        let c2 = const 12 in
-        let o1 = observe (map2 c1 c2 ~f:( + )) in
-        (* c2 is child 1, o1 is parent 0 *)
-        stabilize_ [%here];
-        let o2 = observe (map c2 ~f:Fn.id) in
-        (* c2 is child 0, o2 is parent 1 *)
-        stabilize_ [%here];
-        Observer.disallow_future_use o1;
-        (* o2 is parent 0, so c2 is child 1 for that index *)
-        stabilize_ [%here];
-        Observer.disallow_future_use o2;
-        stabilize_ [%here]
-      ;;
-
-      let%expect_test _ =
-        (* [bind_lhs_change_should_invalidate_rhs = false] *)
-        if not M.bind_lhs_change_should_invalidate_rhs
-        then (
-          let va = Var.create 0 in
-          let vb = Var.create 0 in
-          let r = ref None in
-          let o1 =
-            observe
-              (bind (watch va) ~f:(fun a ->
-                 let t = map (watch vb) ~f:(fun b -> a + b) in
-                 if a = 0 then r := Some t;
-                 t))
-          in
-          stabilize_ [%here];
-          let o2 = observe (Option.value_exn !r) in
-          Var.set va 1;
-          stabilize_ [%here];
-          [%test_result: int] (Observer.value_exn o2) ~expect:0;
-          Var.set vb 1;
-          stabilize_ [%here];
-          [%test_result: int] (Observer.value_exn o2) ~expect:1;
-          Var.set vb 2;
-          stabilize_ [%here];
-          [%test_result: int] (Observer.value_exn o2) ~expect:2;
-          disallow_future_use o1;
-          stabilize_ [%here];
-          [%test_result: int] (Observer.value_exn o2) ~expect:2;
-          Var.set vb 3;
-          stabilize_ [%here];
-          [%test_result: int] (Observer.value_exn o2) ~expect:3;
-          disallow_future_use o2)
-      ;;
-
-    end :
-
 *)
+
+    [<Test>]
+    let ``replacing a parent with a second parent that has different child_index`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        let c1 = I.Const 12
+        let c2 = I.Const 12
+        let o1 = I.Observe (I.Map2 (+) c1 c2)
+        // c2 is child 1, o1 is parent 0
+        fix.Stabilize ()
+
+        let o2 = I.Observe (I.Map id c2)
+        // c2 is child 0, o2 is parent 1
+        fix.Stabilize ()
+
+        Observer.disallowFutureUse o1
+        // o2 is parent 0, so c2 is child 1 for that index
+        fix.Stabilize ()
+        Observer.disallowFutureUse o2
+        fix.Stabilize ()

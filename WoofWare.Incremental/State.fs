@@ -112,18 +112,18 @@ module internal State =
 
     let amStabilizing (t : State) : bool =
         match t.Status with
-        | Status.Running_on_update_handlers
+        | Status.RunningOnUpdateHandlers
         | Status.Stabilizing -> true
-        | Status.Not_stabilizing -> false
-        | Status.Stabilize_previously_raised raised_exn ->
+        | Status.NotStabilizing -> false
+        | Status.StabilizePreviouslyRaised raised_exn ->
             failwith "TODO: reraise exception: 'cannot call am_stabilizing -- stabilize previously raised'"
 
     let invariant (t : State) : unit =
         match t.Status with
-        | Status.Stabilize_previously_raised _ -> ()
-        | Status.Running_on_update_handlers
+        | Status.StabilizePreviouslyRaised _ -> ()
+        | Status.RunningOnUpdateHandlers
         | Status.Stabilizing
-        | Status.Not_stabilizing ->
+        | Status.NotStabilizing ->
             iterObservers
                 t
                 (fun obs ->
@@ -217,9 +217,9 @@ module internal State =
 
             do
                 match t.Status with
-                | Status.Stabilize_previously_raised _ -> failwith "invariant failed"
-                | Status.Running_on_update_handlers
-                | Status.Not_stabilizing ->
+                | Status.StabilizePreviouslyRaised _ -> failwith "invariant failed"
+                | Status.RunningOnUpdateHandlers
+                | Status.NotStabilizing ->
                     if not (Stack.isEmpty t.SetDuringStabilization) then
                         failwith "invariant failed"
                 | Status.Stabilizing ->
@@ -242,11 +242,11 @@ module internal State =
 
     let ensureNotStabilizing t name allowInUpdateHandler =
         match t.Status with
-        | Status.Not_stabilizing -> ()
-        | Status.Running_on_update_handlers ->
+        | Status.NotStabilizing -> ()
+        | Status.RunningOnUpdateHandlers ->
             if not allowInUpdateHandler then
                 failwith $"cannot %s{name} during on-update handlers"
-        | Status.Stabilize_previously_raised raised ->
+        | Status.StabilizePreviouslyRaised raised ->
             RaisedException.reraiseWithMessage raised $"cannot %s{name} -- stabilize previously raised"
         | Status.Stabilizing -> failwith $"cannot %s{name} during stabilization"
 
@@ -995,9 +995,7 @@ module internal State =
         if Debug.globalFlag then
             invariant t
 
-    let recomputeFirstNodeThatIsNecessary (r : RecomputeHeap) : unit =
-        let node = RecomputeHeap.removeMin r
-
+    let private recomputeEval =
         { new NodeEval<_> with
             member _.Eval node =
                 if Debug.globalFlag && not (Node.needsToBeComputed node) then
@@ -1005,8 +1003,11 @@ module internal State =
 
                 recompute node |> FakeUnit.ofUnit
         }
-        |> node.Apply
-        |> FakeUnit.toUnit
+
+    let recomputeFirstNodeThatIsNecessary (r : RecomputeHeap) : unit =
+        let node = RecomputeHeap.removeMin r
+
+        node.Apply recomputeEval |> FakeUnit.toUnit
 
     let unlinkDisallowedObservers (t : State) : unit =
         while not (Stack.isEmpty t.DisallowedObservers) do
@@ -1034,7 +1035,7 @@ module internal State =
             |> FakeUnit.toUnit
 
     let disallowFutureUse (internalObserver : InternalObserver<'a>) : unit =
-        let t = InternalObserver.incrState internalObserver in
+        let t = InternalObserver.incrState internalObserver
 
         match internalObserver.State with
         | InternalObserverState.Disallowed
@@ -1151,9 +1152,9 @@ module internal State =
         let t = Observer'.incrState observer
 
         match t.Status with
-        | Status.Not_stabilizing
-        | Status.Running_on_update_handlers -> Observer'.valueThrowing observer
-        | Status.Stabilize_previously_raised exn ->
+        | Status.NotStabilizing
+        | Status.RunningOnUpdateHandlers -> Observer'.valueThrowing observer
+        | Status.StabilizePreviouslyRaised exn ->
             RaisedException.reraiseWithMessage exn "Observer.valueThrowing called after stabilize previously raised"
         | Status.Stabilizing -> failwith "Observer.valueThrowing called during stabilization"
 
@@ -1192,9 +1193,9 @@ module internal State =
         let t = Var.incrState var in
 
         match t.Status with
-        | Status.Running_on_update_handlers
-        | Status.Not_stabilizing -> setVarWhileNotStabilizing var value
-        | Status.Stabilize_previously_raised exn ->
+        | Status.RunningOnUpdateHandlers
+        | Status.NotStabilizing -> setVarWhileNotStabilizing var value
+        | Status.StabilizePreviouslyRaised exn ->
             RaisedException.reraiseWithMessage exn "cannot set var -- stabilization previously raised"
         | Status.Stabilizing ->
             if var.ValueSetDuringStabilization.IsNone then
@@ -1274,7 +1275,7 @@ module internal State =
             |> node.Apply
             |> FakeUnit.toUnit
 
-        t.Status <- Status.Running_on_update_handlers
+        t.Status <- Status.RunningOnUpdateHandlers
         let now = t.StabilizationNum
 
         while not (Stack.isEmpty t.RunOnUpdateHandlers) do
@@ -1287,12 +1288,12 @@ module internal State =
             |> rouh.Apply
             |> FakeUnit.toUnit
 
-        t.Status <- Status.Not_stabilizing
+        t.Status <- Status.NotStabilizing
         reclaimSpaceInWeakHashTables t
 
     let raiseDuringStabilization (t : State) (exn : exn) : 'a =
         let raised = RaisedException.create exn in
-        t.Status <- Stabilize_previously_raised raised
+        t.Status <- StabilizePreviouslyRaised raised
         RaisedException.reraise raised
 
     let stabilize (t : State) : unit =
@@ -1312,7 +1313,7 @@ module internal State =
     let doOneStepOfStabilize (t : State) : StepResult =
         try
             match t.Status with
-            | Status.Not_stabilizing ->
+            | Status.NotStabilizing ->
                 stabilizeStart t
                 StepResult.KeepGoing
             | Status.Stabilizing ->
@@ -1324,13 +1325,13 @@ module internal State =
                 else
                     stabilizeEnd t
                     StepResult.Done
-            | Status.Running_on_update_handlers
-            | Status.Stabilize_previously_raised _ ->
+            | Status.RunningOnUpdateHandlers
+            | Status.StabilizePreviouslyRaised _ ->
                 ensureNotStabilizing t "step" false
                 failwith "assert false"
         with exn ->
             (match t.Status with
-             | Status.Stabilize_previously_raised _ ->
+             | Status.StabilizePreviouslyRaised _ ->
                  // If stabilization has already raised, then [exn] is merely a notification of this
                  // fact, rather than the original exception itself.  We should just propagate [exn]
                  // forward; calling [raise_during_stabilization] would store [exn] as the exception
@@ -1882,7 +1883,7 @@ module internal State =
 
         let t =
             {
-                Status = Status.Not_stabilizing
+                Status = Status.NotStabilizing
                 BindLhsChangeShouldInvalidateRhs = true
                 StabilizationNum = StabilizationNum.zero
                 CurrentScope = Scope.top

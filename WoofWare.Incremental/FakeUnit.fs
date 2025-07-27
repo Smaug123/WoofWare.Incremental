@@ -1,5 +1,6 @@
 namespace WoofWare.Incremental
 
+[<Struct>]
 type internal FakeUnit = private | FakeUnit
 
 [<RequireQualifiedAccess>]

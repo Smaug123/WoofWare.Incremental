@@ -97,19 +97,21 @@ module TestBind =
         fix.Stabilize ()
         Observer.disallowFutureUse o
 
-    [<Test ; Explicit "not passing yet">]
+    [<Test>]
     let ``more binds`` () =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
 
         let v1 = I.Var.Create 0
         let i1 = I.Var.Watch v1
-        let i4 = i1 |> I.Bind (fun x1 -> i1 |> I.Bind (fun x2 -> I.Const (x1 + x2)))
+        let i2 = i1 |> I.Map ((+) 1)
+        let i3 = i1 |> I.Map ((+) 2)
+        let i4 = i2 |> I.Bind (fun x1 -> i3 |> I.Bind (fun x2 -> I.Const (x1 + x2)))
         let o4 = I.Observe i4
 
         fix.Stabilize ()
 
-        for x = 0 to 0 do
+        for x = 0 to 19 do
             Gc.collect ()
             I.Var.Set v1 x
             fix.Stabilize ()
