@@ -3,9 +3,9 @@ namespace WoofWare.Incremental
 open System
 open TypeEquality
 
-type internal FoldUpdate<'a, 'b> =
-    | FInverse of ('b -> 'a -> 'b)
-    | Update of ('b -> 'a -> 'a -> 'b)
+type FoldUpdate<'elt, 'acc> =
+    | FInverse of ('acc -> 'elt -> 'acc)
+    | Update of ('acc -> 'elt -> 'elt -> 'acc)
 
 
 [<RequireQualifiedAccess>]

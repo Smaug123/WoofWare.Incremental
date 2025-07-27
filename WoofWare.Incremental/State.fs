@@ -1528,7 +1528,7 @@ module internal State =
     let all (t : State) (ts : Node<'a> list) : Node<'a list> =
         arrayFold t (Array.ofList (List.rev ts)) [] (fun ac a -> a :: ac)
 
-    let internal unorderedArrayFold
+    let internal unorderedArrayFold<'b, 'acc>
         (t : State)
         (fullComputeEveryNChanges : int option)
         (children : Node<'b> array)

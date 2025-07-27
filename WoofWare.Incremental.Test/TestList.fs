@@ -13,4 +13,5 @@ module TestList =
             let expected = List.sort l1 = l1
             actual = expected
 
-        Check.QuickThrowOnFailure property
+        let config = Config.Default.WithQuietOnSuccess (true)
+        Check.One (config, property)

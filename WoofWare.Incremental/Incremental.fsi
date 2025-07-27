@@ -32,6 +32,7 @@ type IClock =
     abstract DefaultTimingWheelConfig : TimingWheelConfig
     abstract Create' : TimingWheelConfig -> TimeNs -> Clock
     abstract Create : TimeNs -> Clock
+    abstract After : Clock -> TimeNs.Span -> Node<BeforeOrAfter>
     abstract At : Clock -> TimeNs -> Node<BeforeOrAfter>
     abstract AtIntervals : Clock -> TimeNs.Span -> Node<unit>
     abstract AdvanceClock : Clock -> TimeNs -> unit
@@ -83,34 +84,47 @@ type Incremental =
     abstract SetMaxHeightAllowed : int -> unit
     abstract MaxHeightAllowed : int
 
+    abstract ArrayFold<'a, 'acc> : init : 'acc -> f : ('acc -> 'a -> 'acc) -> 'a Node[] -> Node<'acc>
+
+    abstract UnorderedArrayFold<'a, 'acc> :
+        init : 'acc -> f : ('acc -> 'a -> 'acc) -> update : FoldUpdate<'a, 'acc> -> 'a Node[] -> Node<'acc>
+
+    abstract UnorderedArrayFold'<'a, 'acc> :
+        fullUpdateEveryNUpdates : int ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        update : FoldUpdate<'a, 'acc> ->
+        'a Node[] ->
+            Node<'acc>
+
     abstract OptUnorderedArrayFold<'a, 'acc> :
-        'a option Node[] ->
         init : 'acc ->
         f : ('acc -> 'a -> 'acc) ->
         fInverse : ('acc -> 'a -> 'acc) ->
+        'a option Node[] ->
             Node<'acc option>
 
     abstract OptUnorderedArrayFold'<'a, 'acc> :
         fullUpdateEveryNUpdates : int ->
-        'a option Node[] ->
         init : 'acc ->
         f : ('acc -> 'a -> 'acc) ->
         fInverse : ('acc -> 'a -> 'acc) ->
+        'a option Node[] ->
             Node<'acc option>
 
     abstract VoptUnorderedArrayFold<'a, 'acc> :
-        'a voption Node[] ->
         init : 'acc ->
         f : ('acc -> 'a -> 'acc) ->
         fInverse : ('acc -> 'a -> 'acc) ->
+        'a voption Node[] ->
             Node<'acc voption>
 
     abstract VoptUnorderedArrayFold'<'a, 'acc> :
         fullUpdateEveryNUpdates : int ->
-        'a voption Node[] ->
         init : 'acc ->
         f : ('acc -> 'a -> 'acc) ->
         fInverse : ('acc -> 'a -> 'acc) ->
+        'a voption Node[] ->
             Node<'acc voption>
 
     abstract Sum<'a, 'b> :
@@ -130,6 +144,8 @@ type Incremental =
             Node<'b voption>
 
     abstract If<'a> : Node<bool> -> trueCase : Node<'a> -> falseCase : Node<'a> -> Node<'a>
+
+    abstract ReduceBalanced<'a, 'b> : f : ('a -> 'b) -> reduce : ('b -> 'b -> 'b) -> Node<'a>[] -> Node<'b> option
 
 [<RequireQualifiedAccess>]
 module Incremental =

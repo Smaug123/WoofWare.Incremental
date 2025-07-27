@@ -61,6 +61,7 @@ type IClock =
     abstract Create' : TimingWheelConfig -> TimeNs -> Clock
     abstract Create : TimeNs -> Clock
     abstract At : Clock -> TimeNs -> Node<BeforeOrAfter>
+    abstract After : Clock -> TimeNs.Span -> Node<BeforeOrAfter>
     abstract AtIntervals : Clock -> TimeNs.Span -> Node<unit>
     abstract AdvanceClock : Clock -> TimeNs -> unit
     abstract AdvanceClockBy : Clock -> TimeNs.Span -> unit
@@ -108,34 +109,47 @@ type Incremental =
     abstract SetMaxHeightAllowed : int -> unit
     abstract MaxHeightAllowed : int
 
+    abstract ArrayFold<'a, 'acc> : init : 'acc -> f : ('acc -> 'a -> 'acc) -> 'a Node[] -> Node<'acc>
+
+    abstract UnorderedArrayFold<'a, 'acc> :
+        init : 'acc -> f : ('acc -> 'a -> 'acc) -> update : FoldUpdate<'a, 'acc> -> 'a Node[] -> Node<'acc>
+
+    abstract UnorderedArrayFold'<'a, 'acc> :
+        fullUpdateEveryNUpdates : int ->
+        init : 'acc ->
+        f : ('acc -> 'a -> 'acc) ->
+        update : FoldUpdate<'a, 'acc> ->
+        'a Node[] ->
+            Node<'acc>
+
     abstract OptUnorderedArrayFold<'a, 'acc> :
-        'a option Node[] ->
         init : 'acc ->
         f : ('acc -> 'a -> 'acc) ->
         fInverse : ('acc -> 'a -> 'acc) ->
+        'a option Node[] ->
             Node<'acc option>
 
     abstract OptUnorderedArrayFold'<'a, 'acc> :
         fullUpdateEveryNUpdates : int ->
-        'a option Node[] ->
         init : 'acc ->
         f : ('acc -> 'a -> 'acc) ->
         fInverse : ('acc -> 'a -> 'acc) ->
+        'a option Node[] ->
             Node<'acc option>
 
     abstract VoptUnorderedArrayFold<'a, 'acc> :
-        'a voption Node[] ->
         init : 'acc ->
         f : ('acc -> 'a -> 'acc) ->
         fInverse : ('acc -> 'a -> 'acc) ->
+        'a voption Node[] ->
             Node<'acc voption>
 
     abstract VoptUnorderedArrayFold'<'a, 'acc> :
         fullUpdateEveryNUpdates : int ->
-        'a voption Node[] ->
         init : 'acc ->
         f : ('acc -> 'a -> 'acc) ->
         fInverse : ('acc -> 'a -> 'acc) ->
+        'a voption Node[] ->
             Node<'acc voption>
 
     abstract Sum<'a, 'b> :
@@ -155,6 +169,8 @@ type Incremental =
             Node<'b voption>
 
     abstract If<'a> : Node<bool> -> trueCase : Node<'a> -> falseCase : Node<'a> -> Node<'a>
+
+    abstract ReduceBalanced<'a, 'b> : ('a -> 'b) -> ('b -> 'b -> 'b) -> Node<'a>[] -> Node<'b> option
 
 type IncrementalImpl (state : State) =
     let var =
@@ -200,6 +216,7 @@ type IncrementalImpl (state : State) =
             member this.At clock time = State.at clock time
             member this.AtIntervals clock time = State.atIntervals clock time
             member this.AdvanceClock clock time = State.advanceClock clock time
+            member this.After clock time = State.after clock time
 
             member this.AdvanceClockBy clock span =
                 State.advanceClock clock (TimeNs.add (Clock.now clock) span)
@@ -271,17 +288,28 @@ type IncrementalImpl (state : State) =
         member this.ForAll nodes = State.forAll state nodes
         member this.Exists nodes = State.exists state nodes
 
-        member this.OptUnorderedArrayFold nodes init f fInverse =
+        member this.OptUnorderedArrayFold init f fInverse nodes =
             State.optUnorderedArrayFold state None nodes init f fInverse
 
-        member this.OptUnorderedArrayFold' updateEvery nodes init f fInverse =
+        member this.OptUnorderedArrayFold' updateEvery init f fInverse nodes =
             State.optUnorderedArrayFold state (Some updateEvery) nodes init f fInverse
 
-        member this.VoptUnorderedArrayFold nodes init f fInverse =
+        member this.VoptUnorderedArrayFold init f fInverse nodes =
             State.voptUnorderedArrayFold state None nodes init f fInverse
 
-        member this.VoptUnorderedArrayFold' updateEvery nodes init f fInverse =
+        member this.VoptUnorderedArrayFold' updateEvery init f fInverse nodes =
             State.voptUnorderedArrayFold state (Some updateEvery) nodes init f fInverse
+
+        member this.UnorderedArrayFold (init : 'acc) (f : 'acc -> 'a -> 'acc) update nodes =
+            State.unorderedArrayFold<'a, 'acc> state None nodes init f update
+
+        member this.UnorderedArrayFold' updateEvery init f update nodes =
+            State.unorderedArrayFold state (Some updateEvery) nodes init f update
+
+        member this.ArrayFold init acc nodes = State.arrayFold state nodes init acc
+
+        member this.ReduceBalanced f reduce nodes =
+            ReduceBalanced.create state nodes f reduce
 
         member this.SetMaxHeightAllowed h = State.setMaxHeightAllowed state h
         member this.MaxHeightAllowed = State.maxHeightAllowed state

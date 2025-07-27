@@ -40,10 +40,12 @@
     <Compile Include="TestNecessaryIfAlive.fs" />
     <Compile Include="TestOptUnorderedArrayFold.fs" />
     <Compile Include="TestSum.fs" />
-    <None Include="TestUnorderedArrayFold.fs" />
+    <Compile Include="TestUnorderedArrayFold.fs" />
     <None Include="TestIncrementalStepFunction.fs" />
     <None Include="TestClock.fs" />
-    <None Include="TestOnUpdate.fs" />
+    <Compile Include="TestArrayFold.fs" />
+    <Compile Include="TestReduceBalanced.fs" />
+    <Compile Include="TestOnUpdate.fs" />
   </ItemGroup>
 
   <ItemGroup>

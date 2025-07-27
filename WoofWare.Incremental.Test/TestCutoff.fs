@@ -8,6 +8,8 @@ open WoofWare.Incremental
 
 [<TestFixture>]
 module TestCutoff =
+    let config = Config.Default.WithQuietOnSuccess (true)
+
     [<Test>]
     let ``test ofCompare`` () =
         let t = Cutoff.ofCompare (fun (a : int) (b : int) -> a.CompareTo b)
@@ -15,12 +17,12 @@ module TestCutoff =
         let property (a : int) =
             Cutoff.shouldCutoff t a a |> shouldEqual true
 
-        Check.QuickThrowOnFailure property
+        Check.One (config, property)
 
         let property (a : int) (b : int) =
             Cutoff.shouldCutoff t a b |> shouldEqual (a = b)
 
-        Check.QuickThrowOnFailure property
+        Check.One (config, property)
 
     [<Test>]
     let ``test equal`` () =
@@ -29,12 +31,12 @@ module TestCutoff =
         let property (a : int) =
             Cutoff.shouldCutoff t a a |> shouldEqual true
 
-        Check.QuickThrowOnFailure property
+        Check.One (config, property)
 
         let property (a : int) (b : int) =
             Cutoff.shouldCutoff t a b |> shouldEqual (a = b)
 
-        Check.QuickThrowOnFailure property
+        Check.One (config, property)
 
     [<Test>]
     let ``test always`` () =

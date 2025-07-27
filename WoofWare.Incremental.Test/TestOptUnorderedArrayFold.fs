@@ -13,8 +13,8 @@ module TestOptUnorderedArrayFold =
         let I = fix.I
 
         let o =
-            I.OptUnorderedArrayFold<int, _>
-                [||]
+            [||]
+            |> I.OptUnorderedArrayFold<int, _>
                 ()
                 (fun _ -> failwith "should not call")
                 (fun _ -> failwith "should not call")
@@ -32,7 +32,8 @@ module TestOptUnorderedArrayFold =
         let y = I.Var.Create None
 
         let t =
-            I.OptUnorderedArrayFold [| I.Var.Watch x ; I.Var.Watch y |] 0 (+) (-)
+            [| I.Var.Watch x ; I.Var.Watch y |]
+            |> I.OptUnorderedArrayFold 0 (+) (-)
             |> I.Observe
 
         let check expect =
