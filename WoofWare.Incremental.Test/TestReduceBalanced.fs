@@ -151,6 +151,9 @@ module TestReduceBalanced =
                 }
         }
 
+    let arb (I : Incremental) =
+        Arb.fromGen (gen ArbMap.defaults I |> Gen.listOf)
+
     open System.Numerics
 
     let ceilLog2 (n : int) : int =
@@ -166,99 +169,114 @@ module TestReduceBalanced =
             else
                 int floorLog2 + 1 // n is not a power of 2
 
+    let property (fix : IncrementalFixture) testValues =
+        let I = fix.I
+
+        let arr =
+            testValues
+            |> List.map (fun testValue -> I.Var.Watch testValue.Var)
+            |> Array.ofList
+
+        let len = Array.length arr
+        let mutable reduceCount = 0
+        let mutable foldCount = 0
+        let mutable updateCount = 0
+
+        let assertExpectedAndReset () =
+            if updateCount <> 0 then
+                foldCount |> shouldEqual 0
+                reduceCount |> shouldEqual 0
+            else
+                foldCount |> shouldEqual len
+
+                if reduceCount > min (len - 1) (ceilLog2 len * updateCount) then
+                    failwith "assertion failed"
+
+            foldCount <- 0
+            reduceCount <- 0
+            updateCount <- 0
+
+        let reduceF =
+            arr
+            |> I.ReduceBalanced
+                id
+                (fun a b ->
+                    Interlocked.Increment &reduceCount |> ignore<int>
+                    a * b
+                )
+            |> Option.get
+
+        let foldF =
+            arr
+            |> I.ArrayFold
+                1
+                (fun a b ->
+                    Interlocked.Increment &foldCount |> ignore<int>
+                    a * b
+                )
+
+        updateCount <- len
+        let reduceO = I.Observe reduceF
+        let foldO = I.Observe foldF
+        fix.Stabilize ()
+
+        Observer.valueThrowing foldO |> shouldEqual (Observer.valueThrowing reduceO)
+        assertExpectedAndReset ()
+
+        for testValue in testValues do
+            testValue.Update1
+            |> Option.iter (fun a ->
+                I.Var.Set testValue.Var a
+                Interlocked.Increment &updateCount |> ignore<int>
+            )
+
+        fix.Stabilize ()
+        Observer.valueThrowing foldO |> shouldEqual (Observer.valueThrowing reduceO)
+
+        assertExpectedAndReset ()
+
+        for testValue in testValues do
+            let mutable updated = false
+
+            testValue.Update2
+            |> Option.iter (fun a ->
+                I.Var.Set testValue.Var a
+                updated <- true
+            )
+
+            testValue.Update3
+            |> Option.iter (fun a ->
+                I.Var.Set testValue.Var a
+                updated <- true
+            )
+
+            if updated then
+                Interlocked.Increment &updateCount |> ignore<int>
+
+        fix.Stabilize ()
+        Observer.valueThrowing foldO |> shouldEqual (Observer.valueThrowing reduceO)
+        assertExpectedAndReset ()
+
     [<Test>]
     let ``general creation and updating`` () =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
 
-        let property testValues =
-            let arr =
-                testValues
-                |> List.map (fun testValue -> I.Var.Watch testValue.Var)
-                |> Array.ofList
+        let config = Config.Default.WithQuietOnSuccess true
 
-            let len = Array.length arr
-            let mutable reduceCount = 0
-            let mutable foldCount = 0
-            let mutable updateCount = 0
+        (property fix)
+        |> Prop.forAll (arb I)
+        |> fun property -> Check.One (config, property)
 
-            let assertExpectedAndReset () =
-                if updateCount <> 0 then
-                    foldCount |> shouldEqual 0
-                    reduceCount |> shouldEqual 0
-                else
-                    foldCount |> shouldEqual len
+    let replays =
+        [ 11695027613933141854UL, 12778457246669182719UL ] |> List.map TestCaseData
 
-                    if reduceCount > min (len - 1) (ceilLog2 len * updateCount) then
-                        failwith "assertion failed"
+    [<TestCaseSource(nameof replays)>]
+    let ``reproductions of past failures`` (seed : uint64, gamma : uint64) =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let config = Config.Default.WithQuietOnSuccess(true).WithReplay (seed, gamma)
 
-                foldCount <- 0
-                reduceCount <- 0
-                updateCount <- 0
-
-            let reduceF =
-                arr
-                |> I.ReduceBalanced
-                    id
-                    (fun a b ->
-                        Interlocked.Increment &reduceCount |> ignore<int>
-                        a * b
-                    )
-                |> Option.get
-
-            let foldF =
-                arr
-                |> I.ArrayFold
-                    1
-                    (fun a b ->
-                        Interlocked.Increment &foldCount |> ignore<int>
-                        a * b
-                    )
-
-            updateCount <- len
-            let reduceO = I.Observe reduceF
-            let foldO = I.Observe foldF
-            fix.Stabilize ()
-
-            Observer.valueThrowing foldO |> shouldEqual (Observer.valueThrowing reduceO)
-            assertExpectedAndReset ()
-
-            for testValue in testValues do
-                testValue.Update1
-                |> Option.iter (fun a ->
-                    I.Var.Set testValue.Var a
-                    Interlocked.Increment &updateCount |> ignore<int>
-                )
-
-            fix.Stabilize ()
-            Observer.valueThrowing foldO |> shouldEqual (Observer.valueThrowing reduceO)
-
-            assertExpectedAndReset ()
-
-            for testValue in testValues do
-                let mutable updated = false
-
-                testValue.Update2
-                |> Option.iter (fun a ->
-                    I.Var.Set testValue.Var a
-                    updated <- true
-                )
-
-                testValue.Update3
-                |> Option.iter (fun a ->
-                    I.Var.Set testValue.Var a
-                    updated <- true
-                )
-
-                if updated then
-                    Interlocked.Increment &updateCount |> ignore<int>
-
-            fix.Stabilize ()
-            Observer.valueThrowing foldO |> shouldEqual (Observer.valueThrowing reduceO)
-            assertExpectedAndReset ()
-
-        let config = Config.Default.WithQuietOnSuccess (true)
-
-        property
-        |> Prop.forAll (Arb.fromGen (gen ArbMap.defaults I |> Gen.listOf))
+        (property fix)
+        |> Prop.forAll (arb I)
         |> fun property -> Check.One (config, property)
