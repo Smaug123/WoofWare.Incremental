@@ -14,7 +14,7 @@ module TestArrayFold =
         let o = [||] |> I.ArrayFold 13 (fun _ () -> failwith "should not call") |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
     [<Test>]
     let ``another test`` () =
@@ -31,7 +31,7 @@ module TestArrayFold =
 
         let check expect =
             fix.Stabilize ()
-            Observer.valueThrowing o |> shouldEqual expect
+            Observer.value o |> shouldEqual expect
 
         check [ 13 ; 14 ]
         I.Var.Set x 15

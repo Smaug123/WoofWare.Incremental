@@ -38,9 +38,9 @@ module Observer =
 
     let observing<'a> (Observer o : 'a Observer) = InternalObserver.observing o.Value
 
-    let value (Observer o) = State.observerValue o
+    let value' (Observer o) = State.observerValue o
 
-    let valueThrowing (Observer o) = State.observerValueThrowing o
+    let value (Observer o) = State.observerValueThrowing o
 
     let onUpdateThrowing (Observer a) (f : Update<'a> -> unit) =
         fun x ->

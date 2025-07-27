@@ -72,7 +72,7 @@ module Utils =
     let isInvalid (fix : IncrementalFixture) (t : Node<'a>) =
         let o = fix.I.Observe t
         fix.Stabilize ()
-        let result = Observer.value o |> Result.isError
+        let result = Observer.value' o |> Result.isError
         Observer.disallowFutureUse o
 
         result

@@ -20,16 +20,16 @@ module TestClock =
 
         fix.Stabilize ()
         let beforeAdvance = Clock.now clock
-        Observer.valueThrowing w |> shouldEqual beforeAdvance
+        Observer.value w |> shouldEqual beforeAdvance
         let to_ = TimeNs.add beforeAdvance (TimeNs.Span.ofSec 1.0)
         I.Clock.AdvanceClock clock to_
 
         Clock.now clock |> shouldEqual to_
         // but we haven't yet stabilized...
-        Observer.valueThrowing w |> shouldEqual beforeAdvance
+        Observer.value w |> shouldEqual beforeAdvance
 
         fix.Stabilize ()
-        Observer.valueThrowing w |> shouldEqual to_
+        Observer.value w |> shouldEqual to_
 
     [<Test>]
     let ``advanceClock backwards`` () =
@@ -44,7 +44,7 @@ module TestClock =
 
             TimeNs.display (Clock.now clock)
             + "\n"
-            + TimeNs.display (Observer.valueThrowing o)
+            + TimeNs.display (Observer.value o)
 
         expect {
             snapshot
@@ -75,7 +75,7 @@ module TestClock =
         }
 
     let is<'a when 'a : equality> (observer : Observer<'a>) (v : 'a) =
-        Observer.valueThrowing observer = v |> shouldEqual true
+        Observer.value observer = v |> shouldEqual true
 
     [<Test>]
     let ``test 2`` () =
@@ -87,7 +87,7 @@ module TestClock =
 
         let show (expected : BeforeOrAfter) =
             fix.Stabilize ()
-            Observer.valueThrowing o |> shouldEqual expected
+            Observer.value o |> shouldEqual expected
 
         show BeforeOrAfter.Before
         I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 1.0)
@@ -368,12 +368,12 @@ module TestClock =
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
         fix.Stabilize ()
         I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 2.0)
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 14
+        Observer.value o |> shouldEqual 14
 
     [<Test>]
     let ``at in the future, unobserved`` () =
@@ -394,7 +394,7 @@ module TestClock =
         I.Var.Set x 19
         let o = I.Observe i
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 17
+        Observer.value o |> shouldEqual 17
 
     [<Test>]
     let ``advanceClock past at prior to stabilization`` () =
@@ -409,7 +409,7 @@ module TestClock =
 
         I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 2.0)
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 15
+        Observer.value o |> shouldEqual 15
 
     [<Test>]
     let ``unobserved, advanceClock past at prior to stabilization`` () =
@@ -428,7 +428,7 @@ module TestClock =
         I.Var.Set x 17
         let o = I.Observe i
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
     [<Test>]
     let ``test invalidated`` () =
@@ -442,7 +442,7 @@ module TestClock =
 
         let o = I.Observe t
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
         I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 2.0)
         fix.Stabilize ()
         NodeHelpers.isValid t |> shouldEqual false
@@ -505,7 +505,7 @@ module TestClock =
         let o = I.Observe i
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
         Observer.disallowFutureUse o
 

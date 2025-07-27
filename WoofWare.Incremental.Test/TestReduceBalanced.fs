@@ -28,7 +28,7 @@ module TestReduceBalanced =
 
         let o = I.Observe f
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 1
+        Observer.value o |> shouldEqual 1
 
     [<Test>]
     let ``non-commutative function`` () =
@@ -53,12 +53,12 @@ module TestReduceBalanced =
         let o = I.Observe f
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual "abcdefg"
+        Observer.value o |> shouldEqual "abcdefg"
         reduceCalls |> shouldEqual 6
 
         I.Var.Set list.[0] "z"
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual "zbcdefg"
+        Observer.value o |> shouldEqual "zbcdefg"
         reduceCalls |> shouldEqual 9
 
     [<Test>]
@@ -69,7 +69,7 @@ module TestReduceBalanced =
         let observeStabilizeDisallow node =
             let o = I.Observe node
             fix.Stabilize ()
-            let v = Observer.valueThrowing o
+            let v = Observer.value o
             Observer.disallowFutureUse o
             v
 
@@ -106,13 +106,13 @@ module TestReduceBalanced =
         let o2 = I.Observe f2
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 2
-        Observer.valueThrowing o2 |> shouldEqual 3
+        Observer.value o |> shouldEqual 2
+        Observer.value o2 |> shouldEqual 3
 
         I.Var.Set x 3
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 6
-        Observer.valueThrowing o2 |> shouldEqual 9
+        Observer.value o |> shouldEqual 6
+        Observer.value o2 |> shouldEqual 9
 
         Observer.disallowFutureUse o
         Observer.disallowFutureUse o2
@@ -121,8 +121,8 @@ module TestReduceBalanced =
         let o = I.Observe f
         let o2 = I.Observe f2
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 8
-        Observer.valueThrowing o2 |> shouldEqual 12
+        Observer.value o |> shouldEqual 8
+        Observer.value o2 |> shouldEqual 12
 
     type TestValue =
         {
@@ -220,7 +220,7 @@ module TestReduceBalanced =
         let foldO = I.Observe foldF
         fix.Stabilize ()
 
-        Observer.valueThrowing foldO |> shouldEqual (Observer.valueThrowing reduceO)
+        Observer.value foldO |> shouldEqual (Observer.value reduceO)
         assertExpectedAndReset ()
 
         for testValue in testValues do
@@ -231,7 +231,7 @@ module TestReduceBalanced =
             )
 
         fix.Stabilize ()
-        Observer.valueThrowing foldO |> shouldEqual (Observer.valueThrowing reduceO)
+        Observer.value foldO |> shouldEqual (Observer.value reduceO)
 
         assertExpectedAndReset ()
 
@@ -254,7 +254,7 @@ module TestReduceBalanced =
                 Interlocked.Increment &updateCount |> ignore<int>
 
         fix.Stabilize ()
-        Observer.valueThrowing foldO |> shouldEqual (Observer.valueThrowing reduceO)
+        Observer.value foldO |> shouldEqual (Observer.value reduceO)
         assertExpectedAndReset ()
 
     [<Test>]

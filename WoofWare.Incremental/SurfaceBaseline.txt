@@ -370,8 +370,8 @@ WoofWare.Incremental.Observer.observing [static method]: 'a WoofWare.Incremental
 WoofWare.Incremental.Observer.onUpdateThrowing [static method]: 'a WoofWare.Incremental.Observer -> ('a WoofWare.Incremental.Observer+Update -> unit) -> unit
 WoofWare.Incremental.Observer.toString [static method]: 'a WoofWare.Incremental.Observer -> string
 WoofWare.Incremental.Observer.useIsAllowed [static method]: 'a WoofWare.Incremental.Observer -> bool
-WoofWare.Incremental.Observer.value [static method]: 'a WoofWare.Incremental.Observer -> Microsoft.FSharp.Core.FSharpResult<'a, System.Exception>
-WoofWare.Incremental.Observer.valueThrowing [static method]: 'a WoofWare.Incremental.Observer -> 'a
+WoofWare.Incremental.Observer.value [static method]: 'a WoofWare.Incremental.Observer -> 'a
+WoofWare.Incremental.Observer.value' [static method]: 'a WoofWare.Incremental.Observer -> Microsoft.FSharp.Core.FSharpResult<'a, System.Exception>
 WoofWare.Incremental.Observer`1 inherit obj
 WoofWare.Incremental.OnUpdateHandler inherit obj
 WoofWare.Incremental.OnUpdateHandler.create [static method]: ('a WoofWare.Incremental.NodeUpdate -> unit) -> int -> 'a WoofWare.Incremental.OnUpdateHandler

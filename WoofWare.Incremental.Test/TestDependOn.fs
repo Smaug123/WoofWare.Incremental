@@ -36,7 +36,7 @@ module TestDependOn =
 
         let check (eo : int) (enx : int) (eny : int) =
             fix.Stabilize ()
-            Observer.valueThrowing o |> shouldEqual eo
+            Observer.value o |> shouldEqual eo
             nx.Value |> shouldEqual enx
             ny.Value |> shouldEqual eny
 
@@ -66,7 +66,7 @@ module TestDependOn =
 
         Observer.onUpdateThrowing o (incrO nx)
         check 4 4
-        Observer.valueThrowing o |> shouldEqual 19
+        Observer.value o |> shouldEqual 19
 
     [<Test>]
     let ``propagating the dependOn while the result of dependOn is not observable`` () =
@@ -78,16 +78,16 @@ module TestDependOn =
 
         let o = I.Observe depend
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 1
+        Observer.value o |> shouldEqual 1
         Observer.disallowFutureUse o
         let o = I.Observe (I.Var.Watch var)
         I.Var.Set var 2
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 2
+        Observer.value o |> shouldEqual 2
         Observer.disallowFutureUse o
         let o = I.Observe depend
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 2
+        Observer.value o |> shouldEqual 2
 
     [<Test>]
     let ``dependOn doesn't cut off using physEqual`` () =

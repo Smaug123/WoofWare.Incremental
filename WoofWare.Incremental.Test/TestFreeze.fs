@@ -18,27 +18,27 @@ module TestFreeze =
         Node.isConst f |> shouldEqual false
 
         fix.Stabilize ()
-        Observer.valueThrowing y |> shouldEqual 13
+        Observer.value y |> shouldEqual 13
         Node.isConst f |> shouldEqual true
 
         let u = I.Var.Create 1
         let z = I.Var.Watch u |> I.Bind (fun _ -> I.Freeze (I.Var.Watch x)) |> I.Observe
         fix.Stabilize ()
 
-        Observer.valueThrowing z |> shouldEqual 13
+        Observer.value z |> shouldEqual 13
         I.Var.Set u 2
         I.Var.Set x 14
 
         fix.Stabilize ()
-        Observer.valueThrowing z |> shouldEqual 14
+        Observer.value z |> shouldEqual 14
 
         I.Var.Set x 15
         fix.Stabilize ()
-        Observer.valueThrowing z |> shouldEqual 14
+        Observer.value z |> shouldEqual 14
 
         I.Var.Set u 3
         fix.Stabilize ()
-        Observer.valueThrowing z |> shouldEqual 15
+        Observer.value z |> shouldEqual 15
 
 (*
       let%expect_test _ =

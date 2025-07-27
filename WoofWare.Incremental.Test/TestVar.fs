@@ -17,7 +17,7 @@ module TestVar =
         let o = I.Observe (I.Var.Watch x)
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual 0
+        Observer.value o |> shouldEqual 0
 
     [<Test>]
     let ``observe a set var after stabilization`` () =
@@ -29,7 +29,7 @@ module TestVar =
         fix.Stabilize ()
         let o = I.Observe (I.Var.Watch x)
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 1
+        Observer.value o |> shouldEqual 1
 
     [<Test>]
     let ``observe a replace var after stabilization`` () =
@@ -43,7 +43,7 @@ module TestVar =
         let o = I.Observe (I.Var.Watch x)
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual 1
+        Observer.value o |> shouldEqual 1
 
     [<Test>]
     let ``observing and setting var after stabilization`` () =
@@ -55,7 +55,7 @@ module TestVar =
         let o = I.Observe (I.Var.Watch x)
         I.Var.Set x 1
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 1
+        Observer.value o |> shouldEqual 1
 
     [<Test>]
     let ``set without stabilizing`` () =
@@ -68,12 +68,12 @@ module TestVar =
 
         let o = I.Observe (I.Var.Watch x)
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
         I.Var.Set x 14
 
         I.Var.Value x |> shouldEqual 14
         I.Var.LatestValue x |> shouldEqual 14
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
     [<Test>]
     let ``set during stabilization`` () =
@@ -107,9 +107,9 @@ module TestVar =
             I.Var.Value v2 |> shouldEqual i2
 
         let obsVals i0 i1 i2 =
-            Observer.valueThrowing o0 |> shouldEqual i0
-            Observer.valueThrowing o1 |> shouldEqual i1
-            Observer.valueThrowing o2 |> shouldEqual i2
+            Observer.value o0 |> shouldEqual i0
+            Observer.value o1 |> shouldEqual i1
+            Observer.value o2 |> shouldEqual i2
 
         varVals 0 1 2
         fix.Stabilize ()
@@ -148,7 +148,7 @@ module TestVar =
         fix.Stabilize ()
         I.Var.Value x |> shouldEqual 2
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 2
+        Observer.value o |> shouldEqual 2
         Observer.disallowFutureUse o
 
     [<Test>]
@@ -177,10 +177,10 @@ module TestVar =
         fix.Stabilize ()
 
         I.Var.Value x |> shouldEqual 3
-        Observer.valueThrowing o |> shouldEqual 0
+        Observer.value o |> shouldEqual 0
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 3
+        Observer.value o |> shouldEqual 3
 
         Observer.disallowFutureUse o
 
@@ -198,7 +198,7 @@ module TestVar =
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
     [<Test>]
     let ``create and set during stabilization`` () =
@@ -216,9 +216,9 @@ module TestVar =
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 15
+        Observer.value o |> shouldEqual 15
 
     [<TestCase false>]
     [<TestCase true>]
@@ -244,4 +244,4 @@ module TestVar =
         fix.Stabilize ()
 
         not (NodeHelpers.isValid rhs) |> shouldEqual useCurrentScope
-        Observer.valueThrowing o |> shouldEqual 1
+        Observer.value o |> shouldEqual 1

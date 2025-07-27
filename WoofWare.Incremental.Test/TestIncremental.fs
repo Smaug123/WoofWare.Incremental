@@ -1,9 +1,6 @@
 namespace WoofWare.Incremental.Test
 
-open System
-open System.Diagnostics
 open System.Threading
-open System.IO
 open NUnit.Framework
 open WoofWare.Incremental
 open WoofWare.TimingWheel
@@ -24,7 +21,7 @@ module TestIncremental =
         let o = I.Observe t
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual i
+        Observer.value o |> shouldEqual i
         Observer.disallowFutureUse o
 
     [<Test>]
@@ -48,7 +45,7 @@ module TestIncremental =
         fix.Stabilize ()
 
         NodeHelpers.isNecessary i |> shouldEqual true
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
         Node.isConst i |> shouldEqual true
 
     [<Test>]
@@ -93,13 +90,13 @@ module TestIncremental =
         r |> shouldEqual 0
         fix.Stabilize ()
         r |> shouldEqual 1
-        Observer.valueThrowing i2 |> shouldEqual 0
+        Observer.value i2 |> shouldEqual 0
 
         I.Var.Set x0 10
         I.Var.Set x1 11
         fix.Stabilize ()
         r |> shouldEqual 2
-        Observer.valueThrowing i2 |> shouldEqual 10
+        Observer.value i2 |> shouldEqual 10
 
     [<Test>]
     let ``nested var sets`` () =
@@ -125,11 +122,11 @@ module TestIncremental =
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing nav |> shouldEqual ((0.5 * 50.0) + (0.5 * 20.0))
+        Observer.value nav |> shouldEqual ((0.5 * 50.0) + (0.5 * 20.0))
 
         I.Var.Set cfg (0.6, 0.4)
         fix.Stabilize ()
-        Observer.valueThrowing nav |> shouldEqual ((0.6 * 50.0) + (0.4 * 20.0))
+        Observer.value nav |> shouldEqual ((0.6 * 50.0) + (0.4 * 20.0))
 
     [<Test>]
     let ``adjust heights`` () =

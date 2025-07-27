@@ -21,7 +21,7 @@ module TestOptUnorderedArrayFold =
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing(o).IsSome |> shouldEqual true
+        Observer.value(o).IsSome |> shouldEqual true
 
     [<Test>]
     let ``non-empty arr`` () =
@@ -38,7 +38,7 @@ module TestOptUnorderedArrayFold =
 
         let check expect =
             fix.Stabilize ()
-            Observer.valueThrowing t |> shouldEqual expect
+            Observer.value t |> shouldEqual expect
 
         check None
         I.Var.Set x (Some 13)

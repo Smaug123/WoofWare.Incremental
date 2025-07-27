@@ -22,7 +22,7 @@ module TestUnorderedArrayFold =
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
     [<Test>]
     let ``unnecessary unorderedArrayFold isn't computed`` () =
@@ -45,23 +45,23 @@ module TestUnorderedArrayFold =
         let r = I.Observe fold
 
         fix.Stabilize ()
-        Observer.valueThrowing r |> shouldEqual 1
+        Observer.value r |> shouldEqual 1
         numFInverse |> shouldEqual 0
 
         I.Var.Set x 2
         fix.Stabilize ()
-        Observer.valueThrowing r |> shouldEqual 2
+        Observer.value r |> shouldEqual 2
         numFInverse |> shouldEqual 1
 
         Observer.disallowFutureUse r
         I.Var.Set x 3
         fix.Stabilize ()
-        Observer.valueThrowing ox |> shouldEqual 3
+        Observer.value ox |> shouldEqual 3
         numFInverse |> shouldEqual 1
 
         let r = I.Observe fold
         fix.Stabilize ()
-        Observer.valueThrowing r |> shouldEqual 3
+        Observer.value r |> shouldEqual 3
         numFInverse |> shouldEqual 1
 
     [<Test>]
@@ -77,11 +77,11 @@ module TestUnorderedArrayFold =
         let o = I.Observe f
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 2
+        Observer.value o |> shouldEqual 2
 
         I.Var.Set x 3
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 6
+        Observer.value o |> shouldEqual 6
 
         Observer.disallowFutureUse o
         fix.Stabilize ()
@@ -89,7 +89,7 @@ module TestUnorderedArrayFold =
         fix.Stabilize ()
         let o = I.Observe f
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 8
+        Observer.value o |> shouldEqual 8
 
     [<Test>]
     let ``update is an Update`` () =
@@ -105,7 +105,7 @@ module TestUnorderedArrayFold =
 
         let check v =
             fix.Stabilize ()
-            Observer.valueThrowing r |> shouldEqual v
+            Observer.value r |> shouldEqual v
 
         check 1
         I.Var.Set x 3

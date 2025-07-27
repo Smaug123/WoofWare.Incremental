@@ -22,8 +22,8 @@ module Observer =
 
     val disallowFutureUse<'a> : 'a Observer -> unit
     val useIsAllowed<'a> : 'a Observer -> bool
-    val value<'a> : 'a Observer -> Result<'a, exn>
-    val valueThrowing<'a> : 'a Observer -> 'a
+    val value'<'a> : 'a Observer -> Result<'a, exn>
+    val value<'a> : 'a Observer -> 'a
     val onUpdateThrowing<'a> : 'a Observer -> (Update<'a> -> unit) -> unit
     /// The Incremental DAG node which this observer is observing.
     val observing<'a> : 'a Observer -> 'a Node

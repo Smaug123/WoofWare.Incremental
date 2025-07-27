@@ -59,11 +59,11 @@ module TestObserver =
         let I = Incremental.make ()
         let x = I.Var.Create 0
         let o = I.Observe (I.Var.Watch x)
-        Observer.value(o).IsError |> shouldEqual true
+        Observer.value'(o).IsError |> shouldEqual true
 
         expect {
             snapshotThrows @"System.Exception: Observer.valueThrowing called without stabilizing"
-            return! fun () -> Observer.valueThrowing o
+            return! fun () -> Observer.value o
         }
 
     [<Test>]
@@ -81,11 +81,11 @@ module TestObserver =
         I.Var.Set x 15
         let o = I.Observe (I.Var.Watch x)
 
-        Observer.value(o).IsError |> shouldEqual true
+        Observer.value'(o).IsError |> shouldEqual true
 
         expect {
             snapshotThrows @"System.Exception: Observer.valueThrowing called without stabilizing"
-            return! fun () -> Observer.valueThrowing o
+            return! fun () -> Observer.value o
         }
 
     [<Test>]
@@ -98,11 +98,11 @@ module TestObserver =
         fix.Stabilize ()
         Observer.disallowFutureUse o
 
-        Observer.value(o).IsError |> shouldEqual true
+        Observer.value'(o).IsError |> shouldEqual true
 
         expect {
             snapshotThrows @"System.Exception: Observer.valueThrowing called after disallowFutureUse"
-            return! fun () -> Observer.valueThrowing o
+            return! fun () -> Observer.value o
         }
 
     [<Test>]
@@ -140,7 +140,7 @@ module TestObserver =
         State.numActiveObservers I.State |> shouldEqual (before + 1)
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
         Gc.collect ()
 
@@ -400,7 +400,7 @@ module TestObserver =
         Observer.onUpdateThrowing o (fun _ -> Observer.disallowFutureUse o)
         fix.Stabilize ()
 
-        Observer.value(o).IsError |> shouldEqual true
+        Observer.value'(o).IsError |> shouldEqual true
 
     [<Test>]
     let ``disallowing other on-update handlers in an on-update handler`` () =
@@ -653,7 +653,7 @@ module TestObserver =
             |> I.Map (fun _ ->
                 let o2 = I.Observe (I.Var.Watch x)
                 Observer.useIsAllowed o2 |> shouldEqual true
-                Observer.value(o2).IsError |> shouldEqual true
+                Observer.value'(o2).IsError |> shouldEqual true
                 r <- Some o2
                 0
             )
@@ -662,14 +662,14 @@ module TestObserver =
         fix.Stabilize ()
         let o2 = r.Value
         Observer.useIsAllowed o2 |> shouldEqual true
-        Observer.value(o2).IsError |> shouldEqual true
+        Observer.value'(o2).IsError |> shouldEqual true
         fix.Stabilize ()
-        Observer.valueThrowing o2 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 13
 
         Observer.disallowFutureUse o1
         Observer.disallowFutureUse o2
         fix.Stabilize ()
-        Observer.value(o2).IsError |> shouldEqual true
+        Observer.value'(o2).IsError |> shouldEqual true
 
     [<Test>]
     let ``creating an observer and adding on-update handler during stabilization`` () =
