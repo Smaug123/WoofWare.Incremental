@@ -259,7 +259,7 @@ module TestIncrementalFailures =
 
     let timeNsOfString (s : string) : TimeNs =
         let sinceEpoch = DateTime.Parse(s).Subtract(DateTime.UnixEpoch).TotalMicroseconds
-        sinceEpoch * 10.0 |> int64<float> |> (*) 1L<timeNs>
+        sinceEpoch * 10.0 |> int64<float> |> (fun x -> x * 1L<timeNs>)
 
     [<Test>]
     let ``atIntervals doesn't try to add alarms before the current time`` () =

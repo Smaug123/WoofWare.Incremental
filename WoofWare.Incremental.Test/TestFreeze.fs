@@ -40,23 +40,30 @@ module TestFreeze =
         fix.Stabilize ()
         Observer.value z |> shouldEqual 15
 
-(*
-      let%expect_test _ =
-        let x = Var.create_ [%here] 13 in
-        let o1 = observe (freeze (Var.watch x >>| Fn.id)) in
-        let o2 = observe (Var.watch x >>| Fn.id) in
-        stabilize_ [%here];
-        assert (value o1 = 13);
-        assert (value o2 = 13);
-        stabilize_ [%here];
-        assert (value o1 = 13);
-        assert (value o2 = 13);
-        Var.set x 14;
-        stabilize_ [%here];
-        assert (value o1 = 13);
-        assert (value o2 = 14)
-      ;;
+    [<Test>]
+    let ``test 2`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
 
+        let x = I.Var.Create 13
+        let o1 = I.Observe (I.Freeze (I.Var.Watch x |> I.Map id))
+        let o2 = I.Observe (I.Var.Watch x |> I.Map id)
+
+        fix.Stabilize ()
+        Observer.value o1 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 13
+
+        fix.Stabilize ()
+        Observer.value o1 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 13
+
+        I.Var.Set x 14
+
+        fix.Stabilize ()
+        Observer.value o1 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 14
+
+(*
       let%expect_test _ =
         (* [freeze] nodes increment [num_nodes_became_necessary] *)
         let i1 = State.(num_nodes_became_necessary t) in

@@ -76,8 +76,8 @@ module internal UnorderedArrayFold =
         | Some teq ->
             if t.NumChangesSinceLastFullCompute < t.FullComputeEveryNChanges - 1 then
                 t.NumChangesSinceLastFullCompute <- t.NumChangesSinceLastFullCompute + 1
-                (* We only reach this case if we have already done a full compute, in which case
-           [t.fold_value.IsSome] and [old_value_opt.IsSome]. *)
+                // We only reach this case if we have already done a full compute, in which case
+                // [t.fold_value.IsSome] and [old_value_opt.IsSome].
                 t.FoldValue <-
                     t.Update t.FoldValue.Value (oldValueOpt.Value |> Teq.cast teq) (newValue |> Teq.cast teq)
                     |> ValueSome

@@ -468,7 +468,7 @@ and State =
             RunOnUpdateHandlers : RunOnUpdateHandlers Stack
             mutable OnlyInDebug : OnlyInDebug
             WeakHashTables : WeakHashTableCrate ThreadSafeQueue
-            (* Stats.  These are all incremented at the appropriate place, and never decremented. *)
+            // Stats.  These are all incremented at the appropriate place, and never decremented.
             mutable KeepNodeCreationBacktrace : bool
             mutable NumNodesBecameNecessary : int
             mutable NumNodesBecameUnnecessary : int

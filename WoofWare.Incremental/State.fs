@@ -955,12 +955,9 @@ module internal State =
                                 | Kind.JoinLhsChange _ -> node.Height > Scope.height parent.CreatedIn
                                 | Kind.Map _ -> node.Height > Scope.height parent.CreatedIn
                                 | Kind.StepFunction _ -> node.Height > Scope.height parent.CreatedIn
-                                (* For these, we need to check that the "_change" child has already been
-                         evaluated (if needed).  If so, this also implies:
-
-                         {[
-                           node.height > Scope.height parent.created_in
-                         ]} *)
+                                // For these, we need to check that the "_change" child has already been
+                                // evaluated (if needed).  If so, this also implies:
+                                // node.height > Scope.height parent.created_in
                                 | Kind.BindMain b ->
                                     { new BindMainEval<_, _> with
                                         member _.Eval b = node.Height > b.LhsChange.Height
@@ -1334,10 +1331,10 @@ module internal State =
         with exn ->
             (match t.Status with
              | Status.Stabilize_previously_raised _ ->
-                 (* If stabilization has already raised, then [exn] is merely a notification of this
-              fact, rather than the original exception itself.  We should just propagate [exn]
-              forward; calling [raise_during_stabilization] would store [exn] as the exception
-              that initially raised during stabilization. *)
+                 // If stabilization has already raised, then [exn] is merely a notification of this
+                 // fact, rather than the original exception itself.  We should just propagate [exn]
+                 // forward; calling [raise_during_stabilization] would store [exn] as the exception
+                 // that initially raised during stabilization.
                  raise exn
              | _ -> raiseDuringStabilization t exn)
 
@@ -1778,7 +1775,7 @@ module internal State =
                 ExtractedStepFunctionFromChildAt = StabilizationNum.none
                 UpcomingSteps = Sequence.empty ()
                 Alarm = TimingWheel.Alarm.null'
-                AlarmValue = Unchecked.defaultof<_> (* set below *)
+                AlarmValue = Unchecked.defaultof<_> // set below
                 Clock = clock
             }
 
@@ -1961,9 +1958,9 @@ module internal State =
             | None -> failwith $"can only call currentlyRunningNode during stabilization (%s{name})"
             | Some current -> current
 
-        (* Note that the two following functions are not symmetric of one another: in [let y =
-             map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
-             only a parent of [x] if y is necessary. *)
+        // Note that the two following functions are not symmetric of one another: in [let y =
+        //   map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
+        //   only a parent of [x] if y is necessary.
 
         let assertCurrentlyRunningNodeIsChild (state : State) (node : Node<'a>) (name : string) : unit =
             let current = currentlyRunningNodeThrowing state name
