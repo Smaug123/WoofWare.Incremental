@@ -196,7 +196,7 @@ module RecomputeHeap =
             if isEmpty t then
                 failwith "expected nonempty if there was a min"
 
-        let nodesByHeight = t.NodesByHeight in
+        let nodesByHeight = t.NodesByHeight
         let mutable node = nodesByHeight.[t.HeightLowerBound]
 
         while node.IsNone do

@@ -1049,17 +1049,18 @@ module internal State =
             internalObserver.State <- InternalObserverState.Disallowed
             Stack.push (InternalObserverCrate.make internalObserver) t.DisallowedObservers
 
+    let private disallowIfFinalizedEval =
+        { new InternalObserverEval<_> with
+            member _.Eval internalObserver =
+                if List.isEmpty internalObserver.OnUpdateHandlers then
+                    disallowFutureUse internalObserver
+
+                FakeUnit.ofUnit ()
+        }
+
     let disallowFinalizedObservers (t : State) : unit =
         let disallowIfFinalized (internalObserver : InternalObserverCrate) =
-            { new InternalObserverEval<_> with
-                member _.Eval internalObserver =
-                    if List.isEmpty internalObserver.OnUpdateHandlers then
-                        disallowFutureUse internalObserver
-
-                    FakeUnit.ofUnit ()
-            }
-            |> internalObserver.Apply
-            |> FakeUnit.toUnit
+            internalObserver.Apply disallowIfFinalizedEval |> FakeUnit.toUnit
 
         t.FinalizedObservers |> ThreadSafeQueue.dequeueUntilEmpty disallowIfFinalized
 
@@ -1190,7 +1191,7 @@ module internal State =
                 RecomputeHeap.add t.RecomputeHeap watch
 
     let setVar (var : Var<'a>) (value : 'a) : unit =
-        let t = Var.incrState var in
+        let t = Var.incrState var
 
         match t.Status with
         | Status.RunningOnUpdateHandlers
@@ -1203,14 +1204,14 @@ module internal State =
 
             var.ValueSetDuringStabilization <- Some value
 
+    let private reclaimEval =
+        { new WeakHashTableEval<_> with
+            member _.Eval w =
+                WeakHashTable.reclaimSpaceForKeysWithUnusedData w |> FakeUnit.ofUnit
+        }
+
     let reclaimSpaceInWeakHashTables (t : State) =
-        let reclaim (w : WeakHashTableCrate) =
-            { new WeakHashTableEval<_> with
-                member _.Eval w =
-                    WeakHashTable.reclaimSpaceForKeysWithUnusedData w |> FakeUnit.ofUnit
-            }
-            |> w.Apply
-            |> FakeUnit.toUnit
+        let reclaim (w : WeakHashTableCrate) = w.Apply reclaimEval |> FakeUnit.toUnit
 
         ThreadSafeQueue.dequeueUntilEmpty reclaim t.WeakHashTables
 
@@ -1225,6 +1226,15 @@ module internal State =
         if Debug.globalFlag then
             invariant t
 
+    let private setDuringStabilizationEval =
+        { new VarEval<_> with
+            member _.Eval var =
+                let value = var.ValueSetDuringStabilization.Value
+                var.ValueSetDuringStabilization <- None
+                setVarWhileNotStabilizing var value
+                FakeUnit.ofUnit ()
+        }
+
     let stabilizeEnd (t : State) : unit =
         if Debug.globalFlag then
             t.OnlyInDebug.CurrentlyRunningNode <- None
@@ -1238,15 +1248,7 @@ module internal State =
         while not (Stack.isEmpty t.SetDuringStabilization) do
             let var = Stack.pop t.SetDuringStabilization |> Option.get
 
-            { new VarEval<_> with
-                member _.Eval var =
-                    let value = var.ValueSetDuringStabilization.Value
-                    var.ValueSetDuringStabilization <- None
-                    setVarWhileNotStabilizing var value
-                    FakeUnit.ofUnit ()
-            }
-            |> var.Apply
-            |> FakeUnit.toUnit
+            var.Apply setDuringStabilizationEval |> FakeUnit.toUnit
 
         while not (Stack.isEmpty t.HandleAfterStabilization) do
             let node = t.HandleAfterStabilization |> Stack.pop |> Option.get
@@ -1257,7 +1259,7 @@ module internal State =
                     let oldValue = node.OldValueOpt in
                     node.OldValueOpt <- ValueNone
 
-                    let node_update : _ NodeUpdate =
+                    let nodeUpdate : _ NodeUpdate =
                         if not (NodeHelpers.isValid node) then
                             Invalidated
                         else if not (NodeHelpers.isNecessary node) then
@@ -1269,7 +1271,7 @@ module internal State =
                             | ValueNone -> Necessary new_value
                             | ValueSome oldValue -> Changed (oldValue, new_value)
 
-                    Stack.push (RunOnUpdateHandlers.make node node_update) t.RunOnUpdateHandlers
+                    Stack.push (RunOnUpdateHandlers.make node nodeUpdate) t.RunOnUpdateHandlers
                     FakeUnit.ofUnit ()
             }
             |> node.Apply

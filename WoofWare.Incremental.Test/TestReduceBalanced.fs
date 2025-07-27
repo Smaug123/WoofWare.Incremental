@@ -56,7 +56,7 @@ module TestReduceBalanced =
         Observer.value o |> shouldEqual "abcdefg"
         reduceCalls |> shouldEqual 6
 
-        I.Var.Set list.[0] "z"
+        I.Var.Set (List.head list) "z"
         fix.Stabilize ()
         Observer.value o |> shouldEqual "zbcdefg"
         reduceCalls |> shouldEqual 9
@@ -162,9 +162,9 @@ module TestReduceBalanced =
         | 1 -> 0
         | n ->
             let un = uint32 n
-            let floorLog2 = BitOperations.Log2 (un)
+            let floorLog2 = BitOperations.Log2 un
 
-            if BitOperations.PopCount (un) = 1 then
+            if BitOperations.PopCount un = 1 then
                 int floorLog2 // n is a power of 2
             else
                 int floorLog2 + 1 // n is not a power of 2
@@ -262,7 +262,7 @@ module TestReduceBalanced =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
 
-        let config = Config.QuickThrowOnFailure.WithQuietOnSuccess (true)
+        let config = Config.QuickThrowOnFailure.WithQuietOnSuccess true
 
         (property fix)
         |> Prop.forAll (arb I)
