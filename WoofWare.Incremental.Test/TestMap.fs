@@ -67,11 +67,9 @@ module TestMap =
             fix.Stabilize ()
             Observer.value t1o |> shouldEqual (Observer.value o0 + 1)
 
-            Observer.value t2o
-            |> shouldEqual (Observer.value o0 + Observer.value o1)
+            Observer.value t2o |> shouldEqual (Observer.value o0 + Observer.value o1)
 
-            Observer.value t3o
-            |> shouldEqual (Observer.value t1o - Observer.value t2o)
+            Observer.value t3o |> shouldEqual (Observer.value t1o - Observer.value t2o)
 
         check ()
         I.Var.Set x0 16

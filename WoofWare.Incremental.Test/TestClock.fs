@@ -1,6 +1,5 @@
 namespace WoofWare.Incremental.Test
 
-open System
 open System.Threading
 open FsUnitTyped
 open NUnit.Framework
@@ -42,9 +41,7 @@ module TestClock =
         let showNow () =
             fix.Stabilize ()
 
-            TimeNs.display (Clock.now clock)
-            + "\n"
-            + TimeNs.display (Observer.value o)
+            TimeNs.display (Clock.now clock) + "\n" + TimeNs.display (Observer.value o)
 
         expect {
             snapshot
@@ -138,7 +135,7 @@ module TestClock =
         let at span =
             I.Observe (I.Clock.At clock (TimeNs.add now span))
 
-        let i1 = at (TimeNs.Span.ofSec 1.0)
+        let i1 = at (TimeNs.Span.ofSec -1.0)
         let i2 = at (TimeNs.Span.ofSec -0.1)
         let i3 = at (TimeNs.Span.ofSec 1.0)
         fix.Stabilize ()
@@ -509,185 +506,187 @@ module TestClock =
 
         Observer.disallowFutureUse o
 
-(*
-      let%expect_test _ =
-        (* one step at a time *)
-        let clock = Clock.create ~start:Time_ns.epoch () in
-        let i = relative_step_function_incr clock ~init:13 [ 1, 14; 2, 15 ] in
-        let o = observe i in
-        let show () = print_s [%sexp (value o : int)] in
-        stabilize_ [%here];
-        show ();
-        [%expect {| 13 |}];
-        Clock.advance_clock_by clock (sec 1.5);
-        stabilize_ [%here];
-        show ();
-        [%expect {| 14 |}];
-        Clock.advance_clock_by clock (sec 1.);
-        stabilize_ [%here];
-        show ();
-        [%expect {| 15 |}];
-        disallow_future_use o
-      ;;
+    [<Test>]
+    let ``one step at a time`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let clock = I.Clock.Create TimeNs.epoch
+        let i = relativeStepFunctionIncr I clock 13 [ 1, 14 ; 2, 15 ]
+        let o = I.Observe i
 
-      let%expect_test _ =
-        (* all steps in the past *)
-        let clock = Clock.create ~start:(Time_ns.add Time_ns.epoch (sec 2.)) () in
-        let i = relative_step_function_incr clock ~init:13 [ -2, 14; -1, 15 ] in
-        let o = observe i in
-        let show () = print_s [%sexp (value o : int)] in
-        stabilize_ [%here];
-        show ();
-        [%expect {| 15 |}];
-        disallow_future_use o
-      ;;
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 13
 
-      let%expect_test _ =
-        (* some steps in the past *)
-        let clock = Clock.create ~start:(Time_ns.add Time_ns.epoch (sec 1.)) () in
-        let i = relative_step_function_incr clock ~init:13 [ -1, 14; 1, 15 ] in
-        let o = observe i in
-        let show () = print_s [%sexp (value o : int)] in
-        stabilize_ [%here];
-        show ();
-        [%expect {| 14 |}];
-        Clock.advance_clock_by clock (sec 1.5);
-        stabilize_ [%here];
-        show ();
-        [%expect {| 15 |}];
-        disallow_future_use o
-      ;;
+        I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 1.5)
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 14
 
-      let%expect_test _ =
-        (* cross multiple steps in one stabilization cycle *)
-        let clock = Clock.create ~start:Time_ns.epoch () in
-        let i = relative_step_function_incr clock ~init:13 [ 1, 14; 2, 15 ] in
-        let o = observe i in
-        let show () = print_s [%sexp (value o : int)] in
-        stabilize_ [%here];
-        show ();
-        [%expect {| 13 |}];
-        Clock.advance_clock_by clock (sec 1.5);
-        Clock.advance_clock_by clock (sec 1.);
-        stabilize_ [%here];
-        show ();
-        [%expect {| 15 |}];
-        disallow_future_use o
-      ;;
+        I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 1.0)
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 15
 
-      let%expect_test _ =
-        (* cross step in same stabilization as creation *)
-        let clock = Clock.create ~start:Time_ns.epoch () in
-        let i = relative_step_function_incr clock ~init:13 [ 1, 14 ] in
-        let o = observe i in
-        let show () = print_s [%sexp (value o : int)] in
-        Clock.advance_clock_by clock (sec 2.);
-        stabilize_ [%here];
-        show ();
-        [%expect {| 14 |}];
-        disallow_future_use o
-      ;;
+        Observer.disallowFutureUse o
 
-      let%expect_test _ =
-        (* observe after step *)
-        let clock = Clock.create ~start:Time_ns.epoch () in
-        let i = relative_step_function_incr clock ~init:13 [ 1, 14 ] in
-        stabilize_ [%here];
-        Clock.advance_clock_by clock (sec 1.5);
-        stabilize_ [%here];
-        let o = observe i in
-        let show () = print_s [%sexp (value o : int)] in
-        stabilize_ [%here];
-        show ();
-        [%expect {| 14 |}];
-        disallow_future_use o
-      ;;
+    [<Test>]
+    let ``all steps in the past`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let clock = I.Clock.Create (TimeNs.add TimeNs.epoch (TimeNs.Span.ofSec 2.0))
 
-      let%expect_test _ =
-        (* advancing exactly to steps doesn't skip steps *)
-        let clock = Clock.create ~start:Time_ns.epoch () in
-        let base = Clock.now clock in
-        let curr = ref base in
-        let steps = ref [] in
+        let i = relativeStepFunctionIncr I clock 13 [ -2, 14 ; -1, 15 ]
+        let o = I.Observe i
+
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 15
+
+        Observer.disallowFutureUse o
+
+    [<Test>]
+    let ``some steps in the past`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let clock = I.Clock.Create (TimeNs.add TimeNs.epoch (TimeNs.Span.ofSec 1.0))
+
+        let i = relativeStepFunctionIncr I clock 13 [ -1, 14 ; 1, 15 ]
+        let o = I.Observe i
+
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 14
+
+        I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 1.5)
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 15
+
+        Observer.disallowFutureUse o
+
+    [<Test>]
+    let ``cross multiple steps in one stabilization cycle`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let clock = I.Clock.Create TimeNs.epoch
+
+        let i = relativeStepFunctionIncr I clock 13 [ 1, 14 ; 2, 15 ]
+        let o = I.Observe i
+
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 13
+
+        I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 1.5)
+        I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 1.0)
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 15
+
+        Observer.disallowFutureUse o
+
+    [<Test>]
+    let ``cross step in same stabilization as creation`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let clock = I.Clock.Create TimeNs.epoch
+
+        let i = relativeStepFunctionIncr I clock 13 [ 1, 14 ]
+        let o = I.Observe i
+        I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 2.0)
+
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 14
+
+        Observer.disallowFutureUse o
+
+    [<Test>]
+    let ``observe after step`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let clock = I.Clock.Create TimeNs.epoch
+
+        let i = relativeStepFunctionIncr I clock 13 [ 1, 14 ]
+        fix.Stabilize ()
+        I.Clock.AdvanceClockBy clock (TimeNs.Span.ofSec 1.5)
+        fix.Stabilize ()
+        let o = I.Observe i
+
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 14
+
+        Observer.disallowFutureUse o
+
+    [<Test>]
+    let ``advancing exactly to steps doesn't skip steps`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let clock = I.Clock.Create TimeNs.epoch
+        let base_ = Clock.now clock
+        let mutable curr = base_
+        let steps = ResizeArray ()
+
         for i = 1 to 20 do
-          curr := Time_ns.next_multiple ~base ~after:!curr ~interval:(sec 1.) ();
-          steps := (!curr, i) :: !steps
-        done;
-        let steps = List.rev !steps in
-        let o = observe (Clock.step_function clock ~init:0 steps) in
-        List.iter steps ~f:(fun (to_, _) ->
-          Clock.advance_clock clock ~to_;
-          stabilize_ [%here];
-          print_s [%sexp (value o : int)]);
-        [%expect
-          {|
-          1
-          2
-          3
-          4
-          5
-          6
-          7
-          8
-          9
-          10
-          11
-          12
-          13
-          14
-          15
-          16
-          17
-          18
-          19
-          20
-          |}];
-        disallow_future_use o
-      ;;
+            curr <- TimeNs.nextMultiple None base_ curr (TimeNs.Span.ofSec 1.0)
+            steps.Add (curr, i)
 
-      let%expect_test _ =
-        (* Advancing to a scheduled time shouldn't break things. *)
-        let clock = Clock.create ~start:Time_ns.epoch () in
-        let fut = Time_ns.add (Clock.now clock) (sec 1.0) in
-        let o1 = observe (Clock.at clock fut) in
-        let o2 = observe (ok_exn (Clock.snapshot clock (const 1) ~at:fut ~before:0)) in
-        Clock.advance_clock clock ~to_:fut;
-        stabilize_ [%here];
-        disallow_future_use o1;
-        disallow_future_use o2
-      ;;
+        let steps = List.ofSeq steps
 
-      let%expect_test _ =
-        (* alarms get cleaned up for invalidated time-based incrementals *)
-        let clock = Clock.create ~start:Time_ns.epoch () in
-        List.iter
-          [ (fun () -> Clock.after clock (sec 1.) >>| fun _ -> ())
-          ; (fun () -> Clock.at_intervals clock (sec 1.))
-          ; (fun () -> relative_step_function_incr clock ~init:() [ 1, () ])
-          ]
-          ~f:(fun create_time_based_incremental ->
-            let num_alarms = Clock.timing_wheel_length clock in
-            let x = Var.create_ [%here] 0 in
+        let o = I.Clock.StepFunction clock 0 steps |> I.Observe
+
+        steps
+        |> List.iteri (fun i (to_, _) ->
+            I.Clock.AdvanceClock clock to_
+            fix.Stabilize ()
+            Observer.value o |> shouldEqual (i + 1)
+        )
+
+        Observer.disallowFutureUse o
+
+    [<Test>]
+    let ``advancing to a scheduled time shouldn't break things`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let clock = I.Clock.Create TimeNs.epoch
+
+        let fut = TimeNs.add (Clock.now clock) (TimeNs.Span.ofSec 1.0)
+        let o1 = I.Observe (I.Clock.At clock fut)
+        let o2 = I.Clock.Snapshot clock (I.Const 1) fut 0 |> Result.get |> I.Observe
+
+        I.Clock.AdvanceClock clock fut
+        fix.Stabilize ()
+
+        Observer.disallowFutureUse o1
+        Observer.disallowFutureUse o2
+
+    [<Test>]
+    let ``alarms get cleaned up for invalidated time-based incrementals`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let clock = I.Clock.Create TimeNs.epoch
+
+        for createTimeBasedIncremental in
+            [
+                (fun () -> I.Clock.After clock (TimeNs.Span.ofSec 1.0) |> I.Map ignore)
+                (fun () -> I.Clock.AtIntervals clock (TimeNs.Span.ofSec 1.0))
+                (fun () -> relativeStepFunctionIncr I clock () [ 1, () ])
+            ] do
+            let numAlarms = Clock.timingWheelLength clock
+            let x = I.Var.Create 0
+
             let o =
-              observe
-                (bind (Var.watch x) ~f:(fun i ->
-                   if i >= 0 then create_time_based_incremental () else return ()))
-            in
-            stabilize_ [%here];
-            for i = 1 to 10 do
-              Var.set x i;
-              stabilize_ [%here];
-              if check_invalidity
-              then
-                [%test_result: int]
-                  ~expect:(num_alarms + 1)
-                  (Clock.timing_wheel_length clock)
-            done;
-            Var.set x (-1);
-            stabilize_ [%here];
-            if check_invalidity
-            then [%test_result: int] ~expect:num_alarms (Clock.timing_wheel_length clock);
-            disallow_future_use o)
-      ;;
+                I.Var.Watch x
+                |> I.Bind (fun i ->
+                    if i >= 0 then
+                        createTimeBasedIncremental ()
+                    else
+                        I.Return ()
+                )
+                |> I.Observe
 
-*)
+            fix.Stabilize ()
+
+            for i = 1 to 10 do
+                I.Var.Set x i
+                fix.Stabilize ()
+                Clock.timingWheelLength clock |> shouldEqual (numAlarms + 1)
+
+            I.Var.Set x -1
+            fix.Stabilize ()
+
+            Clock.timingWheelLength clock |> shouldEqual numAlarms
+
+            Observer.disallowFutureUse o
