@@ -25,7 +25,7 @@ module TestArrayFold =
         let y = I.Var.Create 14
 
         let o =
-            [| I.Var.Watch x ; I.Var.Watch y |]
+            [| I.Var.Watch y ; I.Var.Watch x |]
             |> I.ArrayFold [] (fun ac x -> x :: ac)
             |> I.Observe
 

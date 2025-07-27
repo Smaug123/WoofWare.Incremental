@@ -25,7 +25,6 @@ module TestBind =
         let I = fix.I
 
         isInvalidatedOnBindRhs fix (fun i -> I.Bind (fun _ -> I.Const i) (I.Const i))
-        |> shouldEqual true
 
     [<Test>]
     let ``bind created with invalid RHS`` () =

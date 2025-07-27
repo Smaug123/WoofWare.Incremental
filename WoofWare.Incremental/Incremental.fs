@@ -66,6 +66,9 @@ type IClock =
     abstract AdvanceClock : Clock -> TimeNs -> unit
     abstract AdvanceClockBy : Clock -> TimeNs.Span -> unit
     abstract Snapshot<'a> : Clock -> Node<'a> -> at : TimeNs -> before : 'a -> Result<Node<'a>, string>
+    abstract WatchNow : Clock -> Node<TimeNs>
+    abstract AlarmPrecision : Clock -> TimeNs.Span
+    abstract StepFunction : Clock -> init : 'a -> (TimeNs * 'a) list -> Node<'a>
 
 type IVar =
     abstract Create<'a> : 'a -> Var<'a>
@@ -222,6 +225,16 @@ type IncrementalImpl (state : State) =
                 State.advanceClock clock (TimeNs.add (Clock.now clock) span)
 
             member this.Snapshot clock v at before = State.snapshot clock v at before
+
+            member this.WatchNow clock = clock.Now.Watch
+
+            member _.AlarmPrecision clock =
+                TimingWheel.alarmPrecision clock.TimingWheel
+
+            member _.StepFunction clock init steps =
+                StepFunction.create init steps
+                |> State.konst (Clock.incrState clock)
+                |> State.incrementalStepFunction clock
         }
 
     interface Incremental with

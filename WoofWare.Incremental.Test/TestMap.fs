@@ -27,7 +27,7 @@ module TestMap =
         Observer.valueThrowing o |> shouldEqual (2 * n)
 
         isInvalid fix (mapN fix.Invalid) |> shouldEqual true
-        isInvalidatedOnBindRhs fix (fun i -> mapN (I.Const i)) |> shouldEqual true
+        isInvalidatedOnBindRhs fix (fun i -> mapN (I.Const i))
 
     [<Test>]
     let ``a couple of maps`` () =

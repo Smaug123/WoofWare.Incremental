@@ -103,7 +103,7 @@ module TestReduceBalanced =
             |> I.ReduceBalanced id (+)
             |> Option.get
 
-        let o2 = I.Observe f
+        let o2 = I.Observe f2
 
         fix.Stabilize ()
         Observer.valueThrowing o |> shouldEqual 2
@@ -169,7 +169,7 @@ module TestReduceBalanced =
             else
                 int floorLog2 + 1 // n is not a power of 2
 
-    let property (fix : IncrementalFixture) testValues =
+    let property (fix : IncrementalFixture) (testValues : TestValue list) =
         let I = fix.I
 
         let arr =
@@ -183,7 +183,7 @@ module TestReduceBalanced =
         let mutable updateCount = 0
 
         let assertExpectedAndReset () =
-            if updateCount <> 0 then
+            if updateCount = 0 then
                 foldCount |> shouldEqual 0
                 reduceCount |> shouldEqual 0
             else
@@ -262,20 +262,26 @@ module TestReduceBalanced =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
 
-        let config = Config.Default.WithQuietOnSuccess true
+        let config = Config.QuickThrowOnFailure.WithQuietOnSuccess (true)
 
         (property fix)
         |> Prop.forAll (arb I)
         |> fun property -> Check.One (config, property)
 
     let replays =
-        [ 11695027613933141854UL, 12778457246669182719UL ] |> List.map TestCaseData
+        [
+            11695027613933141854UL, 12778457246669182719UL
+            18365685331342435458UL, 15790651599255451313UL
+        ]
+        |> List.map TestCaseData
 
     [<TestCaseSource(nameof replays)>]
     let ``reproductions of past failures`` (seed : uint64, gamma : uint64) =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
-        let config = Config.Default.WithQuietOnSuccess(true).WithReplay (seed, gamma)
+
+        let config =
+            Config.QuickThrowOnFailure.WithQuietOnSuccess(true).WithReplay (seed, gamma)
 
         (property fix)
         |> Prop.forAll (arb I)

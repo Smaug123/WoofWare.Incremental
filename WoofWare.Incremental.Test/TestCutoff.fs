@@ -8,7 +8,7 @@ open WoofWare.Incremental
 
 [<TestFixture>]
 module TestCutoff =
-    let config = Config.Default.WithQuietOnSuccess (true)
+    let config = Config.QuickThrowOnFailure.WithQuietOnSuccess (true)
 
     [<Test>]
     let ``test ofCompare`` () =

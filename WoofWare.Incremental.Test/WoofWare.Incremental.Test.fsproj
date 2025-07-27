@@ -42,7 +42,7 @@
     <Compile Include="TestSum.fs" />
     <Compile Include="TestUnorderedArrayFold.fs" />
     <None Include="TestIncrementalStepFunction.fs" />
-    <None Include="TestClock.fs" />
+    <Compile Include="TestClock.fs" />
     <Compile Include="TestArrayFold.fs" />
     <Compile Include="TestReduceBalanced.fs" />
     <Compile Include="TestOnUpdate.fs" />

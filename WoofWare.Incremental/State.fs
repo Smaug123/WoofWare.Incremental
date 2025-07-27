@@ -26,6 +26,8 @@ type StepResult =
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal State =
+    let internal numNodesBecameNecessary (t : State) = t.NumNodesBecameNecessary
+
     let internal numNodesRecomputedDirectlyBecauseOneChild (t : State) =
         t.NumNodesRecomputedDirectlyBecauseOneChild
 
@@ -1764,7 +1766,7 @@ module internal State =
 
             Ok main
 
-    let incremental_step_function clock child =
+    let incrementalStepFunction (clock : Clock) (child : Node<StepFunction<'a>>) : Node<'a> =
         let t = Clock.incrState clock
         let main = createNode t Kind.Uninitialized
 

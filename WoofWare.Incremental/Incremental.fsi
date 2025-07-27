@@ -25,7 +25,10 @@ module Observer =
     val value<'a> : 'a Observer -> Result<'a, exn>
     val valueThrowing<'a> : 'a Observer -> 'a
     val onUpdateThrowing<'a> : 'a Observer -> (Update<'a> -> unit) -> unit
+    /// The Incremental DAG node which this observer is observing.
     val observing<'a> : 'a Observer -> 'a Node
+    /// Human-readable string representation, showing the value of the observer (if it's in a valid state)
+    /// or the observer's state (if the state is not valid for observation).
     val toString<'a> : 'a Observer -> string
 
 type IClock =
@@ -38,6 +41,9 @@ type IClock =
     abstract AdvanceClock : Clock -> TimeNs -> unit
     abstract AdvanceClockBy : Clock -> TimeNs.Span -> unit
     abstract Snapshot<'a> : Clock -> Node<'a> -> at : TimeNs -> before : 'a -> Result<Node<'a>, string>
+    abstract WatchNow : Clock -> Node<TimeNs>
+    abstract AlarmPrecision : Clock -> TimeNs.Span
+    abstract StepFunction : Clock -> init : 'a -> (TimeNs * 'a) list -> Node<'a>
 
 type IVar =
     abstract Create<'a> : 'a -> Var<'a>

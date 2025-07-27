@@ -16,4 +16,4 @@ module TestTheFixture =
     [<Test>]
     let ``Test isInvalidatedOnBindRhs`` () =
         let fix = IncrementalFixture.Make ()
-        isInvalidatedOnBindRhs fix (fun _ -> fix.I.Const 13) |> shouldEqual true
+        isInvalidatedOnBindRhs fix (fun _ -> fix.I.Const 13)
