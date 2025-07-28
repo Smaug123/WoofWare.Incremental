@@ -436,7 +436,7 @@ module internal State =
             |> FakeUnit.toUnit
 
     let propagateInvalidity t : unit =
-        let mutable node = None
+        let mutable node = ValueNone
 
         while (node <- Stack.pop t.PropagateInvalidity
                node.IsSome) do
@@ -1099,7 +1099,7 @@ module internal State =
 
     let addNewObservers (t : State) : unit =
         while not (Stack.isEmpty t.NewObservers) do
-            let packed = Stack.pop t.NewObservers |> Option.get
+            let packed = Stack.pop t.NewObservers |> ValueOption.get
 
             { new InternalObserverEval<_> with
                 member _.Eval internalObserver =
@@ -1246,12 +1246,12 @@ module internal State =
         t.StabilizationNum <- StabilizationNum.add1 t.StabilizationNum
 
         while not (Stack.isEmpty t.SetDuringStabilization) do
-            let var = Stack.pop t.SetDuringStabilization |> Option.get
+            let var = Stack.pop t.SetDuringStabilization |> ValueOption.get
 
             var.Apply setDuringStabilizationEval |> FakeUnit.toUnit
 
         while not (Stack.isEmpty t.HandleAfterStabilization) do
-            let node = t.HandleAfterStabilization |> Stack.pop |> Option.get
+            let node = t.HandleAfterStabilization |> Stack.pop |> ValueOption.get
 
             { new NodeEval<_> with
                 member _.Eval node =
@@ -1281,7 +1281,7 @@ module internal State =
         let now = t.StabilizationNum
 
         while not (Stack.isEmpty t.RunOnUpdateHandlers) do
-            let rouh = t.RunOnUpdateHandlers |> Stack.pop |> Option.get
+            let rouh = t.RunOnUpdateHandlers |> Stack.pop |> ValueOption.get
 
             { new RunOnUpdateHandlersEval<_> with
                 member _.Eval node nodeUpdate =

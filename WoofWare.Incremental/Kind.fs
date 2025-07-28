@@ -65,7 +65,7 @@ module internal Kind =
     /// We do not implement the time-based nodes ([At], [At_intervals], [Snapshot],
     /// [Step_function]) as parents of the current-time node for performance reasons.  We don't
     /// want all such nodes to be recomputed whenever the time changes, which would be horribly
-    /// inneficient.  Instead, we only want them to be recomputed at the "right" time,
+    /// inefficient.  Instead, we only want them to be recomputed at the "right" time,
     /// i.e. when time passes some threshold relevant to them.  We do this via scheduling
     /// alarms at those thresholds.
     let iteriChildren<'a> (t : Kind<'a>) (f : int -> NodeCrate -> unit) : unit =
