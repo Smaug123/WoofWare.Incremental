@@ -26,6 +26,8 @@ type StepResult =
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal State =
+    let internal numNodesBecameNecessary (t : State) = t.NumNodesBecameNecessary
+
     let internal numNodesRecomputedDirectlyBecauseOneChild (t : State) =
         t.NumNodesRecomputedDirectlyBecauseOneChild
 
@@ -110,18 +112,18 @@ module internal State =
 
     let amStabilizing (t : State) : bool =
         match t.Status with
-        | Status.Running_on_update_handlers
+        | Status.RunningOnUpdateHandlers
         | Status.Stabilizing -> true
-        | Status.Not_stabilizing -> false
-        | Status.Stabilize_previously_raised raised_exn ->
+        | Status.NotStabilizing -> false
+        | Status.StabilizePreviouslyRaised raised_exn ->
             failwith "TODO: reraise exception: 'cannot call am_stabilizing -- stabilize previously raised'"
 
     let invariant (t : State) : unit =
         match t.Status with
-        | Status.Stabilize_previously_raised _ -> ()
-        | Status.Running_on_update_handlers
+        | Status.StabilizePreviouslyRaised _ -> ()
+        | Status.RunningOnUpdateHandlers
         | Status.Stabilizing
-        | Status.Not_stabilizing ->
+        | Status.NotStabilizing ->
             iterObservers
                 t
                 (fun obs ->
@@ -215,9 +217,9 @@ module internal State =
 
             do
                 match t.Status with
-                | Status.Stabilize_previously_raised _ -> failwith "invariant failed"
-                | Status.Running_on_update_handlers
-                | Status.Not_stabilizing ->
+                | Status.StabilizePreviouslyRaised _ -> failwith "invariant failed"
+                | Status.RunningOnUpdateHandlers
+                | Status.NotStabilizing ->
                     if not (Stack.isEmpty t.SetDuringStabilization) then
                         failwith "invariant failed"
                 | Status.Stabilizing ->
@@ -240,11 +242,11 @@ module internal State =
 
     let ensureNotStabilizing t name allowInUpdateHandler =
         match t.Status with
-        | Status.Not_stabilizing -> ()
-        | Status.Running_on_update_handlers ->
+        | Status.NotStabilizing -> ()
+        | Status.RunningOnUpdateHandlers ->
             if not allowInUpdateHandler then
                 failwith $"cannot %s{name} during on-update handlers"
-        | Status.Stabilize_previously_raised raised ->
+        | Status.StabilizePreviouslyRaised raised ->
             RaisedException.reraiseWithMessage raised $"cannot %s{name} -- stabilize previously raised"
         | Status.Stabilizing -> failwith $"cannot %s{name} during stabilization"
 
@@ -434,7 +436,7 @@ module internal State =
             |> FakeUnit.toUnit
 
     let propagateInvalidity t : unit =
-        let mutable node = None
+        let mutable node = ValueNone
 
         while (node <- Stack.pop t.PropagateInvalidity
                node.IsSome) do
@@ -953,12 +955,9 @@ module internal State =
                                 | Kind.JoinLhsChange _ -> node.Height > Scope.height parent.CreatedIn
                                 | Kind.Map _ -> node.Height > Scope.height parent.CreatedIn
                                 | Kind.StepFunction _ -> node.Height > Scope.height parent.CreatedIn
-                                (* For these, we need to check that the "_change" child has already been
-                         evaluated (if needed).  If so, this also implies:
-
-                         {[
-                           node.height > Scope.height parent.created_in
-                         ]} *)
+                                // For these, we need to check that the "_change" child has already been
+                                // evaluated (if needed).  If so, this also implies:
+                                // node.height > Scope.height parent.created_in
                                 | Kind.BindMain b ->
                                     { new BindMainEval<_, _> with
                                         member _.Eval b = node.Height > b.LhsChange.Height
@@ -996,9 +995,7 @@ module internal State =
         if Debug.globalFlag then
             invariant t
 
-    let recomputeFirstNodeThatIsNecessary (r : RecomputeHeap) : unit =
-        let node = RecomputeHeap.removeMin r
-
+    let private recomputeEval =
         { new NodeEval<_> with
             member _.Eval node =
                 if Debug.globalFlag && not (Node.needsToBeComputed node) then
@@ -1006,8 +1003,11 @@ module internal State =
 
                 recompute node |> FakeUnit.ofUnit
         }
-        |> node.Apply
-        |> FakeUnit.toUnit
+
+    let recomputeFirstNodeThatIsNecessary (r : RecomputeHeap) : unit =
+        let node = RecomputeHeap.removeMin r
+
+        node.Apply recomputeEval |> FakeUnit.toUnit
 
     let unlinkDisallowedObservers (t : State) : unit =
         while not (Stack.isEmpty t.DisallowedObservers) do
@@ -1035,7 +1035,7 @@ module internal State =
             |> FakeUnit.toUnit
 
     let disallowFutureUse (internalObserver : InternalObserver<'a>) : unit =
-        let t = InternalObserver.incrState internalObserver in
+        let t = InternalObserver.incrState internalObserver
 
         match internalObserver.State with
         | InternalObserverState.Disallowed
@@ -1049,17 +1049,18 @@ module internal State =
             internalObserver.State <- InternalObserverState.Disallowed
             Stack.push (InternalObserverCrate.make internalObserver) t.DisallowedObservers
 
+    let private disallowIfFinalizedEval =
+        { new InternalObserverEval<_> with
+            member _.Eval internalObserver =
+                if List.isEmpty internalObserver.OnUpdateHandlers then
+                    disallowFutureUse internalObserver
+
+                FakeUnit.ofUnit ()
+        }
+
     let disallowFinalizedObservers (t : State) : unit =
         let disallowIfFinalized (internalObserver : InternalObserverCrate) =
-            { new InternalObserverEval<_> with
-                member _.Eval internalObserver =
-                    if List.isEmpty internalObserver.OnUpdateHandlers then
-                        disallowFutureUse internalObserver
-
-                    FakeUnit.ofUnit ()
-            }
-            |> internalObserver.Apply
-            |> FakeUnit.toUnit
+            internalObserver.Apply disallowIfFinalizedEval |> FakeUnit.toUnit
 
         t.FinalizedObservers |> ThreadSafeQueue.dequeueUntilEmpty disallowIfFinalized
 
@@ -1098,7 +1099,7 @@ module internal State =
 
     let addNewObservers (t : State) : unit =
         while not (Stack.isEmpty t.NewObservers) do
-            let packed = Stack.pop t.NewObservers |> Option.get
+            let packed = Stack.pop t.NewObservers |> ValueOption.get
 
             { new InternalObserverEval<_> with
                 member _.Eval internalObserver =
@@ -1152,9 +1153,9 @@ module internal State =
         let t = Observer'.incrState observer
 
         match t.Status with
-        | Status.Not_stabilizing
-        | Status.Running_on_update_handlers -> Observer'.valueThrowing observer
-        | Status.Stabilize_previously_raised exn ->
+        | Status.NotStabilizing
+        | Status.RunningOnUpdateHandlers -> Observer'.valueThrowing observer
+        | Status.StabilizePreviouslyRaised exn ->
             RaisedException.reraiseWithMessage exn "Observer.valueThrowing called after stabilize previously raised"
         | Status.Stabilizing -> failwith "Observer.valueThrowing called during stabilization"
 
@@ -1190,12 +1191,12 @@ module internal State =
                 RecomputeHeap.add t.RecomputeHeap watch
 
     let setVar (var : Var<'a>) (value : 'a) : unit =
-        let t = Var.incrState var in
+        let t = Var.incrState var
 
         match t.Status with
-        | Status.Running_on_update_handlers
-        | Status.Not_stabilizing -> setVarWhileNotStabilizing var value
-        | Status.Stabilize_previously_raised exn ->
+        | Status.RunningOnUpdateHandlers
+        | Status.NotStabilizing -> setVarWhileNotStabilizing var value
+        | Status.StabilizePreviouslyRaised exn ->
             RaisedException.reraiseWithMessage exn "cannot set var -- stabilization previously raised"
         | Status.Stabilizing ->
             if var.ValueSetDuringStabilization.IsNone then
@@ -1203,14 +1204,14 @@ module internal State =
 
             var.ValueSetDuringStabilization <- Some value
 
+    let private reclaimEval =
+        { new WeakHashTableEval<_> with
+            member _.Eval w =
+                WeakHashTable.reclaimSpaceForKeysWithUnusedData w |> FakeUnit.ofUnit
+        }
+
     let reclaimSpaceInWeakHashTables (t : State) =
-        let reclaim (w : WeakHashTableCrate) =
-            { new WeakHashTableEval<_> with
-                member _.Eval w =
-                    WeakHashTable.reclaimSpaceForKeysWithUnusedData w |> FakeUnit.ofUnit
-            }
-            |> w.Apply
-            |> FakeUnit.toUnit
+        let reclaim (w : WeakHashTableCrate) = w.Apply reclaimEval |> FakeUnit.toUnit
 
         ThreadSafeQueue.dequeueUntilEmpty reclaim t.WeakHashTables
 
@@ -1225,6 +1226,15 @@ module internal State =
         if Debug.globalFlag then
             invariant t
 
+    let private setDuringStabilizationEval =
+        { new VarEval<_> with
+            member _.Eval var =
+                let value = var.ValueSetDuringStabilization.Value
+                var.ValueSetDuringStabilization <- None
+                setVarWhileNotStabilizing var value
+                FakeUnit.ofUnit ()
+        }
+
     let stabilizeEnd (t : State) : unit =
         if Debug.globalFlag then
             t.OnlyInDebug.CurrentlyRunningNode <- None
@@ -1236,20 +1246,12 @@ module internal State =
         t.StabilizationNum <- StabilizationNum.add1 t.StabilizationNum
 
         while not (Stack.isEmpty t.SetDuringStabilization) do
-            let var = Stack.pop t.SetDuringStabilization |> Option.get
+            let var = Stack.pop t.SetDuringStabilization |> ValueOption.get
 
-            { new VarEval<_> with
-                member _.Eval var =
-                    let value = var.ValueSetDuringStabilization.Value
-                    var.ValueSetDuringStabilization <- None
-                    setVarWhileNotStabilizing var value
-                    FakeUnit.ofUnit ()
-            }
-            |> var.Apply
-            |> FakeUnit.toUnit
+            var.Apply setDuringStabilizationEval |> FakeUnit.toUnit
 
         while not (Stack.isEmpty t.HandleAfterStabilization) do
-            let node = t.HandleAfterStabilization |> Stack.pop |> Option.get
+            let node = t.HandleAfterStabilization |> Stack.pop |> ValueOption.get
 
             { new NodeEval<_> with
                 member _.Eval node =
@@ -1257,7 +1259,7 @@ module internal State =
                     let oldValue = node.OldValueOpt in
                     node.OldValueOpt <- ValueNone
 
-                    let node_update : _ NodeUpdate =
+                    let nodeUpdate : _ NodeUpdate =
                         if not (NodeHelpers.isValid node) then
                             Invalidated
                         else if not (NodeHelpers.isNecessary node) then
@@ -1269,17 +1271,17 @@ module internal State =
                             | ValueNone -> Necessary new_value
                             | ValueSome oldValue -> Changed (oldValue, new_value)
 
-                    Stack.push (RunOnUpdateHandlers.make node node_update) t.RunOnUpdateHandlers
+                    Stack.push (RunOnUpdateHandlers.make node nodeUpdate) t.RunOnUpdateHandlers
                     FakeUnit.ofUnit ()
             }
             |> node.Apply
             |> FakeUnit.toUnit
 
-        t.Status <- Status.Running_on_update_handlers
+        t.Status <- Status.RunningOnUpdateHandlers
         let now = t.StabilizationNum
 
         while not (Stack.isEmpty t.RunOnUpdateHandlers) do
-            let rouh = t.RunOnUpdateHandlers |> Stack.pop |> Option.get
+            let rouh = t.RunOnUpdateHandlers |> Stack.pop |> ValueOption.get
 
             { new RunOnUpdateHandlersEval<_> with
                 member _.Eval node nodeUpdate =
@@ -1288,12 +1290,12 @@ module internal State =
             |> rouh.Apply
             |> FakeUnit.toUnit
 
-        t.Status <- Status.Not_stabilizing
+        t.Status <- Status.NotStabilizing
         reclaimSpaceInWeakHashTables t
 
     let raiseDuringStabilization (t : State) (exn : exn) : 'a =
         let raised = RaisedException.create exn in
-        t.Status <- Stabilize_previously_raised raised
+        t.Status <- StabilizePreviouslyRaised raised
         RaisedException.reraise raised
 
     let stabilize (t : State) : unit =
@@ -1313,7 +1315,7 @@ module internal State =
     let doOneStepOfStabilize (t : State) : StepResult =
         try
             match t.Status with
-            | Status.Not_stabilizing ->
+            | Status.NotStabilizing ->
                 stabilizeStart t
                 StepResult.KeepGoing
             | Status.Stabilizing ->
@@ -1325,17 +1327,17 @@ module internal State =
                 else
                     stabilizeEnd t
                     StepResult.Done
-            | Status.Running_on_update_handlers
-            | Status.Stabilize_previously_raised _ ->
+            | Status.RunningOnUpdateHandlers
+            | Status.StabilizePreviouslyRaised _ ->
                 ensureNotStabilizing t "step" false
                 failwith "assert false"
         with exn ->
             (match t.Status with
-             | Status.Stabilize_previously_raised _ ->
-                 (* If stabilization has already raised, then [exn] is merely a notification of this
-              fact, rather than the original exception itself.  We should just propagate [exn]
-              forward; calling [raise_during_stabilization] would store [exn] as the exception
-              that initially raised during stabilization. *)
+             | Status.StabilizePreviouslyRaised _ ->
+                 // If stabilization has already raised, then [exn] is merely a notification of this
+                 // fact, rather than the original exception itself.  We should just propagate [exn]
+                 // forward; calling [raise_during_stabilization] would store [exn] as the exception
+                 // that initially raised during stabilization.
                  raise exn
              | _ -> raiseDuringStabilization t exn)
 
@@ -1528,7 +1530,7 @@ module internal State =
     let all (t : State) (ts : Node<'a> list) : Node<'a list> =
         arrayFold t (Array.ofList (List.rev ts)) [] (fun ac a -> a :: ac)
 
-    let internal unorderedArrayFold
+    let internal unorderedArrayFold<'b, 'acc>
         (t : State)
         (fullComputeEveryNChanges : int option)
         (children : Node<'b> array)
@@ -1764,7 +1766,7 @@ module internal State =
 
             Ok main
 
-    let incremental_step_function clock child =
+    let incrementalStepFunction (clock : Clock) (child : Node<StepFunction<'a>>) : Node<'a> =
         let t = Clock.incrState clock
         let main = createNode t Kind.Uninitialized
 
@@ -1776,7 +1778,7 @@ module internal State =
                 ExtractedStepFunctionFromChildAt = StabilizationNum.none
                 UpcomingSteps = Sequence.empty ()
                 Alarm = TimingWheel.Alarm.null'
-                AlarmValue = Unchecked.defaultof<_> (* set below *)
+                AlarmValue = Unchecked.defaultof<_> // set below
                 Clock = clock
             }
 
@@ -1883,7 +1885,7 @@ module internal State =
 
         let t =
             {
-                Status = Status.Not_stabilizing
+                Status = Status.NotStabilizing
                 BindLhsChangeShouldInvalidateRhs = true
                 StabilizationNum = StabilizationNum.zero
                 CurrentScope = Scope.top
@@ -1959,9 +1961,9 @@ module internal State =
             | None -> failwith $"can only call currentlyRunningNode during stabilization (%s{name})"
             | Some current -> current
 
-        (* Note that the two following functions are not symmetric of one another: in [let y =
-             map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
-             only a parent of [x] if y is necessary. *)
+        // Note that the two following functions are not symmetric of one another: in [let y =
+        //   map x], [x] is always a child of [y] (assuming [x] doesn't become invalid) but [y] in
+        //   only a parent of [x] if y is necessary.
 
         let assertCurrentlyRunningNodeIsChild (state : State) (node : Node<'a>) (name : string) : unit =
             let current = currentlyRunningNodeThrowing state name

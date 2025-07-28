@@ -1,4 +1,4 @@
-WoofWare.Incremental.BeforeOrAfter inherit obj, implements WoofWare.Incremental.BeforeOrAfter System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.BeforeOrAfter System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 2 cases
+WoofWare.Incremental.BeforeOrAfter inherit System.ValueType, implements WoofWare.Incremental.BeforeOrAfter System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.BeforeOrAfter System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 2 cases
 WoofWare.Incremental.BeforeOrAfter+Tags inherit obj
 WoofWare.Incremental.BeforeOrAfter+Tags.After [static field]: int = 1
 WoofWare.Incremental.BeforeOrAfter+Tags.Before [static field]: int = 0
@@ -44,6 +44,24 @@ WoofWare.Incremental.Expert1Node.makeStale [static method]: 'a WoofWare.Incremen
 WoofWare.Incremental.Expert1Node.removeDependency [static method]: 'a WoofWare.Incremental.Expert1Node -> 'b WoofWare.Incremental.Expert1Dependency -> unit
 WoofWare.Incremental.Expert1Node.watch [static method]: 'a WoofWare.Incremental.Expert1Node -> 'a WoofWare.Incremental.Node
 WoofWare.Incremental.Expert1Node`1 inherit obj
+WoofWare.Incremental.FoldUpdate`2 inherit obj - union type with 2 cases
+WoofWare.Incremental.FoldUpdate`2+FInverse inherit WoofWare.Incremental.FoldUpdate<'elt, 'acc>
+WoofWare.Incremental.FoldUpdate`2+FInverse.get_Item [method]: unit -> ('acc -> 'elt -> 'acc)
+WoofWare.Incremental.FoldUpdate`2+FInverse.Item [property]: [read-only] 'acc -> 'elt -> 'acc
+WoofWare.Incremental.FoldUpdate`2+Tags inherit obj
+WoofWare.Incremental.FoldUpdate`2+Tags.FInverse [static field]: int = 0
+WoofWare.Incremental.FoldUpdate`2+Tags.Update [static field]: int = 1
+WoofWare.Incremental.FoldUpdate`2+Update inherit WoofWare.Incremental.FoldUpdate<'elt, 'acc>
+WoofWare.Incremental.FoldUpdate`2+Update.get_Item [method]: unit -> ('acc -> 'elt -> 'elt -> 'acc)
+WoofWare.Incremental.FoldUpdate`2+Update.Item [property]: [read-only] 'acc -> 'elt -> 'elt -> 'acc
+WoofWare.Incremental.FoldUpdate`2.get_IsFInverse [method]: unit -> bool
+WoofWare.Incremental.FoldUpdate`2.get_IsUpdate [method]: unit -> bool
+WoofWare.Incremental.FoldUpdate`2.get_Tag [method]: unit -> int
+WoofWare.Incremental.FoldUpdate`2.IsFInverse [property]: [read-only] bool
+WoofWare.Incremental.FoldUpdate`2.IsUpdate [property]: [read-only] bool
+WoofWare.Incremental.FoldUpdate`2.NewFInverse [static method]: ('acc -> 'elt -> 'acc) -> WoofWare.Incremental.FoldUpdate<'elt, 'acc>
+WoofWare.Incremental.FoldUpdate`2.NewUpdate [static method]: ('acc -> 'elt -> 'elt -> 'acc) -> WoofWare.Incremental.FoldUpdate<'elt, 'acc>
+WoofWare.Incremental.FoldUpdate`2.Tag [property]: [read-only] int
 WoofWare.Incremental.ForAnalyzer inherit obj
 WoofWare.Incremental.ForAnalyzer+Cutoff inherit obj, implements WoofWare.Incremental.ForAnalyzer+Cutoff System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.ForAnalyzer+Cutoff System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 6 cases
 WoofWare.Incremental.ForAnalyzer+Cutoff+Tags inherit obj
@@ -199,21 +217,27 @@ WoofWare.Incremental.ForAnalyzer+KindModule inherit obj
 WoofWare.Incremental.ForAnalyzer+KindModule.toString [static method]: WoofWare.Incremental.ForAnalyzer+Kind -> string
 WoofWare.Incremental.ForAnalyzer.directlyObserved [static method]: WoofWare.Incremental.State -> WoofWare.Incremental.NodeCrate list
 WoofWare.Incremental.ForAnalyzer.traverse [static method]: WoofWare.Incremental.NodeCrate list -> (WoofWare.Incremental.NodeId -> WoofWare.Incremental.ForAnalyzer+Kind -> WoofWare.Incremental.ForAnalyzer+Cutoff -> WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList -> WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList -> WoofWare.Incremental.DotUserInfo option -> int -> int -> int -> unit) -> unit
-WoofWare.Incremental.IClock - interface with 9 member(s)
+WoofWare.Incremental.IClock - interface with 14 member(s)
 WoofWare.Incremental.IClock.AdvanceClock [method]: WoofWare.Incremental.Clock -> System.Int64 -> unit
 WoofWare.Incremental.IClock.AdvanceClockBy [method]: WoofWare.Incremental.Clock -> System.Int64 -> unit
+WoofWare.Incremental.IClock.After [method]: WoofWare.Incremental.Clock -> System.Int64 -> WoofWare.Incremental.BeforeOrAfter WoofWare.Incremental.Node
+WoofWare.Incremental.IClock.AlarmPrecision [method]: WoofWare.Incremental.Clock -> System.Int64
 WoofWare.Incremental.IClock.At [method]: WoofWare.Incremental.Clock -> System.Int64 -> WoofWare.Incremental.BeforeOrAfter WoofWare.Incremental.Node
 WoofWare.Incremental.IClock.AtIntervals [method]: WoofWare.Incremental.Clock -> System.Int64 -> unit WoofWare.Incremental.Node
 WoofWare.Incremental.IClock.Create [method]: System.Int64 -> WoofWare.Incremental.Clock
 WoofWare.Incremental.IClock.Create' [method]: WoofWare.TimingWheel.TimingWheelConfig -> System.Int64 -> WoofWare.Incremental.Clock
 WoofWare.Incremental.IClock.DefaultTimingWheelConfig [property]: [read-only] WoofWare.TimingWheel.TimingWheelConfig
 WoofWare.Incremental.IClock.get_DefaultTimingWheelConfig [method]: unit -> WoofWare.TimingWheel.TimingWheelConfig
+WoofWare.Incremental.IClock.IncrementalStepFunction [method]: WoofWare.Incremental.Clock -> 'a WoofWare.Incremental.StepFunction WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
 WoofWare.Incremental.IClock.Snapshot [method]: WoofWare.Incremental.Clock -> 'a WoofWare.Incremental.Node -> System.Int64 -> 'a -> Microsoft.FSharp.Core.FSharpResult<'a WoofWare.Incremental.Node, string>
+WoofWare.Incremental.IClock.StepFunction [method]: WoofWare.Incremental.Clock -> 'a -> (System.Int64 * 'a) list -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.IClock.WatchNow [method]: WoofWare.Incremental.Clock -> System.Int64 WoofWare.Incremental.Node
 WoofWare.Incremental.IExpertIncremental - interface with 1 member(s)
 WoofWare.Incremental.IExpertIncremental.DoOneStepOfStabilize [method]: unit -> WoofWare.Incremental.StepResult
-WoofWare.Incremental.Incremental - interface with 45 member(s)
+WoofWare.Incremental.Incremental - interface with 51 member(s)
 WoofWare.Incremental.Incremental.All [method]: 'a WoofWare.Incremental.Node list -> 'a list WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.AmStabilizing [property]: [read-only] bool
+WoofWare.Incremental.Incremental.ArrayFold [method]: 'acc -> ('acc -> 'a -> 'acc) -> 'a WoofWare.Incremental.Node [] -> 'acc WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Bind [method]: ('a -> 'b WoofWare.Incremental.Node) -> 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Both [method]: 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node -> ('a * 'b) WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Clock [property]: [read-only] WoofWare.Incremental.IClock
@@ -232,8 +256,10 @@ WoofWare.Incremental.Incremental.get_Expert [method]: unit -> WoofWare.Increment
 WoofWare.Incremental.Incremental.get_MaxHeightAllowed [method]: unit -> int
 WoofWare.Incremental.Incremental.get_State [method]: unit -> WoofWare.Incremental.State
 WoofWare.Incremental.Incremental.get_Var [method]: unit -> WoofWare.Incremental.IVar
+WoofWare.Incremental.Incremental.GetCutoff [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Cutoff
 WoofWare.Incremental.Incremental.If [method]: bool WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Join [method]: 'a WoofWare.Incremental.Node WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.LazyFromFun [method]: (unit -> 'a) -> 'a System.Lazy
 WoofWare.Incremental.Incremental.Map [method]: ('a -> 'b) -> 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Map2 [method]: ('a -> 'b -> 'c) -> 'a WoofWare.Incremental.Node -> 'b WoofWare.Incremental.Node -> 'c WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.MaxHeightAllowed [property]: [read-only] int
@@ -242,20 +268,23 @@ WoofWare.Incremental.Incremental.Observe [method]: 'a WoofWare.Incremental.Node 
 WoofWare.Incremental.Incremental.Observe' [method]: bool -> 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Observer
 WoofWare.Incremental.Incremental.OnUpdate [method]: 'a WoofWare.Incremental.Node -> ('a WoofWare.Incremental.NodeUpdate -> unit) -> unit
 WoofWare.Incremental.Incremental.OptSum [method]: int option -> 'b -> ('b -> 'a -> 'b) -> ('b -> 'a -> 'b) -> 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'b Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
-WoofWare.Incremental.Incremental.OptUnorderedArrayFold [method]: 'a option WoofWare.Incremental.Node [] -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'acc option WoofWare.Incremental.Node
-WoofWare.Incremental.Incremental.OptUnorderedArrayFold' [method]: int -> 'a option WoofWare.Incremental.Node [] -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'acc option WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.OptUnorderedArrayFold [method]: 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'a option WoofWare.Incremental.Node [] -> 'acc option WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.OptUnorderedArrayFold' [method]: int -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'a option WoofWare.Incremental.Node [] -> 'acc option WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Pack [method]: 'a WoofWare.Incremental.Node -> WoofWare.Incremental.NodeCrate
+WoofWare.Incremental.Incremental.ReduceBalanced [method]: ('a -> 'b) -> ('b -> 'b -> 'b) -> 'a WoofWare.Incremental.Node [] -> 'b WoofWare.Incremental.Node option
 WoofWare.Incremental.Incremental.Return [method]: 'a -> 'a WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.SaveDot [method]: (string -> unit) -> unit
 WoofWare.Incremental.Incremental.SaveDot' [method]: bool -> bool -> (string -> unit) -> unit
-WoofWare.Incremental.Incremental.SetCutoff [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Cutoff -> unit
+WoofWare.Incremental.Incremental.SetCutoff [method]: 'a WoofWare.Incremental.Cutoff -> 'a WoofWare.Incremental.Node -> unit
 WoofWare.Incremental.Incremental.SetMaxHeightAllowed [method]: int -> unit
 WoofWare.Incremental.Incremental.Stabilize [method]: unit -> unit
 WoofWare.Incremental.Incremental.State [property]: [read-only] WoofWare.Incremental.State
 WoofWare.Incremental.Incremental.Sum [method]: int option -> 'b -> ('b -> 'a -> 'b) -> ('b -> 'a -> 'b) -> 'a WoofWare.Incremental.Node [] -> 'b WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.UnorderedArrayFold [method]: 'acc -> ('acc -> 'a -> 'acc) -> WoofWare.Incremental.FoldUpdate<'a, 'acc> -> 'a WoofWare.Incremental.Node [] -> 'acc WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.UnorderedArrayFold' [method]: int -> 'acc -> ('acc -> 'a -> 'acc) -> WoofWare.Incremental.FoldUpdate<'a, 'acc> -> 'a WoofWare.Incremental.Node [] -> 'acc WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.Var [property]: [read-only] WoofWare.Incremental.IVar
-WoofWare.Incremental.Incremental.VoptUnorderedArrayFold [method]: 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'acc Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
-WoofWare.Incremental.Incremental.VoptUnorderedArrayFold' [method]: int -> 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'acc Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.VoptUnorderedArrayFold [method]: 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'acc Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
+WoofWare.Incremental.Incremental.VoptUnorderedArrayFold' [method]: int -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'acc Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.WithinScope [method]: WoofWare.Incremental.Scope -> (unit -> 'a) -> 'a
 WoofWare.Incremental.IncrementalModule inherit obj
 WoofWare.Incremental.IncrementalModule.make [static method]: unit -> WoofWare.Incremental.Incremental
@@ -344,8 +373,8 @@ WoofWare.Incremental.Observer.observing [static method]: 'a WoofWare.Incremental
 WoofWare.Incremental.Observer.onUpdateThrowing [static method]: 'a WoofWare.Incremental.Observer -> ('a WoofWare.Incremental.Observer+Update -> unit) -> unit
 WoofWare.Incremental.Observer.toString [static method]: 'a WoofWare.Incremental.Observer -> string
 WoofWare.Incremental.Observer.useIsAllowed [static method]: 'a WoofWare.Incremental.Observer -> bool
-WoofWare.Incremental.Observer.value [static method]: 'a WoofWare.Incremental.Observer -> Microsoft.FSharp.Core.FSharpResult<'a, System.Exception>
-WoofWare.Incremental.Observer.valueThrowing [static method]: 'a WoofWare.Incremental.Observer -> 'a
+WoofWare.Incremental.Observer.value [static method]: 'a WoofWare.Incremental.Observer -> 'a
+WoofWare.Incremental.Observer.value' [static method]: 'a WoofWare.Incremental.Observer -> Microsoft.FSharp.Core.FSharpResult<'a, System.Exception>
 WoofWare.Incremental.Observer`1 inherit obj
 WoofWare.Incremental.OnUpdateHandler inherit obj
 WoofWare.Incremental.OnUpdateHandler.create [static method]: ('a WoofWare.Incremental.NodeUpdate -> unit) -> int -> 'a WoofWare.Incremental.OnUpdateHandler
@@ -369,7 +398,7 @@ WoofWare.Incremental.Sequence.fold [static method]: 'acc -> ('acc -> 'a -> 'acc)
 WoofWare.Incremental.Sequence.head [static method]: 'a WoofWare.Incremental.Sequence -> 'a option
 WoofWare.Incremental.Sequence.next [static method]: 'a WoofWare.Incremental.Sequence -> ('a * 'a WoofWare.Incremental.Sequence) option
 WoofWare.Incremental.Sequence.ofList [static method]: 'a list -> 'a WoofWare.Incremental.Sequence
-WoofWare.Incremental.Sequence.unfold [static method]: 'state -> ('state -> ('a * 'state) option) -> 'a WoofWare.Incremental.Sequence
+WoofWare.Incremental.Sequence.unfold [static method]: ('state -> ('a * 'state) option) -> 'state -> 'a WoofWare.Incremental.Sequence
 WoofWare.Incremental.Sequence`1 inherit obj, implements 'a WoofWare.Incremental.Sequence System.IEquatable, System.Collections.IStructuralEquatable
 WoofWare.Incremental.Sequence`1.Equals [method]: ('a WoofWare.Incremental.Sequence, System.Collections.IEqualityComparer) -> bool
 WoofWare.Incremental.Skeleton.Node inherit obj, implements WoofWare.Incremental.Skeleton.Node System.IEquatable, System.Collections.IStructuralEquatable

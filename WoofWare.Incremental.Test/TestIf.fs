@@ -14,7 +14,7 @@ module TestIf =
 
         let o = I.If (I.Const true) (I.Const 13) (I.Const 14) |> I.Observe
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
     [<Test>]
     let ``test if false`` () =
@@ -23,7 +23,7 @@ module TestIf =
 
         let o = I.If (I.Const false) (I.Const 13) (I.Const 14) |> I.Observe
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 14
+        Observer.value o |> shouldEqual 14
 
     [<Test>]
     let ``if, graph changes only`` () =
@@ -35,7 +35,7 @@ module TestIf =
 
         let check expect =
             fix.Stabilize ()
-            Observer.valueThrowing o |> shouldEqual expect
+            Observer.value o |> shouldEqual expect
 
         check 3
         I.Var.Set x false
@@ -73,19 +73,19 @@ module TestIf =
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing ite |> shouldEqual 1
+        Observer.value ite |> shouldEqual 1
         numThenRun |> shouldEqual 1
         numElseRun |> shouldEqual 0
 
         I.Var.Set test false
         fix.Stabilize ()
-        Observer.valueThrowing ite |> shouldEqual 2
+        Observer.value ite |> shouldEqual 2
         numThenRun |> shouldEqual 1
         numElseRun |> shouldEqual 1
 
         I.Var.Set test true
         fix.Stabilize ()
-        Observer.valueThrowing ite |> shouldEqual 1
+        Observer.value ite |> shouldEqual 1
         numThenRun |> shouldEqual 1
         numElseRun |> shouldEqual 1
 
@@ -94,7 +94,7 @@ module TestIf =
         let ntr = numThenRun
         let ner = numElseRun
         fix.Stabilize ()
-        Observer.valueThrowing ite |> shouldEqual 3
+        Observer.value ite |> shouldEqual 3
         numThenRun |> shouldEqual (ntr + 1)
         numElseRun |> shouldEqual ner
 
@@ -102,7 +102,7 @@ module TestIf =
         I.Var.Set thenCase 5
         I.Var.Set elseCase 6
         fix.Stabilize ()
-        Observer.valueThrowing ite |> shouldEqual 6
+        Observer.value ite |> shouldEqual 6
 
     [<Test>]
     let ``invalid unused branch doesn't invalidate the if`` () =
@@ -133,7 +133,7 @@ module TestIf =
 
         fix.Stabilize ()
         NodeHelpers.isValid elseCase |> shouldEqual false
-        Observer.valueThrowing o2 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 13
 
         Observer.disallowFutureUse o1
         Observer.disallowFutureUse o2

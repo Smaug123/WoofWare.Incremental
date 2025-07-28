@@ -27,7 +27,7 @@ module TestExceptionalBehaviour =
             snapshotThrows
                 @"System.AggregateException: Observer.valueThrowing called after stabilize previously raised (oh no!)"
 
-            return! fun () -> Observer.valueThrowing o
+            return! fun () -> Observer.value o
         }
 
         expect {

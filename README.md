@@ -8,7 +8,7 @@ This is [`incremental`](https://github.com/janestreet/incremental), but in F#.
 
 # Status
 
-The library is ported, and about half the tests are ported and running.
+The library is ported, and most of the tests are ported and running.
 There are known bugs and infelicities; this library is not yet usable unless you are willing to get hurt and report the bugs.
 
 # Licence

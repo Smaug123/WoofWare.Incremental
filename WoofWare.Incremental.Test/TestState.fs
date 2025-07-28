@@ -37,6 +37,9 @@ module TestState =
 
     [<Test>]
     let ``observe max height`` () =
+#if DEBUG
+        failwith "this test only runs in release mode"
+#endif
         let fix = IncrementalFixture.Make ()
         let I = fix.I
 
@@ -51,7 +54,7 @@ module TestState =
         let o = I.Observe (loop (State.maxHeightAllowed I.State))
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual (State.maxHeightAllowed I.State)
+        Observer.value o |> shouldEqual (State.maxHeightAllowed I.State)
 
         I.MaxHeightAllowed |> shouldEqual (State.maxHeightSeen I.State)
         State.invariant I.State

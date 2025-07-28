@@ -35,7 +35,7 @@ module TestNecessaryIfAlive =
         let I = fix.I
 
         let x = I.Var.Create 13
-        I.SetCutoff (I.Var.Watch x) Cutoff.never
+        I.Var.Watch x |> I.SetCutoff Cutoff.never
 
         let t = I.NecessaryIfAlive (I.Var.Watch x)
         let o = I.Observe t

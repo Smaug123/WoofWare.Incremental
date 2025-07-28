@@ -1,6 +1,7 @@
 namespace WoofWare.Incremental.Test
 
 open System
+open System.Diagnostics
 open FsUnitTyped
 open NUnit.Framework
 open WoofWare.Incremental
@@ -30,30 +31,37 @@ module TestNonDebug =
     // Debug-enabled incremental allocates a bunch of words during stabilization,
     // so we only run this test for non-debug incremental.
     [<Test>]
+    [<Explicit "not yet passing; in fact recompute allocates wildly visiting the crates">]
     [<NonParallelizable>]
-    [<Explicit "not yet passing">]
     let ``Stabilization propagating values through an existing graph should not allocate`` () =
-        let I = Incremental.make ()
-        let v' = I.Var.Create 0
-        let v = I.Map ((+) 1) (I.Var.Watch v')
-        let w' = I.Var.Create 0
-        let w = I.Map ((+) 1) (I.Var.Watch w')
-        let a = I.Map ((+) 1) v
-        let b = I.Map ((+) 1) w
-        let o = I.Observe (I.Map2 (+) a b)
+        let oldDebug = Debug.globalFlag
 
-        // The first stabilization allocates, but the next two do not.
-        //   The point is that stabilization shouldn't allocate anything except to create
-        //   new nodes. This means that it is okay for stabilization to allocate new
-        //   nodes when the rhs of a bind node changes, but if the shape of the graph
-        //   has not changed, then it shouldn't allocate.
+        try
+            Debug.globalFlag <- false
+            Gc.collect ()
+            let I = Incremental.make ()
+            let v' = I.Var.Create 0
+            let v = I.Map ((+) 1) (I.Var.Watch v')
+            let w' = I.Var.Create 0
+            let w = I.Map ((+) 1) (I.Var.Watch w')
+            let a = I.Map ((+) 1) v
+            let b = I.Map ((+) 1) w
+            let o = I.Observe (I.Map2 (+) a b)
 
-        I.Stabilize ()
-        I.Var.Set v' 4
+            // The first stabilization allocates, but the next two do not.
+            //   The point is that stabilization shouldn't allocate anything except to create
+            //   new nodes. This means that it is okay for stabilization to allocate new
+            //   nodes when the rhs of a bind node changes, but if the shape of the graph
+            //   has not changed, then it shouldn't allocate.
 
-        noAlloc I.Stabilize
-        I.Var.Set v' 5
-        I.Var.Set w' 5
-        noAlloc I.Stabilize
+            I.Stabilize ()
+            I.Var.Set v' 4
 
-        Observer.disallowFutureUse o
+            noAlloc I.Stabilize
+            I.Var.Set v' 5
+            I.Var.Set w' 5
+            noAlloc I.Stabilize
+
+            Observer.disallowFutureUse o
+        finally
+            Debug.globalFlag <- oldDebug

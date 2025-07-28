@@ -6,3 +6,8 @@ module Result =
         match r with
         | Ok o -> o
         | Error e -> failwith $"error: {e}"
+
+    let getError r =
+        match r with
+        | Error e -> e
+        | Ok o -> failwith $"unexpectedly OK: {o}"

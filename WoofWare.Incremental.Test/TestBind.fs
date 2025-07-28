@@ -17,7 +17,7 @@ module TestBind =
         let o = I.Observe (I.Const 13 |> I.Bind I.Const)
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
     [<Test>]
     let ``bind of a constant is invalidated`` () =
@@ -25,7 +25,6 @@ module TestBind =
         let I = fix.I
 
         isInvalidatedOnBindRhs fix (fun i -> I.Bind (fun _ -> I.Const i) (I.Const i))
-        |> shouldEqual true
 
     [<Test>]
     let ``bind created with invalid RHS`` () =
@@ -105,16 +104,18 @@ module TestBind =
 
         let v1 = I.Var.Create 0
         let i1 = I.Var.Watch v1
-        let i4 = i1 |> I.Bind (fun x1 -> i1 |> I.Bind (fun x2 -> I.Const (x1 + x2)))
+        let i2 = i1 |> I.Map ((+) 1)
+        let i3 = i1 |> I.Map ((+) 2)
+        let i4 = i2 |> I.Bind (fun x1 -> i3 |> I.Bind (fun x2 -> I.Const (x1 + x2)))
         let o4 = I.Observe i4
 
         fix.Stabilize ()
 
-    // for x = 0 to 0 do
-    //     Gc.collect ()
-    //     I.Var.Set v1 x
-    //     fix.Stabilize ()
-    //     Observer.valueThrowing o4 |> shouldEqual ((2 * x) + 3)
+        for x = 0 to 19 do
+            Gc.collect ()
+            I.Var.Set v1 x
+            fix.Stabilize ()
+            Observer.value o4 |> shouldEqual ((2 * x) + 3)
 
     [<Test>]
     let ``graph changes only`` () =
@@ -128,7 +129,7 @@ module TestBind =
 
         let check expect =
             fix.Stabilize ()
-            Observer.valueThrowing o |> shouldEqual expect
+            Observer.value o |> shouldEqual expect
 
         check 3
         I.Var.Set x false
@@ -156,8 +157,8 @@ module TestBind =
         let check () =
             fix.Stabilize ()
 
-            Observer.valueThrowing tO
-            |> shouldEqual (Observer.valueThrowing (if Observer.valueThrowing o2 then o0 else o1))
+            Observer.value tO
+            |> shouldEqual (Observer.value (if Observer.value o2 then o0 else o1))
 
         check ()
         I.Var.Set x0 17
@@ -254,7 +255,7 @@ module TestBind =
         I.Var.Set test true
         fix.Stabilize ()
         NodeHelpers.isValid else_ |> shouldEqual false
-        Observer.valueThrowing o2 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 13
         Observer.disallowFutureUse o1
         Observer.disallowFutureUse o2
 
@@ -278,7 +279,7 @@ module TestBind =
         let escaped = r.Value
         let escapedO = I.Observe escaped
         fix.Stabilize ()
-        Observer.valueThrowing escapedO |> shouldEqual 4
+        Observer.value escapedO |> shouldEqual 4
 
         I.Var.Set x 5
         fix.Stabilize ()

@@ -3,10 +3,10 @@ namespace WoofWare.Incremental
 // An UnorderedArrayFold<'a, 'acc> is a kind of DAG node, where 'a is the type of value being folded
 // and 'acc is the type of the accumulator.
 
-type internal FoldUpdate<'a, 'b> =
-    | FInverse of ('b -> 'a -> 'b)
+type FoldUpdate<'elt, 'acc> =
+    | FInverse of ('acc -> 'elt -> 'acc)
     // 'a params are old, then new
-    | Update of ('b -> 'a -> 'a -> 'b)
+    | Update of ('acc -> 'elt -> 'elt -> 'acc)
 
 [<RequireQualifiedAccess>]
 module internal UnorderedArrayFold =

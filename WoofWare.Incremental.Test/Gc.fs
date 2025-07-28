@@ -4,7 +4,7 @@ open System
 
 [<RequireQualifiedAccess>]
 module Gc =
-    let collect () =
+    let inline collect () =
         GC.Collect ()
         GC.WaitForPendingFinalizers ()
         GC.Collect ()

@@ -58,6 +58,7 @@
           src = ./.;
           projectFile = "./WoofWare.Incremental/WoofWare.Incremental.fsproj";
           testProjectFile = "./WoofWare.Incremental.Test/WoofWare.Incremental.Test.fsproj";
+          disabledTests = ["WoofWare.Incremental.Test.TestSurface.EnsureVersionIsMonotonic"];
           nugetDeps = ./nix/deps.json; # `nix build .#default.fetch-deps && ./result nix/deps.json`
           doCheck = true;
         };

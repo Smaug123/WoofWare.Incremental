@@ -19,7 +19,7 @@ type TestJoin (joinViaBind : bool) =
 
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual 1
+        Observer.value o |> shouldEqual 1
 
     [<Test>]
     member _.``graph changes only`` () =
@@ -32,7 +32,7 @@ type TestJoin (joinViaBind : bool) =
 
         let check expect =
             fix.Stabilize ()
-            Observer.valueThrowing o |> shouldEqual expect
+            Observer.value o |> shouldEqual expect
 
         check 3
         I.Var.Set x b
@@ -51,20 +51,20 @@ type TestJoin (joinViaBind : bool) =
         let o = I.Observe (join I (I.Var.Watch v3))
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 1
+        Observer.value o |> shouldEqual 1
 
         I.Var.Set v1 13
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
         I.Var.Set v3 (I.Var.Watch v2)
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 2
+        Observer.value o |> shouldEqual 2
 
         I.Var.Set v3 (I.Var.Watch v1)
         I.Var.Set v1 14
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 14
+        Observer.value o |> shouldEqual 14
 
     [<Test>]
     member _.``an invalid unused RHS doesn't invalidate the join`` () =
@@ -89,7 +89,7 @@ type TestJoin (joinViaBind : bool) =
         // invalidate
         I.Var.Set x (I.Const 3)
         fix.Stabilize ()
-        Observer.valueThrowing o2 |> shouldEqual 3
+        Observer.value o2 |> shouldEqual 3
         Observer.disallowFutureUse o1
         Observer.disallowFutureUse o2
 

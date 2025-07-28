@@ -24,8 +24,8 @@ module TestListFunctions =
                 match vars with
                 | [] ->
                     fix.Stabilize ()
-                    let expected = listF id (Observer.valueThrowing all)
-                    Observer.valueThrowing q |> shouldEqual expected
+                    let expected = listF id (Observer.value all)
+                    Observer.value q |> shouldEqual expected
                 | var :: vars ->
                     for b in [ false ; true ] do
                         I.Var.Set var b

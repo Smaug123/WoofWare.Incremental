@@ -11,23 +11,23 @@ module TestMap =
         let I = fix.I
         let o = I.Observe (mapN (I.Const 1))
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual n
+        Observer.value o |> shouldEqual n
 
         let x = I.Var.Create 1
         let o = I.Observe (mapN (I.Var.Watch x))
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual n
+        Observer.value o |> shouldEqual n
 
         I.Var.Set x 0
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 0
+        Observer.value o |> shouldEqual 0
 
         I.Var.Set x 2
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual (2 * n)
+        Observer.value o |> shouldEqual (2 * n)
 
         isInvalid fix (mapN fix.Invalid) |> shouldEqual true
-        isInvalidatedOnBindRhs fix (fun i -> mapN (I.Const i)) |> shouldEqual true
+        isInvalidatedOnBindRhs fix (fun i -> mapN (I.Const i))
 
     [<Test>]
     let ``a couple of maps`` () =
@@ -50,11 +50,11 @@ module TestMap =
         let t1o = I.Observe t1
 
         fix.Stabilize ()
-        Observer.valueThrowing t1o |> shouldEqual (Observer.valueThrowing o0 + 1)
+        Observer.value t1o |> shouldEqual (Observer.value o0 + 1)
 
         I.Var.Set x0 14
         fix.Stabilize ()
-        Observer.valueThrowing t1o |> shouldEqual (Observer.valueThrowing o0 + 1)
+        Observer.value t1o |> shouldEqual (Observer.value o0 + 1)
 
         let x1 = I.Var.Create 15
         let o1 = I.Observe (I.Var.Watch x1)
@@ -65,13 +65,11 @@ module TestMap =
 
         let check () =
             fix.Stabilize ()
-            Observer.valueThrowing t1o |> shouldEqual (Observer.valueThrowing o0 + 1)
+            Observer.value t1o |> shouldEqual (Observer.value o0 + 1)
 
-            Observer.valueThrowing t2o
-            |> shouldEqual (Observer.valueThrowing o0 + Observer.valueThrowing o1)
+            Observer.value t2o |> shouldEqual (Observer.value o0 + Observer.value o1)
 
-            Observer.valueThrowing t3o
-            |> shouldEqual (Observer.valueThrowing t1o - Observer.valueThrowing t2o)
+            Observer.value t3o |> shouldEqual (Observer.value t1o - Observer.value t2o)
 
         check ()
         I.Var.Set x0 16
@@ -95,11 +93,11 @@ module TestMap =
         let o = I.Observe (loop n (I.Var.Watch x0))
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual n
+        Observer.value o |> shouldEqual n
 
         I.Var.Set x0 1
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual (n + 1)
+        Observer.value o |> shouldEqual (n + 1)
 
         Observer.disallowFutureUse o
         fix.Stabilize ()

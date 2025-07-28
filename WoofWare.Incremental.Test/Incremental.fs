@@ -72,12 +72,12 @@ module Utils =
     let isInvalid (fix : IncrementalFixture) (t : Node<'a>) =
         let o = fix.I.Observe t
         fix.Stabilize ()
-        let result = Observer.value o |> Result.isError
+        let result = Observer.value' o |> Result.isError
         Observer.disallowFutureUse o
 
         result
 
-    let isInvalidatedOnBindRhs (fix : IncrementalFixture) (f : int -> Node<'a>) : bool =
+    let isInvalidatedOnBindRhs (fix : IncrementalFixture) (f : int -> Node<'a>) : unit =
         let x = fix.I.Var.Create 13
         let r = ref None
 
@@ -97,4 +97,4 @@ module Utils =
         let result = isInvalid fix t
         Observer.disallowFutureUse o1
         Observer.disallowFutureUse o2
-        result
+        result |> shouldEqual true

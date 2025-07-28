@@ -5,11 +5,12 @@ open TypeEquality
 open WoofWare.TimingWheel
 open WoofWare.WeakHashTable
 
+[<Struct>]
 type internal Status =
     | Stabilizing
-    | Running_on_update_handlers
-    | Not_stabilizing
-    | Stabilize_previously_raised of RaisedException
+    | RunningOnUpdateHandlers
+    | NotStabilizing
+    | StabilizePreviouslyRaised of RaisedException
 
 /// The adjust-heights heap is used after an edge is added to the graph from a child node
 /// to a parent node. If the child's height is greater than or equal to the parent's
@@ -468,7 +469,7 @@ and State =
             RunOnUpdateHandlers : RunOnUpdateHandlers Stack
             mutable OnlyInDebug : OnlyInDebug
             WeakHashTables : WeakHashTableCrate ThreadSafeQueue
-            (* Stats.  These are all incremented at the appropriate place, and never decremented. *)
+            // Stats.  These are all incremented at the appropriate place, and never decremented.
             mutable KeepNodeCreationBacktrace : bool
             mutable NumNodesBecameNecessary : int
             mutable NumNodesBecameUnnecessary : int
@@ -534,9 +535,11 @@ module internal BindCrate =
             member _.Apply e = e.Eval bind
         }
 
+/// Module for extension methods on the NodeCrate type.
 [<AutoOpen>]
 module CrateExtensions =
     type NodeCrate with
+        /// Construct a NodeCrate from a Node, i.e. hiding its type parameter.
         static member make (node : Node<'a>) : NodeCrate =
             { new NodeCrate with
                 member _.Apply e = e.Eval node

@@ -1,11 +1,5 @@
 namespace WoofWare.Incremental
 
-open System
-
-// module As_recompute_list = Node.Packed.As_list (struct
-//     let next (Node.Packed.T node) = node.next_in_recompute_heap
-//   end)
-
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module RecomputeHeap =
@@ -191,12 +185,26 @@ module RecomputeHeap =
 
         t.HeightLowerBound
 
-    let removeMin t : NodeCrate =
+    let private reduceRecomputeHeap =
+        { new NodeEval<_> with
+            member _.Eval node =
+                node.HeightInRecomputeHeap <- -1
+                node.NextInRecomputeHeap
+        }
+
+    let private clearNextInRecomputeHeap =
+        { new NodeEval<_> with
+            member _.Eval node =
+                node.NextInRecomputeHeap <- ValueNone
+                FakeUnit.ofUnit ()
+        }
+
+    let removeMin (t : RecomputeHeap) : NodeCrate =
         if Debug.globalFlag then
             if isEmpty t then
                 failwith "expected nonempty if there was a min"
 
-        let nodesByHeight = t.NodesByHeight in
+        let nodesByHeight = t.NodesByHeight
         let mutable node = nodesByHeight.[t.HeightLowerBound]
 
         while node.IsNone do
@@ -207,19 +215,24 @@ module RecomputeHeap =
 
             node <- nodesByHeight.[t.HeightLowerBound]
 
-        { new NodeEval<_> with
-            member _.Eval node =
-                node.HeightInRecomputeHeap <- -1
-                t.Length <- t.Length - 1
-                let next = node.NextInRecomputeHeap
-                t.NodesByHeight.[t.HeightLowerBound] <- next
-                setPrev next ValueNone
+        t.Length <- t.Length - 1
 
-                if Debug.globalFlag then
+        let next = node.Value.Apply reduceRecomputeHeap
+
+        t.NodesByHeight.[t.HeightLowerBound] <- next
+        setPrev next ValueNone
+
+        if Debug.globalFlag then
+            { new NodeEval<_> with
+                member _.Eval node =
                     if node.PrevInRecomputeHeap.IsSome then
                         failwith "expected prev node to be None"
 
-                node.NextInRecomputeHeap <- ValueNone
-                NodeCrate.make node
-        }
-        |> node.Value.Apply
+                    FakeUnit.ofUnit ()
+            }
+            |> node.Value.Apply
+            |> FakeUnit.toUnit
+
+        node.Value.Apply clearNextInRecomputeHeap |> FakeUnit.toUnit
+
+        node.Value

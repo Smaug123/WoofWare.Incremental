@@ -46,7 +46,7 @@ module TestIncrementalFailures =
 
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual 3
+        Observer.value o |> shouldEqual 3
 
         r.Value <- j
 
@@ -185,7 +185,7 @@ module TestIncrementalFailures =
         I.Var.Set w a
         I.Var.Set v (I.Const 2)
         I.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 4
+        Observer.value o |> shouldEqual 4
         // a depends on b
         I.Var.Set w (I.Const 3)
         I.Var.Set v b
@@ -206,17 +206,17 @@ module TestIncrementalFailures =
             let b = join (I.Var.Watch w)
             let o = I.Observe (I.Map2 (+) a b)
             I.Stabilize ()
-            Observer.valueThrowing o |> shouldEqual 0
+            Observer.value o |> shouldEqual 0
             // b depends on a, doing `Var.Set` in the other order
             I.Var.Set v (I.Const 2)
             I.Var.Set w a
             I.Stabilize ()
-            Observer.valueThrowing o |> shouldEqual 4
+            Observer.value o |> shouldEqual 4
             // a depends on b
             I.Var.Set v b
             I.Var.Set w (I.Const 3)
             I.Stabilize ()
-            Observer.valueThrowing o |> shouldEqual 6
+            Observer.value o |> shouldEqual 6
 
     [<Test>]
     let ``The cycle that isn't created in the above two tests`` () =
@@ -248,7 +248,7 @@ module TestIncrementalFailures =
         let o = I.Observe (I.Map2 (+) a.Value b.Value)
 
         I.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 4
+        Observer.value o |> shouldEqual 4
 
         I.Var.Set v false
 
@@ -259,7 +259,7 @@ module TestIncrementalFailures =
 
     let timeNsOfString (s : string) : TimeNs =
         let sinceEpoch = DateTime.Parse(s).Subtract(DateTime.UnixEpoch).TotalMicroseconds
-        sinceEpoch * 10.0 |> int64<float> |> (*) 1L<timeNs>
+        sinceEpoch * 10.0 |> int64<float> |> (fun x -> x * 1L<timeNs>)
 
     [<Test>]
     let ``atIntervals doesn't try to add alarms before the current time`` () =
@@ -295,7 +295,7 @@ module TestIncrementalFailures =
         let o = I.Observe z
 
         I.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 0
+        Observer.value o |> shouldEqual 0
 
         match I.Expert.DoOneStepOfStabilize () with
         | StepResult.KeepGoing -> ()
@@ -306,9 +306,9 @@ module TestIncrementalFailures =
         while I.Expert.DoOneStepOfStabilize().IsKeepGoing do
             ()
 
-        Observer.valueThrowing o |> shouldEqual 0
+        Observer.value o |> shouldEqual 0
         I.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 2
+        Observer.value o |> shouldEqual 2
 
     [<Test>]
     let ``stabilizing in the middle of a partial stabilization should raise`` () =
@@ -321,7 +321,7 @@ module TestIncrementalFailures =
 
         I.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual 0
+        Observer.value o |> shouldEqual 0
 
         match I.Expert.DoOneStepOfStabilize () with
         | StepResult.KeepGoing -> ()

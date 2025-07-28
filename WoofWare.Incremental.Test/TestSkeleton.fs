@@ -21,7 +21,7 @@ module TestSkeleton =
         let obs = I.Observe res
         I.Stabilize ()
 
-        let result = Observer.valueThrowing obs
+        let result = Observer.value obs
         result |> shouldEqual 2
 
         let skeleton = Skeleton.snapshot (Some true) I.State
@@ -97,7 +97,7 @@ numStabilizes:1"
         let result = I.Observe node
         I.Stabilize ()
 
-        let result = Observer.valueThrowing result
+        let result = Observer.value result
         result |> shouldEqual "hello!"
 
         let skeleton = Skeleton.snapshot (Some true) I.State
@@ -189,7 +189,7 @@ numStabilizes:1"
         let observer = I.Observe node
         I.Stabilize ()
 
-        let result = Observer.valueThrowing observer
+        let result = Observer.value observer
         result |> shouldEqual 0
 
         let skeleton = Skeleton.snapshot (Some true) I.State
@@ -245,7 +245,7 @@ numStabilizes:1"
 
         I.Var.Set ai 3
         I.Stabilize ()
-        Observer.valueThrowing observer |> shouldEqual 12
+        Observer.value observer |> shouldEqual 12
 
         let newSkeleton = Skeleton.snapshot (Some true) I.State
 

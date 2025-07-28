@@ -1,11 +1,13 @@
 namespace WoofWare.Incremental
 
 [<RequireQualifiedAccess>]
+[<Struct>]
 type internal StaleResult =
     | AlreadyStale
     | Ok
 
 [<RequireQualifiedAccess>]
+[<Struct>]
 type internal BeforeMainComputationResult =
     | Invalid
     | Ok
@@ -151,6 +153,13 @@ module internal Expert =
         |> packedEdgeOpt.Value.Apply
         |> FakeUnit.toUnit
 
+    let private runOnChangeEval =
+        { new ExpertEdgeEval<_> with
+            member _.Eval r =
+                r.OnChange r.Child.ValueOpt.Value
+                FakeUnit.ofUnit ()
+        }
+
     let beforeMainComputation (t : Expert<'a>) : BeforeMainComputationResult =
         if t.NumInvalidChildren > 0 then
             BeforeMainComputationResult.Invalid
@@ -161,13 +170,7 @@ module internal Expert =
 
             if willFireAllCallbacks then
                 for i = 0 to t.NumChildren - 1 do
-                    { new ExpertEdgeEval<_> with
-                        member _.Eval r =
-                            r.OnChange r.Child.ValueOpt.Value
-                            FakeUnit.ofUnit ()
-                    }
-                    |> t.Children.[i].Value.Apply
-                    |> FakeUnit.toUnit
+                    t.Children.[i].Value.Apply runOnChangeEval |> FakeUnit.toUnit
 
             BeforeMainComputationResult.Ok
 
@@ -181,17 +184,18 @@ module internal Expert =
            child. *)
             t.NumInvalidChildren <- 0
 
-    let runEdgeCallback (t : Expert<'a>) (childIndex : int) : unit =
-        if not t.WillFireAllCallbacks then
-            { new ExpertEdgeEval<_> with
-                member _.Eval r =
-                    (* This value is not necessarily set, because we try to run this when connecting the
+    let private runEdgeCallbackEval =
+        { new ExpertEdgeEval<_> with
+            member _.Eval r =
+                (* This value is not necessarily set, because we try to run this when connecting the
                    node to its children, which could be before they have run even once.  Also the node
                    could be invalid. *)
-                    match r.Child.ValueOpt with
-                    | ValueSome v -> r.OnChange v
-                    | ValueNone -> ()
-                    |> FakeUnit.ofUnit
-            }
-            |> t.Children.[childIndex].Value.Apply
-            |> FakeUnit.toUnit
+                match r.Child.ValueOpt with
+                | ValueSome v -> r.OnChange v
+                | ValueNone -> ()
+                |> FakeUnit.ofUnit
+        }
+
+    let runEdgeCallback (t : Expert<'a>) (childIndex : int) : unit =
+        if not t.WillFireAllCallbacks then
+            t.Children.[childIndex].Value.Apply runEdgeCallbackEval |> FakeUnit.toUnit

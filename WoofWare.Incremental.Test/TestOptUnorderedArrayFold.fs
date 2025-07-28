@@ -13,15 +13,15 @@ module TestOptUnorderedArrayFold =
         let I = fix.I
 
         let o =
-            I.OptUnorderedArrayFold<int, _>
-                [||]
+            [||]
+            |> I.OptUnorderedArrayFold<int, _>
                 ()
                 (fun _ -> failwith "should not call")
                 (fun _ -> failwith "should not call")
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing(o).IsSome |> shouldEqual true
+        Observer.value(o).IsSome |> shouldEqual true
 
     [<Test>]
     let ``non-empty arr`` () =
@@ -32,12 +32,13 @@ module TestOptUnorderedArrayFold =
         let y = I.Var.Create None
 
         let t =
-            I.OptUnorderedArrayFold [| I.Var.Watch x ; I.Var.Watch y |] 0 (+) (-)
+            [| I.Var.Watch x ; I.Var.Watch y |]
+            |> I.OptUnorderedArrayFold 0 (+) (-)
             |> I.Observe
 
         let check expect =
             fix.Stabilize ()
-            Observer.valueThrowing t |> shouldEqual expect
+            Observer.value t |> shouldEqual expect
 
         check None
         I.Var.Set x (Some 13)

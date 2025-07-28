@@ -18,7 +18,7 @@ module TestScope =
         let o = I.WithinScope I.CurrentScope (fun () -> I.Const 13) |> I.Observe
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
     [<Test>]
     let ``escape a bind`` () =
@@ -40,13 +40,13 @@ module TestScope =
         fix.Stabilize ()
         let o2 = I.Observe r.Value.Value
         fix.Stabilize ()
-        Observer.valueThrowing o2 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 13
         I.Var.Set x 14
         fix.Stabilize ()
-        Observer.valueThrowing o2 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 13
         Observer.disallowFutureUse o
         fix.Stabilize ()
-        Observer.valueThrowing o2 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 13
 
     [<Test>]
     let ``return to a bind`` () =
@@ -67,7 +67,7 @@ module TestScope =
         let s = r.Value.Value
         let o2 = I.Observe (I.WithinScope s (fun () -> I.Const 13))
         fix.Stabilize ()
-        Observer.valueThrowing o2 |> shouldEqual 13
+        Observer.value o2 |> shouldEqual 13
         I.Var.Set x 14
         Observer.disallowFutureUse o2
         fix.Stabilize ()
@@ -93,9 +93,9 @@ module TestScope =
 
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual true
+        Observer.value o |> shouldEqual true
 
         I.Var.Set i false
         fix.Stabilize ()
 
-        Observer.valueThrowing o |> shouldEqual false
+        Observer.value o |> shouldEqual false

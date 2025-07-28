@@ -13,9 +13,9 @@ module internal Stack =
         for i in s do
             invA i
 
-    let pop<'a> (s : Stack<'a>) : 'a option =
+    let pop<'a> (s : Stack<'a>) : 'a voption =
         match s.TryPop () with
-        | false, _ -> None
-        | true, v -> Some v
+        | false, _ -> ValueNone
+        | true, v -> ValueSome v
 
     let create<'a> () = Stack<'a> ()

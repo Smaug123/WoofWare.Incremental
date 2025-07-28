@@ -18,7 +18,7 @@ module TestSum =
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 13
+        Observer.value o |> shouldEqual 13
 
     [<Test>]
     let ``full recompute`` () =
@@ -45,20 +45,20 @@ module TestSum =
         fix.Stabilize ()
         numAdds |> shouldEqual 2
         numSubs |> shouldEqual 0
-        Observer.valueThrowing z |> shouldEqual 28.0
+        Observer.value z |> shouldEqual 28.0
 
         I.Var.Set x 17.0
         fix.Stabilize ()
         numAdds |> shouldEqual 3
         numSubs |> shouldEqual 1
-        Observer.valueThrowing z |> shouldEqual 32.0
+        Observer.value z |> shouldEqual 32.0
 
         I.Var.Set x 19.0
         fix.Stabilize ()
         // increases 2 for the full recompute
         numAdds |> shouldEqual 5
         numSubs |> shouldEqual 1
-        Observer.valueThrowing z |> shouldEqual 34.0
+        Observer.value z |> shouldEqual 34.0
 
     [<Test>]
     let ``empty optSum`` () =
@@ -70,7 +70,7 @@ module TestSum =
             |> I.Observe
 
         fix.Stabilize ()
-        Observer.valueThrowing(o).IsSome |> shouldEqual true
+        Observer.value(o).IsSome |> shouldEqual true
 
     [<Test>]
     let ``full recompute, opt`` () =
@@ -83,7 +83,7 @@ module TestSum =
 
         let check expect =
             fix.Stabilize ()
-            Observer.valueThrowing t |> shouldEqual expect
+            Observer.value t |> shouldEqual expect
 
         check ValueNone
         I.Var.Set x (ValueSome 13)
@@ -100,17 +100,17 @@ module TestSum =
         let y = I.Var.Create (ofInt 15)
         let z = I.Observe (sum [| I.Var.Watch x ; I.Var.Watch y |])
         fix.Stabilize ()
-        shouldEqual (ofInt 28) (Observer.valueThrowing z)
+        shouldEqual (ofInt 28) (Observer.value z)
 
         fix.Stabilize ()
         I.Var.Set x (ofInt 17)
         fix.Stabilize ()
-        shouldEqual (ofInt 32) (Observer.valueThrowing z)
+        shouldEqual (ofInt 32) (Observer.value z)
 
         I.Var.Set x (ofInt 19)
         I.Var.Set y (ofInt 21)
         fix.Stabilize ()
-        shouldEqual (ofInt 40) (Observer.valueThrowing z)
+        shouldEqual (ofInt 40) (Observer.value z)
 
     [<Test>]
     let ``test ints`` () =
@@ -131,4 +131,4 @@ module TestSum =
 
         let o = I.Observe (I.Sum None 0.0 (+) (-) [||])
         fix.Stabilize ()
-        Observer.valueThrowing o |> shouldEqual 0.0
+        Observer.value o |> shouldEqual 0.0
