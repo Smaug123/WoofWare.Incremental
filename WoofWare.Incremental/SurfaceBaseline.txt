@@ -1,4 +1,4 @@
-WoofWare.Incremental.BeforeOrAfter inherit obj, implements WoofWare.Incremental.BeforeOrAfter System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.BeforeOrAfter System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 2 cases
+WoofWare.Incremental.BeforeOrAfter inherit System.ValueType, implements WoofWare.Incremental.BeforeOrAfter System.IEquatable, System.Collections.IStructuralEquatable, WoofWare.Incremental.BeforeOrAfter System.IComparable, System.IComparable, System.Collections.IStructuralComparable - union type with 2 cases
 WoofWare.Incremental.BeforeOrAfter+Tags inherit obj
 WoofWare.Incremental.BeforeOrAfter+Tags.After [static field]: int = 1
 WoofWare.Incremental.BeforeOrAfter+Tags.Before [static field]: int = 0
