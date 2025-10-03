@@ -78,7 +78,7 @@ jobs:
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
       - name: Run analyzers
-        run: cd "$GITHUB_WORKSPACE" && ls -la && ./analyzers/run.sh
+        run: ./analyzers/run.sh
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@3599b3baa15b485a2e49ef411a7a4bb2452e7f93
         with:

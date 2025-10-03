@@ -4,6 +4,10 @@ nix develop --command dotnet build || exit 1
 nix develop --command dotnet restore analyzers/analyzers.fsproj || exit 1
 nix build .#fsharp-analyzers || exit 1
 
+echo "GITHUB: $GITHUB_WORKSPACE"
+echo "PWD: $(pwd)"
+ls -la
+
 nix run .#fsharp-analyzers -- --verbosity detailed --analyzers-path ./.analyzerpackages/G-Research.FSharp.Analyzers/*/ --project WoofWare.Incremental/WoofWare.Incremental.fsproj --report gr.sarif
 exit_code=$?
 
