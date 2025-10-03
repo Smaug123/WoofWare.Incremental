@@ -30,7 +30,7 @@ module internal IfThenElse =
                 }
                 |> cr.Apply
                 |> FakeUnit.toUnit
-            | k -> failwith $"invariant failure: {k}"
+            | k -> failwith $"invariant failure: %O{k}"
 
         do
             match t.CurrentBranch with

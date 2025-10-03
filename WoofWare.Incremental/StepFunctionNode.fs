@@ -26,7 +26,7 @@ module internal StepFunctionNode =
         | Kind.StepFunction t' ->
             if not (physSame t t') then
                 failwith "invariant failed"
-        | k -> failwith $"invariant failed: {k}"
+        | k -> failwith $"invariant failed: %O{k}"
 
         t.Value |> ValueOption.iter invA
 
@@ -41,4 +41,4 @@ module internal StepFunctionNode =
             }
             |> t2.Apply
             |> FakeUnit.toUnit
-        | k -> failwith $"invariant failed: {k}"
+        | k -> failwith $"invariant failed: %O{k}"

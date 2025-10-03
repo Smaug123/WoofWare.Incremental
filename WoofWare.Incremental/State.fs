@@ -1710,7 +1710,7 @@ module internal State =
         let t = Clock.incrState clock
 
         if interval < (TimingWheel.alarmPrecision clock.TimingWheel) then
-            failwith $"at_intervals got too small interval: {interval}"
+            failwith $"at_intervals got too small interval: %i{interval}"
 
         let main = createNode t Kind.Uninitialized
         let base_ = Clock.now clock
@@ -1943,7 +1943,7 @@ module internal State =
             match node.Kind with
             | Kind.Expert e -> Some e
             | Kind.Invalid -> None
-            | k -> failwith $"unexpected kind {k} for expert node"
+            | k -> failwith $"unexpected kind %O{k} for expert node"
 
         let create (state : State) onObservabilityChange f =
             let e = Expert.create f onObservabilityChange

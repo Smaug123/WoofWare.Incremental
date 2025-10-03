@@ -12,7 +12,7 @@ module internal Join =
         | Kind.JoinMain t' ->
             if not (Type.referenceEqual t t') then
                 failwith "invariant failed"
-        | k -> failwith $"invariant failed: {k}"
+        | k -> failwith $"invariant failed: %O{k}"
 
         match t.LhsChange.Kind with
         | Kind.Invalid -> ()
@@ -26,4 +26,4 @@ module internal Join =
             }
             |> t'.Apply
             |> FakeUnit.toUnit
-        | k -> failwith $"invariant failed: {k}"
+        | k -> failwith $"invariant failed: %O{k}"

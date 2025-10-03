@@ -19,6 +19,6 @@ module internal Snapshot =
             | Kind.Snapshot t' ->
                 if not (Type.referenceEqual t t') then
                     failwith "invariant failed"
-            | k -> failwith $"invariant failed: {k}"
+            | k -> failwith $"invariant failed: %O{k}"
 
         inv t.Before

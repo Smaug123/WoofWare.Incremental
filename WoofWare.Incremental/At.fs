@@ -15,4 +15,4 @@ module internal At =
         | Kind.At (t', _) ->
             if not (Type.arePhysEqual t t') then
                 failwith "invariant failed"
-        | k -> failwith $"invariant failed: {k}"
+        | k -> failwith $"invariant failed: %O{k}"
