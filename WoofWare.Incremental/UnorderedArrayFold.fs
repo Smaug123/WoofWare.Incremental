@@ -97,7 +97,7 @@ module internal UnorderedArrayFold =
             }
             |> t'.Apply
             |> FakeUnit.toUnit
-        | k -> failwith $"invariant failed: {k}"
+        | k -> failwith $"invariant failed: %O{k}"
 
         invB f.Init
 

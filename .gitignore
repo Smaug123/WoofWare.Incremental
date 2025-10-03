@@ -13,3 +13,5 @@ result
 
 **/Generated*.fs
 incremental/
+.analyzerpackages/
+*.sarif

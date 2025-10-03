@@ -62,6 +62,29 @@ jobs:
       - name: Run Fantomas
         run: nix run .#fantomas -- --check .
 
+  analyzers:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # so that NerdBank.GitVersioning has access to history
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - name: Run analyzers
+        run: ./analyzers/run.sh
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@3599b3baa15b485a2e49ef411a7a4bb2452e7f93
+        with:
+          sarif_file: gr.sarif
+          category: g-research
+
   check-nix-format:
     runs-on: ubuntu-latest
     steps:
@@ -166,7 +189,7 @@ jobs:
 
   all-required-checks-complete:
     if: ${{ always() }}
-    needs: [check-dotnet-format, check-nix-format, build, build-nix, flake-check, nuget-pack, expected-pack, github-release-dry-run]
+    needs: [check-dotnet-format, check-nix-format, build, build-nix, flake-check, nuget-pack, expected-pack, github-release-dry-run, analyzers]
     runs-on: ubuntu-latest
     steps:
       - uses: G-Research/common-actions/check-required-lite@2b7dc49cb14f3344fbe6019c14a31165e258c059

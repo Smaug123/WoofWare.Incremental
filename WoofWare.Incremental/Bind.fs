@@ -37,7 +37,7 @@ module Bind =
             }
             |> cr.Apply
             |> FakeUnit.toUnit
-        | k -> failwith $"invariant failed: {k}"
+        | k -> failwith $"invariant failed: %O{k}"
 
         match t.RhsScope with
         | Scope.Top -> failwith "invariant failed"
@@ -86,4 +86,4 @@ module Bind =
                 }
                 |> node.Apply
                 |> FakeUnit.toUnit
-            | k -> failwith $"invariant failed: {k}"
+            | k -> failwith $"invariant failed: %O{k}"
