@@ -1,12 +1,16 @@
 namespace WoofWare.Incremental
 
+#nowarn 842
 [<RequireQualifiedAccess>]
+#warnon 842
 [<Struct>]
 type internal StaleResult =
     | AlreadyStale
     | Ok
 
+#nowarn 842
 [<RequireQualifiedAccess>]
+#warnon 842
 [<Struct>]
 type internal BeforeMainComputationResult =
     | Invalid
