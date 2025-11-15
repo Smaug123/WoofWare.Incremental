@@ -6,13 +6,17 @@ namespace WoofWare.Incremental
     incrementally. The operations to change the set of children and to react to various
     events (new value in a child etc) are exposed to the user. *)
 
+#nowarn 842
 [<RequireQualifiedAccess>]
+#warnon 842
 [<Struct>]
 type internal StaleResult =
     | AlreadyStale
     | Ok
 
+#nowarn 842
 [<RequireQualifiedAccess>]
+#warnon 842
 [<Struct>]
 type internal BeforeMainComputationResult =
     | Invalid
