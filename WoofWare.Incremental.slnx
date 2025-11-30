@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="WoofWare.Incremental.Test/WoofWare.Incremental.Test.fsproj" />
+  <Project Path="WoofWare.Incremental/WoofWare.Incremental.fsproj" />
+</Solution>
