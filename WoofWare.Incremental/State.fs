@@ -115,8 +115,8 @@ module internal State =
         | Status.RunningOnUpdateHandlers
         | Status.Stabilizing -> true
         | Status.NotStabilizing -> false
-        | Status.StabilizePreviouslyRaised raised_exn ->
-            failwith "TODO: reraise exception: 'cannot call am_stabilizing -- stabilize previously raised'"
+        | Status.StabilizePreviouslyRaised raised ->
+            RaisedException.reraiseWithMessage raised "cannot call am_stabilizing -- stabilize previously raised"
 
     let invariant (t : State) : unit =
         match t.Status with
