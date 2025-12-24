@@ -10,17 +10,17 @@ module internal Node =
 
     let same (t1 : Node<'a>) (t2 : Node<'b>) = Type.referenceEqual' t1 t2
 
-    let private nodeIdEval : NodeEval<NodeId> =
+    let private nodeAsObjEval : NodeEval<obj> =
         { new NodeEval<_> with
-            member _.Eval n = n.Id
+            member _.Eval n = n :> obj
         }
 
-    let private nodeIdOfCrate (t : NodeCrate) = t.Apply nodeIdEval
+    // Extract the underlying node as obj. Since Node<'a> is a reference type,
+    // this doesn't allocate - it just returns the same reference.
+    let private nodeAsObj (t : NodeCrate) = t.Apply nodeAsObjEval
 
-    // Comparing node IDs is equivalent to reference equality because each Node receives a unique
-    // ID from NodeId.next() at creation time (via Interlocked.Increment), IDs are never reused,
-    // and a Node's ID never changes after construction.
-    let packedSame (t1 : NodeCrate) (t2 : NodeCrate) = nodeIdOfCrate t1 = nodeIdOfCrate t2
+    let packedSame (t1 : NodeCrate) (t2 : NodeCrate) =
+        Object.ReferenceEquals (nodeAsObj t1, nodeAsObj t2)
 
     let initialNumChildren (n : Node<_>) : int = Kind.initialNumChildren n.Kind
     let iteriChildren (t : Node<'a>) (f : int -> NodeCrate -> unit) : unit = Kind.iteriChildren t.Kind f
