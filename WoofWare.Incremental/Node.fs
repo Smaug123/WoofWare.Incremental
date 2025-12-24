@@ -708,13 +708,14 @@ module internal Node =
 module internal NodeCrate =
     open System.Collections.Generic
 
-    let invariant (t : NodeCrate) =
+    let private invariantEval : NodeEval<FakeUnit> =
         { new NodeEval<_> with
             member _.Eval x =
                 Node.invariant ignore x |> FakeUnit.ofUnit
         }
-        |> t.Apply
-        |> FakeUnit.toUnit
+
+    let invariant (t : NodeCrate) =
+        t.Apply invariantEval |> FakeUnit.toUnit
 
     type AsList =
         {
@@ -855,3 +856,38 @@ module internal NodeCrate =
         }
 
     let isInRecomputeHeap (n : NodeCrate) : bool = n.Apply isInRecomputeHeapEval
+
+    let private prevInRecomputeHeapEval =
+        { new NodeEval<_> with
+            member _.Eval n = n.PrevInRecomputeHeap
+        }
+
+    let prevInRecomputeHeap (n : NodeCrate) : NodeCrate voption = n.Apply prevInRecomputeHeapEval
+
+    let private needsToBeComputedEval =
+        { new NodeEval<_> with
+            member _.Eval n = Node.needsToBeComputed n
+        }
+
+    let needsToBeComputed (n : NodeCrate) : bool = n.Apply needsToBeComputedEval
+
+    let private isNecessaryEval =
+        { new NodeEval<_> with
+            member _.Eval n = NodeHelpers.isNecessary n
+        }
+
+    let isNecessary (n : NodeCrate) : bool = n.Apply isNecessaryEval
+
+    let private isValidEval =
+        { new NodeEval<_> with
+            member _.Eval n = NodeHelpers.isValid n
+        }
+
+    let isValid (n : NodeCrate) : bool = n.Apply isValidEval
+
+    let private nextNodeInSameScopeEval =
+        { new NodeEval<_> with
+            member _.Eval n = n.NextNodeInSameScope
+        }
+
+    let nextNodeInSameScope (n : NodeCrate) : NodeCrate voption = n.Apply nextNodeInSameScopeEval
