@@ -345,6 +345,11 @@ and NodeEval<'ret> =
 and NodeCrate =
     abstract Apply<'TEval, 'ret when 'TEval :> NodeEval<'ret>> : 'TEval -> 'ret
 
+/// Struct visitor interface for allocation-free child iteration.
+/// Implement this on a struct to avoid closure allocations when iterating children.
+and internal IChildVisitor<'TState> =
+    abstract Visit : childIndex : int * child : NodeCrate * state : 'TState -> unit
+
 and internal Observer'<'a> = 'a InternalObserver ref
 
 /// Extra state kept only when [Debug.globalFlag] for the purpose of writing assertions.

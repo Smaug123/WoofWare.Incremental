@@ -40,6 +40,16 @@ module internal Node =
     let initialNumChildren (n : Node<_>) : int = Kind.initialNumChildren n.Kind
     let iteriChildren (t : Node<'a>) (f : int -> NodeCrate -> unit) : unit = Kind.iteriChildren t.Kind f
 
+    /// Allocation-free version of iteriChildren using a struct visitor.
+    let inline iteriChildrenWithVisitor<'a, 'TVisitor, 'TState
+        when 'TVisitor : struct and 'TVisitor :> IChildVisitor<'TState>>
+        (t : Node<'a>)
+        (visitor : 'TVisitor)
+        (state : 'TState)
+        : unit
+        =
+        Kind.iteriChildrenWithVisitor t.Kind visitor state
+
     let userInfo (t : Node<'a>) : string option =
         match t.UserInfo with
         | None -> None

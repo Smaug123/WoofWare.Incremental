@@ -174,6 +174,119 @@ module internal Kind =
             |> cr.Apply
             |> FakeUnit.toUnit
 
+    /// Allocation-free version of iteriChildren using a struct visitor.
+    /// The visitor's Visit method is called for each child with the provided state.
+    let inline iteriChildrenWithVisitor<'a, 'TVisitor, 'TState
+        when 'TVisitor : struct and 'TVisitor :> IChildVisitor<'TState>>
+        (t : Kind<'a>)
+        (visitor : 'TVisitor)
+        (state : 'TState)
+        : unit
+        =
+        match t with
+        | Kind.ArrayFold cr ->
+            { new ArrayFoldEval<_, _> with
+                member _.Eval fold =
+                    for i = 0 to Array.length fold.Children - 1 do
+                        visitor.Visit (i, NodeCrate.make fold.Children.[i], state)
+
+                    FakeUnit.ofUnit ()
+            }
+            |> cr.Apply
+            |> FakeUnit.toUnit
+        | Kind.At _
+        | Kind.AtIntervals _ -> ()
+        | Kind.BindLhsChange (bind, _) ->
+            { new BindEval<_> with
+                member _.Eval bind =
+                    visitor.Visit (0, NodeCrate.make bind.Lhs, state) |> FakeUnit.ofUnit
+            }
+            |> bind.Apply
+            |> FakeUnit.toUnit
+        | Kind.BindMain cr ->
+            { new BindMainEval<_, _> with
+                member _.Eval bind =
+                    visitor.Visit (0, NodeCrate.make bind.LhsChange, state)
+
+                    match bind.Rhs with
+                    | ValueNone -> ()
+                    | ValueSome b -> visitor.Visit (1, NodeCrate.make b, state)
+
+                    FakeUnit.ofUnit ()
+            }
+            |> cr.Apply
+            |> FakeUnit.toUnit
+        | Kind.Const _ -> ()
+        | Kind.Expert expert ->
+            for i = 0 to expert.NumChildren - 1 do
+                { new ExpertEdgeEval<_> with
+                    member _.Eval edge =
+                        visitor.Visit (i, NodeCrate.make edge.Child, state) |> FakeUnit.ofUnit
+                }
+                |> expert.Children.[i].Value.Apply
+                |> FakeUnit.toUnit
+        | Kind.Freeze freeze -> visitor.Visit (0, NodeCrate.make freeze.Child, state)
+        | Kind.IfTestChange (iTC, _) ->
+            { new IfThenElseEval<_> with
+                member _.Eval iTE =
+                    visitor.Visit (0, NodeCrate.make iTE.Test, state) |> FakeUnit.ofUnit
+            }
+            |> iTC.Apply
+            |> FakeUnit.toUnit
+        | Kind.IfThenElse iTE ->
+            visitor.Visit (0, NodeCrate.make iTE.TestChange, state)
+
+            match iTE.CurrentBranch with
+            | ValueNone -> ()
+            | ValueSome b -> visitor.Visit (1, NodeCrate.make b, state)
+        | Kind.Invalid -> ()
+        | Kind.JoinLhsChange (cr, _) ->
+            { new JoinEval<_> with
+                member _.Eval e =
+                    visitor.Visit (0, NodeCrate.make e.Lhs, state) |> FakeUnit.ofUnit
+            }
+            |> cr.Apply
+            |> FakeUnit.toUnit
+        | Kind.JoinMain join ->
+            visitor.Visit (0, NodeCrate.make join.LhsChange, state)
+
+            match join.Rhs with
+            | ValueNone -> ()
+            | ValueSome rhs -> visitor.Visit (1, NodeCrate.make rhs, state)
+        | Kind.Snapshot _ -> ()
+        | Kind.StepFunction stepFunc ->
+            match stepFunc.Child with
+            | ValueNone -> ()
+            | ValueSome child -> visitor.Visit (0, NodeCrate.make child, state)
+        | Kind.Uninitialized -> ()
+        | Kind.UnorderedArrayFold cr ->
+            { new UnorderedArrayFoldEval<_, _> with
+                member _.Eval e =
+                    for i = 0 to Array.length e.Children - 1 do
+                        visitor.Visit (i, NodeCrate.make e.Children.[i], state)
+
+                    FakeUnit.ofUnit ()
+            }
+            |> cr.Apply
+            |> FakeUnit.toUnit
+        | Kind.Var _ -> ()
+        | Kind.Map cr ->
+            { new MapEval<_, _> with
+                member _.Eval (_, node) =
+                    visitor.Visit (0, NodeCrate.make node, state) |> FakeUnit.ofUnit
+            }
+            |> cr.Apply
+            |> FakeUnit.toUnit
+        | Kind.Map2 cr ->
+            { new Map2Eval<_, _> with
+                member _.Eval (_, node0, node1) =
+                    visitor.Visit (0, NodeCrate.make node0, state)
+                    visitor.Visit (1, NodeCrate.make node1, state)
+                    FakeUnit.ofUnit ()
+            }
+            |> cr.Apply
+            |> FakeUnit.toUnit
+
     exception private StopIteration of NodeCrate
 
     /// Only used by Node.invariant, so we don't mind using withReturn and iteriChildren.
