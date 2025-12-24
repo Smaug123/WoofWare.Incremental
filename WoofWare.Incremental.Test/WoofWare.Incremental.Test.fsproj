@@ -39,6 +39,7 @@
     <Compile Include="TestDependOn.fs" />
     <Compile Include="TestNecessaryIfAlive.fs" />
     <Compile Include="TestOptUnorderedArrayFold.fs" />
+    <Compile Include="TestVoptUnorderedArrayFold.fs" />
     <Compile Include="TestSum.fs" />
     <Compile Include="TestUnorderedArrayFold.fs" />
     <Compile Include="TestIncrementalStepFunction.fs" />
