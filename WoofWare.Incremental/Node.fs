@@ -15,11 +15,6 @@ module internal Node =
             member _.Eval n = n :> obj
         }
 
-    let private nodeIdEval : NodeEval<NodeId> =
-        { new NodeEval<_> with
-            member _.Eval n = n.Id
-        }
-
     let private changedAtEval : NodeEval<StabilizationNum> =
         { new NodeEval<_> with
             member _.Eval n = n.ChangedAt
@@ -33,7 +28,6 @@ module internal Node =
     // Extract the underlying node as obj. Since Node<'a> is a reference type,
     // this doesn't allocate - it just returns the same reference.
     let private nodeAsObj (t : NodeCrate) = t.Apply nodeAsObjEval
-    let private nodeIdOfCrate (t : NodeCrate) = t.Apply nodeIdEval
     let private changedAtOfCrate (t : NodeCrate) = t.Apply changedAtEval
     let private isValidCrate (t : NodeCrate) = t.Apply isValidEval
 
@@ -141,12 +135,12 @@ module internal Node =
 
     let hasChild (t : Node<'a>) (child : Node<'b>) : bool =
         let mutable has = false
-        let childId = child.Id
+        let childCrate = NodeCrate.make child
 
         iteriChildren
             t
             (fun _ child' ->
-                if nodeIdOfCrate child' = childId then
+                if packedSame child' childCrate then
                     has <- true
             )
 
@@ -166,12 +160,12 @@ module internal Node =
 
     let hasParent (t : Node<'a>) (parent : Node<'b>) : bool =
         let mutable has = false
-        let parentId = parent.Id
+        let parentCrate = NodeCrate.make parent
 
         iteriParents
             t
             (fun _ parent' ->
-                if nodeIdOfCrate parent' = parentId then
+                if packedSame parent' parentCrate then
                     has <- true
             )
 
