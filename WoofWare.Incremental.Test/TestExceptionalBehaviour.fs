@@ -34,3 +34,10 @@ module TestExceptionalBehaviour =
             snapshotThrows @"System.AggregateException: cannot set var -- stabilization previously raised (oh no!)"
             return! fun () -> I.Var.Set x ()
         }
+
+        expect {
+            snapshotThrows
+                @"System.AggregateException: cannot call am_stabilizing -- stabilize previously raised (oh no!)"
+
+            return! fun () -> I.AmStabilizing |> ignore
+        }
