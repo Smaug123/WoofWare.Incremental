@@ -24,14 +24,14 @@ A copy of that licence is at [LICENCE.md](LICENCE.md).
 
 *This section is entirely quoted from the original OCaml documentation, with minor adjustments to accommodate the port.*
 
-Incremental is a library that gives you a way of building complex computations that can update efficiently in response to their inputs changing, inspired by the work of [[http://www.umut-acar.org/self-adjusting-computation][Umut Acar et. al.]] on self-adjusting computations.
+Incremental is a library that gives you a way of building complex computations that can update efficiently in response to their inputs changing, inspired by the work of [Umut Acar et. al.](http://www.umut-acar.org/self-adjusting-computation) on self-adjusting computations.
 Incremental can be useful in a number of applications, including:
 
 - Building large calculations (of the kind you might build into a spreadsheet) that can react efficiently to changing data.
 - Constructing views in GUI applications that can incorporate new data efficiently.
 - Computing derived data while guaranteeing that the derived data stays in sync with the source data, for instance filtering or inversing a mapping.
 
-You can find an informal introduction to the library in this [[https://blog.janestreet.com/introducing-incremental][blog post]] and [this video](https://www.youtube.com/watch?v=G6a5G5i4gQU).
+You can find an informal introduction to the library in [this blog post](https://blog.janestreet.com/introducing-incremental) and [this video](https://www.youtube.com/watch?v=G6a5G5i4gQU).
 
 ## Incremental in a nutshell
 

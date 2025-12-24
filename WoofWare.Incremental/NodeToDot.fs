@@ -19,6 +19,9 @@ module NodeToDot =
 
         sprintf "%s\n" (DotUserInfo.toString "Mrecord" name (DotUserInfo.toDot info))
 
+    /// Render the graph to DOT format.
+    /// When stableNodeIds is true, all nodes receive the same placeholder name, producing invalid DOT
+    /// but allowing deterministic output for testing. Set to false for usable DOT output.
     let renderDot (stableNodeIds : bool) (emitBindEdges : bool) (write : string -> unit) ts =
         let nodeName =
             if stableNodeIds then
@@ -54,6 +57,6 @@ module NodeToDot =
         write "}\n"
 
     let saveDotToFile (emitBindEdges : bool) (filePath : string) ts =
-        use f = File.Open (filePath, FileMode.OpenOrCreate)
+        use f = File.Open (filePath, FileMode.Create)
         use writer = new StreamWriter (f)
         renderDot false emitBindEdges writer.Write ts
