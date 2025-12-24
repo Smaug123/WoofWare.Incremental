@@ -20,7 +20,7 @@ module internal Node =
     let private nodeAsObj (t : NodeCrate) = t.Apply nodeAsObjEval
 
     let packedSame (t1 : NodeCrate) (t2 : NodeCrate) =
-        Object.ReferenceEquals (nodeAsObj t1, nodeAsObj t2)
+        Type.referenceEqual' (nodeAsObj t1) (nodeAsObj t2)
 
     let initialNumChildren (n : Node<_>) : int = Kind.initialNumChildren n.Kind
     let iteriChildren (t : Node<'a>) (f : int -> NodeCrate -> unit) : unit = Kind.iteriChildren t.Kind f
