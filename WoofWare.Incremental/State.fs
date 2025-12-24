@@ -786,6 +786,151 @@ module internal State =
                         RecomputeHeap.add state.RecomputeHeap parent
                         false
 
+    /// Struct evaluator for Kind.ArrayFold recomputation - returns computed value
+    [<Struct>]
+    type private ArrayFoldRecomputeEval<'result> =
+        interface ArrayFoldEval<'result, 'result> with
+            member _.Eval arrayFold = ArrayFold.compute arrayFold
+
+    /// Struct evaluator for Kind.BindLhsChange recomputation - performs side effects, returns value for maybeChangeValue
+    [<Struct>]
+    type private BindLhsChangeRecomputeEval<'result> =
+        val Node : Node<'result>
+        val Teq : Teq<'result, unit>
+
+        new (node, teq)
+            =
+            {
+                Node = node
+                Teq = teq
+            }
+
+        interface BindEval<'result> with
+            member this.Eval bind =
+                let node = this.Node
+                let teq = this.Teq
+                let t = node.State
+                let oldRhs = bind.Rhs
+                let oldAllNodesCreatedOnRhs = bind.AllNodesCreatedOnRhs
+                bind.AllNodesCreatedOnRhs <- ValueNone
+
+                let rhs =
+                    runWithScope t bind.RhsScope (fun () -> bind.F (Node.valueThrowing bind.Lhs))
+
+                bind.Rhs <- ValueSome rhs
+                node.ChangedAt <- t.StabilizationNum
+                changeChild bind.Main oldRhs rhs Kind.bindRhsChildIndex
+
+                if oldRhs.IsSome then
+                    if t.BindLhsChangeShouldInvalidateRhs then
+                        invalidateNodesCreatedOnRhs oldAllNodesCreatedOnRhs
+                    else
+                        rescopeNodesCreatedOnRhs t oldAllNodesCreatedOnRhs bind.Main.CreatedIn
+
+                    propagateInvalidity t
+
+                if Debug.globalFlag then
+                    assert (NodeHelpers.isValid node)
+
+                Teq.castFrom teq ()
+
+    /// Result type for BindMain evaluation - either valid value or invalid indicator
+    [<Struct>]
+    type private BindMainResult<'a> =
+        | Valid of value : 'a
+        | Invalid
+
+    /// Struct evaluator for Kind.BindMain recomputation - returns value or invalid indicator
+    [<Struct>]
+    type private BindMainRecomputeEval<'result> =
+        interface BindMainEval<'result, BindMainResult<'result>> with
+            member _.Eval bind =
+                let child = bind.Rhs.Value
+
+                if NodeHelpers.isValid child then
+                    Valid (Node.valueThrowing child)
+                else
+                    Invalid
+
+    /// Struct evaluator for Kind.IfTestChange recomputation - performs side effects, returns value for maybeChangeValue
+    [<Struct>]
+    type private IfTestChangeRecomputeEval<'result> =
+        val Node : Node<'result>
+        val Teq : Teq<'result, unit>
+
+        new (node, teq)
+            =
+            {
+                Node = node
+                Teq = teq
+            }
+
+        interface IfThenElseEval<'result> with
+            member this.Eval ifTestChange =
+                let node = this.Node
+                let teq = this.Teq
+                let t = node.State
+                let main = ifTestChange.Main
+                let currentBranch = ifTestChange.CurrentBranch
+
+                let desiredBranch =
+                    if Node.valueThrowing ifTestChange.Test then
+                        ifTestChange.Then
+                    else
+                        ifTestChange.Else
+
+                ifTestChange.CurrentBranch <- ValueSome desiredBranch
+                node.ChangedAt <- t.StabilizationNum
+                changeChild main currentBranch desiredBranch Kind.ifBranchChildIndex
+
+                Teq.castFrom teq ()
+
+    /// Struct evaluator for Kind.JoinLhsChange recomputation - performs side effects, returns value for maybeChangeValue
+    [<Struct>]
+    type private JoinLhsChangeRecomputeEval<'result> =
+        val Node : Node<'result>
+        val Teq : Teq<'result, unit>
+
+        new (node, teq)
+            =
+            {
+                Node = node
+                Teq = teq
+            }
+
+        interface JoinEval<'result> with
+            member this.Eval join =
+                let node = this.Node
+                let teq = this.Teq
+                let t = node.State
+                let lhs = join.Lhs
+                let main = join.Main
+                let oldRhs = join.Rhs
+                let rhs = Node.valueThrowing lhs
+                join.Rhs <- ValueSome rhs
+                node.ChangedAt <- t.StabilizationNum
+                changeChild main oldRhs rhs Kind.joinRhsChildIndex
+                Teq.castFrom teq ()
+
+    /// Struct evaluator for Kind.Map recomputation - returns computed value
+    [<Struct>]
+    type private MapRecomputeEval<'result> =
+        interface MapEval<'result, 'result> with
+            member _.Eval (f, n1) = f (Node.valueThrowing n1)
+
+    /// Struct evaluator for Kind.UnorderedArrayFold recomputation - returns computed value
+    [<Struct>]
+    type private UnorderedArrayFoldRecomputeEval<'result> =
+        interface UnorderedArrayFoldEval<'result, 'result> with
+            member _.Eval u = UnorderedArrayFold.compute u
+
+    /// Struct evaluator for Kind.Map2 recomputation - returns computed value
+    [<Struct>]
+    type private Map2RecomputeEval<'result> =
+        interface Map2Eval<'result, 'result> with
+            member _.Eval (f, n1, n2) =
+                f (Node.valueThrowing n1) (Node.valueThrowing n2)
+
     let rec recompute<'a> (node : 'a Node) : unit =
         let t = node.State
 
@@ -798,12 +943,8 @@ module internal State =
 
         match node.Kind with
         | Kind.ArrayFold arrayFold ->
-            { new ArrayFoldEval<_, _> with
-                member _.Eval arrayFold =
-                    maybeChangeValue node (ArrayFold.compute arrayFold) |> FakeUnit.ofUnit
-            }
-            |> arrayFold.Apply
-            |> FakeUnit.toUnit
+            let value = arrayFold.Apply Unchecked.defaultof<ArrayFoldRecomputeEval<_>>
+            maybeChangeValue node value
         | Kind.At (at, teq) ->
             // It is a bug if we try to compute an [At] node after [at].  [advance_clock] was
             // supposed to convert it to a [Const] at the appropriate time.
@@ -813,53 +954,15 @@ module internal State =
             maybeChangeValue node (Teq.castFrom teq BeforeOrAfter.Before)
         | Kind.AtIntervals (_, teq) -> maybeChangeValue node (Teq.castFrom teq ())
         | Kind.BindLhsChange (bind, teq) ->
-            { new BindEval<_> with
-                member _.Eval bind =
-                    let oldRhs = bind.Rhs
-                    let oldAllNodesCreatedOnRhs = bind.AllNodesCreatedOnRhs
-                    // We clear [all_nodes_created_on_rhs] so it will hold just the nodes created by
-                    // this call to [f].
-                    bind.AllNodesCreatedOnRhs <- ValueNone
-
-                    let rhs =
-                        runWithScope t bind.RhsScope (fun () -> bind.F (Node.valueThrowing bind.Lhs))
-
-                    bind.Rhs <- ValueSome rhs
-                    // Anticipate what [maybe_change_value] will do, to make sure Bind_main is stale
-                    // right away. This way, if the new child is invalid, we'll satisfy the invariant
-                    // saying that [needs_to_be_computed bind_main] in [propagate_invalidity]
-                    node.ChangedAt <- t.StabilizationNum
-                    changeChild bind.Main oldRhs rhs Kind.bindRhsChildIndex
-
-                    if oldRhs.IsSome then
-                        // We invalidate after [change_child], because invalidation changes the [kind] of
-                        // nodes to [Invalid], which means that we can no longer visit their children.
-                        // Also, the [old_rhs] nodes are typically made unnecessary by [change_child], and
-                        // so by invalidating afterwards, we will not waste time adding them to the
-                        // recompute heap and then removing them.
-                        if t.BindLhsChangeShouldInvalidateRhs then
-                            invalidateNodesCreatedOnRhs oldAllNodesCreatedOnRhs
-                        else
-                            rescopeNodesCreatedOnRhs t oldAllNodesCreatedOnRhs bind.Main.CreatedIn
-
-                        propagateInvalidity t
-                    (* [node] was valid at the start of the [Bind_lhs_change] branch, and invalidation
-                      only visits higher nodes, so [node] is still valid. *)
-                    if Debug.globalFlag then
-                        assert (NodeHelpers.isValid node)
-
-                    maybeChangeValue node (Teq.castFrom teq ())
-                    FakeUnit.ofUnit ()
-            }
-            |> bind.Apply
-            |> FakeUnit.toUnit
+            let eval = BindLhsChangeRecomputeEval (node, teq)
+            let value = bind.Apply eval
+            maybeChangeValue node value
         | Kind.BindMain bind ->
-            { new BindMainEval<_, _> with
-                member _.Eval bind : FakeUnit =
-                    copyChild node bind.Rhs.Value |> FakeUnit.ofUnit
-            }
-            |> bind.Apply
-            |> FakeUnit.toUnit
+            match bind.Apply Unchecked.defaultof<BindMainRecomputeEval<_>> with
+            | Valid value -> maybeChangeValue node value
+            | Invalid ->
+                invalidateNode node
+                propagateInvalidity t
         | Kind.Const a -> maybeChangeValue node a
         | Kind.Freeze freeze ->
             let value = Node.valueThrowing freeze.Child
@@ -875,53 +978,19 @@ module internal State =
 
             maybeChangeValue node value
         | Kind.IfTestChange (ifTestChange, teq) ->
-            { new IfThenElseEval<_> with
-                member _.Eval ifTestChange =
-                    let main = ifTestChange.Main
-                    let currentBranch = ifTestChange.CurrentBranch
-
-                    let desiredBranch =
-                        if Node.valueThrowing ifTestChange.Test then
-                            ifTestChange.Then
-                        else
-                            ifTestChange.Else
-
-                    ifTestChange.CurrentBranch <- ValueSome desiredBranch
-                    // see the comment in BindLhsChange
-                    node.ChangedAt <- t.StabilizationNum
-                    changeChild main currentBranch desiredBranch Kind.ifBranchChildIndex
-
-                    maybeChangeValue node (Teq.castFrom teq ())
-                    FakeUnit.ofUnit ()
-            }
-            |> ifTestChange.Apply
-            |> FakeUnit.toUnit
+            let eval = IfTestChangeRecomputeEval (node, teq)
+            let value = ifTestChange.Apply eval
+            maybeChangeValue node value
         | Kind.IfThenElse ite -> copyChild node ite.CurrentBranch.Value
         | Kind.Invalid -> failwith "We never have invalid nodes in the recompute heap; they are never stale."
         | Kind.JoinLhsChange (join, teq) ->
-            { new JoinEval<_> with
-                member _.Eval join =
-                    let lhs = join.Lhs
-                    let main = join.Main
-                    let oldRhs = join.Rhs
-                    let rhs = Node.valueThrowing lhs
-                    join.Rhs <- ValueSome rhs
-                    // see the comment in BindLhsChange
-                    node.ChangedAt <- t.StabilizationNum
-                    changeChild main oldRhs rhs Kind.joinRhsChildIndex
-                    maybeChangeValue node (Teq.castFrom teq ())
-                    FakeUnit.ofUnit ()
-            }
-            |> join.Apply
-            |> FakeUnit.toUnit
+            let eval = JoinLhsChangeRecomputeEval (node, teq)
+            let value = join.Apply eval
+            maybeChangeValue node value
         | Kind.JoinMain join -> copyChild node join.Rhs.Value
         | Kind.Map map ->
-            { new MapEval<_, _> with
-                member _.Eval (f, n1) =
-                    maybeChangeValue node (f (Node.valueThrowing n1)) |> FakeUnit.ofUnit
-            }
-            |> map.Apply
-            |> FakeUnit.toUnit
+            let value = map.Apply Unchecked.defaultof<MapRecomputeEval<_>>
+            maybeChangeValue node value
         | Kind.Snapshot snap ->
             // It is a bug if we try to compute a [Snapshot] and the alarm should have fired.
             // [advance_clock] was supposed to convert it to a [Freeze] at the appropriate
@@ -961,22 +1030,13 @@ module internal State =
 
             maybeChangeValue node stepFunctionValue
         | Kind.UnorderedArrayFold u ->
-            { new UnorderedArrayFoldEval<_, _> with
-                member _.Eval u =
-                    maybeChangeValue node (UnorderedArrayFold.compute u) |> FakeUnit.ofUnit
-            }
-            |> u.Apply
-            |> FakeUnit.toUnit
+            let value = u.Apply Unchecked.defaultof<UnorderedArrayFoldRecomputeEval<_>>
+            maybeChangeValue node value
         | Kind.Uninitialized -> failwith "expected initialised"
         | Kind.Var var -> maybeChangeValue node var.Value
         | Kind.Map2 map2 ->
-            { new Map2Eval<_, _> with
-                member _.Eval (f, n1, n2) =
-                    maybeChangeValue node (f (Node.valueThrowing n1) (Node.valueThrowing n2))
-                    |> FakeUnit.ofUnit
-            }
-            |> map2.Apply
-            |> FakeUnit.toUnit
+            let value = map2.Apply Unchecked.defaultof<Map2RecomputeEval<_>>
+            maybeChangeValue node value
         | Kind.Expert expert ->
             match Expert.beforeMainComputation expert with
             | BeforeMainComputationResult.Invalid ->
