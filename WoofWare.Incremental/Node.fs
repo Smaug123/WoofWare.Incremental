@@ -34,6 +34,9 @@ module internal Node =
     let packedSame (t1 : NodeCrate) (t2 : NodeCrate) =
         Type.referenceEqual' (nodeAsObj t1) (nodeAsObj t2)
 
+    let packedSameAsUnpacked (packed : NodeCrate) (unpacked : Node<'a>) =
+        Type.referenceEqual' (nodeAsObj packed) (unpacked :> obj)
+
     let initialNumChildren (n : Node<_>) : int = Kind.initialNumChildren n.Kind
     let iteriChildren (t : Node<'a>) (f : int -> NodeCrate -> unit) : unit = Kind.iteriChildren t.Kind f
 
@@ -135,12 +138,11 @@ module internal Node =
 
     let hasChild (t : Node<'a>) (child : Node<'b>) : bool =
         let mutable has = false
-        let childCrate = NodeCrate.make child
 
         iteriChildren
             t
             (fun _ child' ->
-                if packedSame child' childCrate then
+                if packedSameAsUnpacked child' child then
                     has <- true
             )
 
@@ -160,12 +162,11 @@ module internal Node =
 
     let hasParent (t : Node<'a>) (parent : Node<'b>) : bool =
         let mutable has = false
-        let parentCrate = NodeCrate.make parent
 
         iteriParents
             t
             (fun _ parent' ->
-                if packedSame parent' parentCrate then
+                if packedSameAsUnpacked parent' parent then
                     has <- true
             )
 
