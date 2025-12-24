@@ -104,7 +104,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="TypeEquality" Version="0.3.0"/>
+    <PackageReference Include="TypeEquality" Version="0.4.2"/>
     <PackageReference Include="WoofWare.BalancedReducer" Version="1.0.5" />
     <PackageReference Include="WoofWare.TimingWheel" Version="0.6.4" />
     <PackageReference Include="WoofWare.WeakHashTable" Version="1.2.2" />

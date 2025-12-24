@@ -1,8 +1,8 @@
 [
   {
     "pname": "ApiSurface",
-    "version": "5.0.1",
-    "hash": "sha256-0GMXEMFgWbbE2OGxW+6h4zGgQHg+IZy1aI13Dn97xSU="
+    "version": "5.0.3",
+    "hash": "sha256-uU5mqLL6zMt17oPYMzhB57ryYC6O6FzSjmdTFg7LvNo="
   },
   {
     "pname": "fantomas",
@@ -16,8 +16,8 @@
   },
   {
     "pname": "FsCheck",
-    "version": "3.3.0",
-    "hash": "sha256-TFDR/uAGv4OqrMX8/reQ4faaAhH9hxTHr1T/YkNPCCU="
+    "version": "3.3.2",
+    "hash": "sha256-3ydyTGpqySynjbcWbmFVeCBnT3KDH3miPSJYJlyxrGs="
   },
   {
     "pname": "fsharp-analyzers",
@@ -46,8 +46,8 @@
   },
   {
     "pname": "Microsoft.ApplicationInsights",
-    "version": "2.22.0",
-    "hash": "sha256-mUQ63atpT00r49ca50uZu2YCiLg3yd6r3HzTryqcuEA="
+    "version": "2.23.0",
+    "hash": "sha256-5sf3bg7CZZjHseK+F3foOchEhmVeioePxMZVvS6Rjb0="
   },
   {
     "pname": "Microsoft.AspNetCore.App.Ref",
@@ -71,13 +71,13 @@
   },
   {
     "pname": "Microsoft.CodeCoverage",
-    "version": "17.14.1",
-    "hash": "sha256-f8QytG8GvRoP47rO2KEmnDLxIpyesaq26TFjDdW40Gs="
+    "version": "18.0.1",
+    "hash": "sha256-G6y5iyHZ3R2shlLCW/uTusio/UqcnWT79X+UAbxvDQY="
   },
   {
     "pname": "Microsoft.NET.Test.Sdk",
-    "version": "17.14.1",
-    "hash": "sha256-mZUzDFvFp7x1nKrcnRd0hhbNu5g8EQYt8SKnRgdhT/A="
+    "version": "18.0.1",
+    "hash": "sha256-0c3/rp9di0w7E5UmfRh6Prrm3Aeyi8NOj5bm2i6jAh0="
   },
   {
     "pname": "Microsoft.NETCore.App.Host.linux-arm64",
@@ -136,43 +136,43 @@
   },
   {
     "pname": "Microsoft.Testing.Extensions.Telemetry",
-    "version": "1.5.3",
-    "hash": "sha256-bIXwPSa3jkr2b6xINOqMUs6/uj/r4oVFM7xq3uVIZDU="
+    "version": "2.0.2",
+    "hash": "sha256-8f23W3125L2ZAExRVwvXSft3a93k+pSb/0CZV0HlFi4="
   },
   {
     "pname": "Microsoft.Testing.Extensions.TrxReport.Abstractions",
-    "version": "1.5.3",
-    "hash": "sha256-IfMRfcyaIKEMRtx326ICKtinDBEfGw/Sv8ZHawJ96Yc="
+    "version": "2.0.2",
+    "hash": "sha256-ePhFIkoWZVt79Tkhu62MxYyIheFMBhf1NUbIimZIZ9c="
   },
   {
     "pname": "Microsoft.Testing.Extensions.VSTestBridge",
-    "version": "1.5.3",
-    "hash": "sha256-XpM/yFjhLSsuzyDV+xKubs4V1zVVYiV05E0+N4S1h0g="
+    "version": "2.0.2",
+    "hash": "sha256-odn6fZO7yaPs3EaEUr12GraVH5anp0r/BabJpJl8q/c="
   },
   {
     "pname": "Microsoft.Testing.Platform",
-    "version": "1.5.3",
-    "hash": "sha256-y61Iih6w5D79dmrj2V675mcaeIiHoj1HSa1FRit2BLM="
+    "version": "2.0.2",
+    "hash": "sha256-K8B4tQaYslm+njUQ59nyvh4f4UgrbOo6DQgO9Hwt0aY="
   },
   {
     "pname": "Microsoft.Testing.Platform.MSBuild",
-    "version": "1.5.3",
-    "hash": "sha256-YspvjE5Jfi587TAfsvfDVJXNrFOkx1B3y1CKV6m7YLY="
+    "version": "2.0.2",
+    "hash": "sha256-RbL2Ie/sQx07hffiao8ScR+yMyYqI8astlC0/uf3bzM="
+  },
+  {
+    "pname": "Microsoft.TestPlatform.AdapterUtilities",
+    "version": "18.0.1",
+    "hash": "sha256-LE5xsyc75ERflV/EA4A4DV+ja2LAb0KR/DPinAG+AgI="
   },
   {
     "pname": "Microsoft.TestPlatform.ObjectModel",
-    "version": "17.12.0",
-    "hash": "sha256-3XBHBSuCxggAIlHXmKNQNlPqMqwFlM952Av6RrLw1/w="
-  },
-  {
-    "pname": "Microsoft.TestPlatform.ObjectModel",
-    "version": "17.14.1",
-    "hash": "sha256-QMf6O+w0IT+16Mrzo7wn+N20f3L1/mDhs/qjmEo1rYs="
+    "version": "18.0.1",
+    "hash": "sha256-oJbS7SZ46RzyOQ+gCysW7qJRy7V8RlQVa5d8uajb91M="
   },
   {
     "pname": "Microsoft.TestPlatform.TestHost",
-    "version": "17.14.1",
-    "hash": "sha256-1cxHWcvHRD7orQ3EEEPPxVGEkTpxom1/zoICC9SInJs="
+    "version": "18.0.1",
+    "hash": "sha256-OXYf5vg4piDr10ve0bZ2ZSb+nb3yOiHayJV3cu5sMV4="
   },
   {
     "pname": "Nerdbank.GitVersioning",
@@ -216,13 +216,13 @@
   },
   {
     "pname": "NUnit",
-    "version": "4.3.2",
-    "hash": "sha256-0RWe8uFoxYp6qhPlDDEghOMcKJgyw2ybvEoAqBLebeE="
+    "version": "4.4.0",
+    "hash": "sha256-5geF5QOF+X/WkuCEgkPVKH4AdKx4U0olpU07S8+G3nU="
   },
   {
     "pname": "NUnit3TestAdapter",
-    "version": "5.0.0",
-    "hash": "sha256-7jZM4qAbIzne3AcdFfMbvbgogqpxvVe6q2S7Ls8xQy0="
+    "version": "6.0.1",
+    "hash": "sha256-EaNIFhALww05XZAS92VGu6/OFrYfJb1llpLazRJQL2I="
   },
   {
     "pname": "runtime.any.System.Runtime",
@@ -306,8 +306,8 @@
   },
   {
     "pname": "TypeEquality",
-    "version": "0.3.0",
-    "hash": "sha256-V50xAOzzyUJrY+MYPRxtnqW5MVeATXCes89wPprv1r4="
+    "version": "0.4.2",
+    "hash": "sha256-YxK6BGHjcuP76j5BbTDi814jxGqOevQSgS00IJcjZSA="
   },
   {
     "pname": "WoofWare.BalancedReducer",
