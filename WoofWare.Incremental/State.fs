@@ -341,78 +341,87 @@ module internal State =
        are unnecessary (nodes can be made necessary without going through their containing
        binds). *)
 
-    let rec invalidateNode<'a> (node : 'a Node) : unit =
-        if not (NodeHelpers.isValid node) then
-            ()
-        else
-            let t = node.State
+    /// Static methods for node invalidation. Uses a type to allow mutual recursion with struct evaluators.
+    type private InvalidationLogic =
+        static member invalidateNode<'a> (node : 'a Node) : unit =
+            if not (NodeHelpers.isValid node) then
+                ()
+            else
+                let t = node.State
 
-            if node.NumOnUpdateHandlers > 0 then
-                handleAfterStabilization node
+                if node.NumOnUpdateHandlers > 0 then
+                    handleAfterStabilization node
 
-            node.ValueOpt <- ValueNone
+                node.ValueOpt <- ValueNone
 
-            if Debug.globalFlag then
-                assert node.OldValueOpt.IsNone
+                if Debug.globalFlag then
+                    assert node.OldValueOpt.IsNone
 
-            node.ChangedAt <- t.StabilizationNum
-            node.RecomputedAt <- t.StabilizationNum
-            t.NumNodesInvalidated <- t.NumNodesInvalidated + 1
+                node.ChangedAt <- t.StabilizationNum
+                node.RecomputedAt <- t.StabilizationNum
+                t.NumNodesInvalidated <- t.NumNodesInvalidated + 1
 
-            if NodeHelpers.isNecessary node then
-                removeChildren node
-                // The node doesn't have children any more, so we can lower its height as much as
-                // possible, to one greater than the scope it was created in.  Also, because we
-                // are lowering the height, we don't need to adjust any of its ancestors' heights.
-                // We could leave the height alone, but we may as well lower it as much as
-                // possible to avoid making the heights of any future ancestors unnecessarily
-                // large.
-                node.Height <- Scope.height node.CreatedIn + 1
-            // We don't set [node.created_in] or [node.next_node_in_same_scope]; we leave [node]
-            // in the scope it was created in.  If that scope is ever invalidated, then that
-            // will clear [node.next_node_in_same_scope]
-            match node.Kind with
-            | Kind.At (at, _) -> removeAlarm at.Clock at.Alarm
-            | Kind.AtIntervals (atIntervals, _) -> removeAlarm atIntervals.Clock atIntervals.Alarm
-            | Kind.BindMain bind ->
-                { new BindMainEval<_, _> with
-                    member _.Eval bind =
-                        invalidateNodesCreatedOnRhs bind.AllNodesCreatedOnRhs |> FakeUnit.ofUnit
-                }
-                |> bind.Apply
-                |> FakeUnit.toUnit
-            | Kind.StepFunction sf -> removeAlarm sf.Clock sf.Alarm
-            | _ -> ()
+                if NodeHelpers.isNecessary node then
+                    removeChildren node
+                    // The node doesn't have children any more, so we can lower its height as much as
+                    // possible, to one greater than the scope it was created in.  Also, because we
+                    // are lowering the height, we don't need to adjust any of its ancestors' heights.
+                    // We could leave the height alone, but we may as well lower it as much as
+                    // possible to avoid making the heights of any future ancestors unnecessarily
+                    // large.
+                    node.Height <- Scope.height node.CreatedIn + 1
+                // We don't set [node.created_in] or [node.next_node_in_same_scope]; we leave [node]
+                // in the scope it was created in.  If that scope is ever invalidated, then that
+                // will clear [node.next_node_in_same_scope]
+                match node.Kind with
+                | Kind.At (at, _) -> removeAlarm at.Clock at.Alarm
+                | Kind.AtIntervals (atIntervals, _) -> removeAlarm atIntervals.Clock atIntervals.Alarm
+                | Kind.BindMain bind -> bind.Apply Unchecked.defaultof<InvalidateBindMainEval<_>> |> FakeUnit.toUnit
+                | Kind.StepFunction sf -> removeAlarm sf.Clock sf.Alarm
+                | _ -> ()
 
-            Node.setKind node Kind.Invalid
-            (* If we called [propagate_invalidity] right away on the parents, we would get into
-           trouble.  The parent would disconnect itself from the current node, thus
-           modifying the list of parents we iterate on.  Even if we made a special case, it
-           still wouldn't be enough to handle other cases where the list of parents is
-           modified (e.g. when [lhs] is invalidated in the example in the comment about
-           [can_recompute_now] far below). *)
-            for index = 0 to node.NumParents - 1 do
-                Stack.push (Node.getParent node index) t.PropagateInvalidity
+                Node.setKind node Kind.Invalid
+                (* If we called [propagate_invalidity] right away on the parents, we would get into
+               trouble.  The parent would disconnect itself from the current node, thus
+               modifying the list of parents we iterate on.  Even if we made a special case, it
+               still wouldn't be enough to handle other cases where the list of parents is
+               modified (e.g. when [lhs] is invalidated in the example in the comment about
+               [can_recompute_now] far below). *)
+                for index = 0 to node.NumParents - 1 do
+                    Stack.push (Node.getParent node index) t.PropagateInvalidity
 
-            if Debug.globalFlag then
-                assert (not (Node.needsToBeComputed node))
+                if Debug.globalFlag then
+                    assert (not (Node.needsToBeComputed node))
 
-            if Node.isInRecomputeHeap node then
-                RecomputeHeap.remove t.RecomputeHeap node
+                if Node.isInRecomputeHeap node then
+                    RecomputeHeap.remove t.RecomputeHeap node
 
-    and invalidateNodesCreatedOnRhs (node : NodeCrate voption) : unit =
-        let mutable r = node
+        static member invalidateNodesCreatedOnRhs (node : NodeCrate voption) : unit =
+            let mutable r = node
 
-        while r.IsSome do
-            { new NodeEval<_> with
-                member _.Eval nodeOnRhs =
-                    r <- nodeOnRhs.NextNodeInSameScope
-                    nodeOnRhs.NextNodeInSameScope <- ValueNone
-                    invalidateNode nodeOnRhs
-                    FakeUnit.ofUnit ()
-            }
-            |> r.Value.Apply
-            |> FakeUnit.toUnit
+            while r.IsSome do
+                r <- r.Value.Apply Unchecked.defaultof<InvalidateNodeEval>
+
+    /// Struct evaluator for BindMain case in invalidateNode. Avoids object expression allocation.
+    and [<Struct>] private InvalidateBindMainEval<'a> =
+        interface BindMainEval<'a, FakeUnit> with
+            member _.Eval bind =
+                InvalidationLogic.invalidateNodesCreatedOnRhs bind.AllNodesCreatedOnRhs
+                FakeUnit.ofUnit ()
+
+    /// Struct evaluator for invalidateNodesCreatedOnRhs loop. Avoids ref cell and object expression allocation.
+    and [<Struct>] private InvalidateNodeEval =
+        interface NodeEval<NodeCrate voption> with
+            member _.Eval nodeOnRhs =
+                let next = nodeOnRhs.NextNodeInSameScope
+                nodeOnRhs.NextNodeInSameScope <- ValueNone
+                InvalidationLogic.invalidateNode nodeOnRhs
+                next
+
+    let invalidateNode<'a> (node : 'a Node) = InvalidationLogic.invalidateNode node
+
+    let invalidateNodesCreatedOnRhs node =
+        InvalidationLogic.invalidateNodesCreatedOnRhs node
 
     (* When [not t.bind_lhs_change_should_invalidate_rhs] and a bind's lhs changes, we move
        nodes created on the bind's rhs up to its parent bind, as opposed to [Scope.Top].  This
@@ -420,20 +429,31 @@ module internal State =
        graph.  This in turn means that we will continue to compute those nodes after the
        parent bind's lhs, which gives them more of a chance to become unnecessary and not be
        computed should the parent bind's lhs change. *)
+
+    /// Struct evaluator for rescopeNodesCreatedOnRhs loop. Avoids ref cell and object expression allocation.
+    [<Struct>]
+    type private RescopeNodeEval =
+        val NewScope : Scope
+
+        new (newScope)
+            =
+            {
+                NewScope = newScope
+            }
+
+        interface NodeEval<NodeCrate voption> with
+            member this.Eval nodeOnRhs =
+                let next = nodeOnRhs.NextNodeInSameScope
+                nodeOnRhs.NextNodeInSameScope <- ValueNone
+                nodeOnRhs.CreatedIn <- this.NewScope
+                Scope.addNode this.NewScope nodeOnRhs
+                next
+
     let rescopeNodesCreatedOnRhs (_t : State) (firstNodeOnRhs : NodeCrate voption) (newScope : Scope) =
         let mutable r = firstNodeOnRhs
 
         while r.IsSome do
-            { new NodeEval<_> with
-                member _.Eval nodeOnRhs =
-                    r <- nodeOnRhs.NextNodeInSameScope
-                    nodeOnRhs.NextNodeInSameScope <- ValueNone
-                    nodeOnRhs.CreatedIn <- newScope
-                    Scope.addNode newScope nodeOnRhs
-                    FakeUnit.ofUnit ()
-            }
-            |> r.Value.Apply
-            |> FakeUnit.toUnit
+            r <- r.Value.Apply (RescopeNodeEval newScope)
 
     let propagateInvalidity t : unit =
         let mutable node = ValueNone
