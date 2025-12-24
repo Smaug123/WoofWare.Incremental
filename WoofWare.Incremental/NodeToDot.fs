@@ -54,6 +54,6 @@ module NodeToDot =
         write "}\n"
 
     let saveDotToFile (emitBindEdges : bool) (filePath : string) ts =
-        use f = File.Open (filePath, FileMode.OpenOrCreate)
+        use f = File.Open (filePath, FileMode.Create)
         use writer = new StreamWriter (f)
         renderDot false emitBindEdges writer.Write ts
