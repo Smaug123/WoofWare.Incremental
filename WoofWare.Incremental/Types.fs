@@ -336,11 +336,11 @@ and Node<'a> =
             mutable CreationBacktrace : string option
         }
 
-and NodeEval<'state, 'ret> =
-    abstract Eval<'a> : 'state -> 'a Node -> 'ret
+and NodeEval<'ret> =
+    abstract Eval<'a> : 'a Node -> 'ret
 
 and NodeCrate =
-    abstract Apply<'state, 'ret> : 'state -> NodeEval<'state, 'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> NodeEval<'ret>> : 'TEval -> 'ret
 
 and internal Observer'<'a> = 'a InternalObserver ref
 
@@ -542,7 +542,7 @@ module CrateExtensions =
         /// Construct a NodeCrate from a Node, i.e. hiding its type parameter.
         static member make (node : Node<'a>) : NodeCrate =
             { new NodeCrate with
-                member _.Apply state e = e.Eval state node
+                member _.Apply e = e.Eval node
             }
 
     type InternalObserverCrate with

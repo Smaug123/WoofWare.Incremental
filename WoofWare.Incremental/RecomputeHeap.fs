@@ -71,24 +71,24 @@ module RecomputeHeap =
     let setNext (prev : NodeCrate voption) (next : NodeCrate voption) : unit =
         match prev with
         | ValueSome prev ->
-            { new NodeEval<_, _> with
-                member _.Eval () node =
+            { new NodeEval<_> with
+                member _.Eval node =
                     node.NextInRecomputeHeap <- next
                     FakeUnit.ofUnit ()
             }
-            |> prev.Apply ()
+            |> prev.Apply
             |> FakeUnit.toUnit
         | ValueNone -> ()
 
     let setPrev (next : NodeCrate voption) (prev : NodeCrate voption) : unit =
         match next with
         | ValueSome next ->
-            { new NodeEval<_, _> with
-                member _.Eval () node =
+            { new NodeEval<_> with
+                member _.Eval node =
                     node.PrevInRecomputeHeap <- prev
                     FakeUnit.ofUnit ()
             }
-            |> next.Apply ()
+            |> next.Apply
             |> FakeUnit.toUnit
         | ValueNone -> ()
 
@@ -172,15 +172,15 @@ module RecomputeHeap =
         t.HeightLowerBound
 
     let private reduceRecomputeHeap =
-        { new NodeEval<_, _> with
-            member _.Eval () node =
+        { new NodeEval<_> with
+            member _.Eval node =
                 node.HeightInRecomputeHeap <- -1
                 node.NextInRecomputeHeap
         }
 
     let private clearNextInRecomputeHeap =
-        { new NodeEval<_, _> with
-            member _.Eval () node =
+        { new NodeEval<_> with
+            member _.Eval node =
                 node.NextInRecomputeHeap <- ValueNone
                 FakeUnit.ofUnit ()
         }
@@ -203,7 +203,7 @@ module RecomputeHeap =
 
         t.Length <- t.Length - 1
 
-        let next = node.Value.Apply () reduceRecomputeHeap
+        let next = node.Value.Apply reduceRecomputeHeap
 
         t.NodesByHeight.[t.HeightLowerBound] <- next
         setPrev next ValueNone
@@ -212,6 +212,6 @@ module RecomputeHeap =
             if (NodeCrate.prevInRecomputeHeap node.Value).IsSome then
                 failwith "expected prev node to be None"
 
-        node.Value.Apply () clearNextInRecomputeHeap |> FakeUnit.toUnit
+        node.Value.Apply clearNextInRecomputeHeap |> FakeUnit.toUnit
 
         node.Value

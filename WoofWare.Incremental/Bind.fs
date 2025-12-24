@@ -14,14 +14,14 @@ module Bind =
         let mutable r = t.AllNodesCreatedOnRhs
 
         while r.IsSome do
-            { new NodeEval<_, _> with
-                member _.Eval () nodeOnRhs =
+            { new NodeEval<_> with
+                member _.Eval nodeOnRhs =
                     r <- nodeOnRhs.NextNodeInSameScope
                     // TODO: inefficient, it's already in scope later
                     f (NodeCrate.make nodeOnRhs)
                     FakeUnit.ofUnit ()
             }
-            |> r.Value.Apply ()
+            |> r.Value.Apply
             |> FakeUnit.toUnit
 
     let invariant (_invA : 'a -> unit) (_invB : 'b -> unit) (t : Bind<'a, 'b>) : unit =
@@ -55,8 +55,8 @@ module Bind =
         iterNodesCreatedOnRhs
             t
             (fun node ->
-                { new NodeEval<_, _> with
-                    member _.Eval () node =
+                { new NodeEval<_> with
+                    member _.Eval node =
                         if not ((node.CreatedIn : Scope).Equals (t.RhsScope : Scope)) then
                             failwith "invariant failed"
 
@@ -66,7 +66,7 @@ module Bind =
 
                         FakeUnit.ofUnit ()
                 }
-                |> node.Apply ()
+                |> node.Apply
                 |> FakeUnit.toUnit
             )
 
