@@ -8,7 +8,6 @@ type private FinalizerAction<'a when 'a : not struct> (action : 'a -> unit, targ
             action target
         with e ->
             System.Diagnostics.Debug.WriteLine ("unhandled exception in finalizer: " + e.Message)
-            reraise ()
 
 [<RequireQualifiedAccess>]
 module internal Gc =
