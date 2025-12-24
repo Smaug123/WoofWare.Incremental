@@ -174,49 +174,49 @@ and internal ArrayFoldEval<'a, 'ret> =
     abstract Eval<'b> : ArrayFold<'b, 'a> -> 'ret
 
 and internal ArrayFoldCrate<'a> =
-    abstract Apply<'ret> : ArrayFoldEval<'a, 'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> ArrayFoldEval<'a, 'ret>> : 'TEval -> 'ret
 
 and internal BindEval<'ret> =
     abstract Eval<'a, 'b> : Bind<'a, 'b> -> 'ret
 
 and internal BindCrate =
-    abstract Apply<'ret> : BindEval<'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> BindEval<'ret>> : 'TEval -> 'ret
 
 and internal BindMainEval<'a, 'ret> =
     abstract Eval<'b> : Bind<'b, 'a> -> 'ret
 
 and internal BindMainCrate<'a> =
-    abstract Apply<'ret> : BindMainEval<'a, 'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> BindMainEval<'a, 'ret>> : 'TEval -> 'ret
 
 and internal IfThenElseEval<'ret> =
     abstract Eval<'a> : IfThenElse<'a> -> 'ret
 
 and internal IfThenElseCrate =
-    abstract Apply<'ret> : IfThenElseEval<'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> IfThenElseEval<'ret>> : 'TEval -> 'ret
 
 and internal JoinEval<'ret> =
     abstract Eval<'a> : Join<'a> -> 'ret
 
 and internal JoinCrate =
-    abstract Apply<'ret> : JoinEval<'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> JoinEval<'ret>> : 'TEval -> 'ret
 
 and internal MapEval<'a, 'ret> =
     abstract Eval<'a1> : ('a1 -> 'a) * 'a1 Node -> 'ret
 
 and internal MapCrate<'a> =
-    abstract Apply<'ret> : MapEval<'a, 'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> MapEval<'a, 'ret>> : 'TEval -> 'ret
 
 and internal UnorderedArrayFoldEval<'a, 'ret> =
     abstract Eval<'b> : UnorderedArrayFold<'b, 'a> -> 'ret
 
 and internal UnorderedArrayFoldCrate<'a> =
-    abstract Apply<'ret> : UnorderedArrayFoldEval<'a, 'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> UnorderedArrayFoldEval<'a, 'ret>> : 'TEval -> 'ret
 
 and internal Map2Eval<'a, 'ret> =
     abstract Eval<'a1, 'a2> : ('a1 -> 'a2 -> 'a) * 'a1 Node * 'a2 Node -> 'ret
 
 and internal Map2Crate<'a> =
-    abstract Apply<'ret> : Map2Eval<'a, 'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> Map2Eval<'a, 'ret>> : 'TEval -> 'ret
 
 and internal Kind<'a> =
     | ArrayFold of ArrayFoldCrate<'a>
@@ -340,7 +340,7 @@ and NodeEval<'ret> =
     abstract Eval<'a> : 'a Node -> 'ret
 
 and NodeCrate =
-    abstract Apply<'ret> : NodeEval<'ret> -> 'ret
+    abstract Apply<'TEval, 'ret when 'TEval :> NodeEval<'ret>> : 'TEval -> 'ret
 
 and internal Observer'<'a> = 'a InternalObserver ref
 
@@ -532,7 +532,7 @@ and internal VarCrate =
 module internal BindCrate =
     let make (bind : Bind<'a, 'b>) =
         { new BindCrate with
-            member _.Apply e = e.Eval bind
+            member _.Apply (e : 'TEval) = e.Eval bind
         }
 
 /// Module for extension methods on the NodeCrate type.
@@ -562,49 +562,49 @@ module internal VarCrate =
 module internal MapCrate =
     let make (f : 'a -> 'b) (n : Node<'a>) : MapCrate<'b> =
         { new MapCrate<_> with
-            member _.Apply e = e.Eval (f, n)
+            member _.Apply (e : 'TEval) = e.Eval (f, n)
         }
 
 [<RequireQualifiedAccess>]
 module internal Map2Crate =
     let make (f : 'a -> 'b -> 'c) (n1 : Node<'a>) (n2 : Node<'b>) : Map2Crate<'c> =
         { new Map2Crate<_> with
-            member _.Apply e = e.Eval (f, n1, n2)
+            member _.Apply (e : 'TEval) = e.Eval (f, n1, n2)
         }
 
 [<RequireQualifiedAccess>]
 module internal BindMainCrate =
     let make (f : Bind<'b, 'a>) : BindMainCrate<'a> =
         { new BindMainCrate<_> with
-            member _.Apply e = e.Eval f
+            member _.Apply (e : 'TEval) = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
 module internal JoinCrate =
     let make (f : Join<'a>) : JoinCrate =
         { new JoinCrate with
-            member _.Apply e = e.Eval f
+            member _.Apply (e : 'TEval) = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
 module internal IfThenElseCrate =
     let make (f : IfThenElse<'a>) : IfThenElseCrate =
         { new IfThenElseCrate with
-            member _.Apply e = e.Eval f
+            member _.Apply (e : 'TEval) = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
 module internal ArrayFoldCrate =
     let make (f : ArrayFold<'a, 'b>) : ArrayFoldCrate<'b> =
         { new ArrayFoldCrate<_> with
-            member _.Apply e = e.Eval f
+            member _.Apply (e : 'TEval) = e.Eval f
         }
 
 [<RequireQualifiedAccess>]
 module internal UnorderedArrayFoldCrate =
     let make (f : UnorderedArrayFold<'a, 'b>) : UnorderedArrayFoldCrate<'b> =
         { new UnorderedArrayFoldCrate<_> with
-            member _.Apply e = e.Eval f
+            member _.Apply (e : 'TEval) = e.Eval f
         }
 
 [<RequireQualifiedAccess>]

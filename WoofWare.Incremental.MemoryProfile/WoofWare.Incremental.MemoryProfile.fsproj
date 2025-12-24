@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.fs"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WoofWare.Incremental\WoofWare.Incremental.fsproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JetBrains.dotMemoryUnit" Version="3.2.20220510" />
+    <PackageReference Include="JetBrains.Profiler.Api" Version="1.4.10" />
+  </ItemGroup>
+
+</Project>

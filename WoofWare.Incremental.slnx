@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="WoofWare.Incremental.Test/WoofWare.Incremental.Test.fsproj" />
   <Project Path="WoofWare.Incremental/WoofWare.Incremental.fsproj" />
+  <Project Path="WoofWare.Incremental.MemoryProfile/WoofWare.Incremental.MemoryProfile.fsproj" />
 </Solution>

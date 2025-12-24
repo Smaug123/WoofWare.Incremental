@@ -15,12 +15,27 @@ module internal Node =
             member _.Eval n = n :> obj
         }
 
+    let private changedAtEval : NodeEval<StabilizationNum> =
+        { new NodeEval<_> with
+            member _.Eval n = n.ChangedAt
+        }
+
+    let private isValidEval : NodeEval<bool> =
+        { new NodeEval<_> with
+            member _.Eval n = NodeHelpers.isValid n
+        }
+
     // Extract the underlying node as obj. Since Node<'a> is a reference type,
     // this doesn't allocate - it just returns the same reference.
     let private nodeAsObj (t : NodeCrate) = t.Apply nodeAsObjEval
+    let private changedAtOfCrate (t : NodeCrate) = t.Apply changedAtEval
+    let private isValidCrate (t : NodeCrate) = t.Apply isValidEval
 
     let packedSame (t1 : NodeCrate) (t2 : NodeCrate) =
-        Object.ReferenceEquals (nodeAsObj t1, nodeAsObj t2)
+        Type.referenceEqual' (nodeAsObj t1) (nodeAsObj t2)
+
+    let packedSameAsUnpacked (packed : NodeCrate) (unpacked : Node<'a>) =
+        Type.referenceEqual' (nodeAsObj packed) (unpacked :> obj)
 
     let initialNumChildren (n : Node<_>) : int = Kind.initialNumChildren n.Kind
     let iteriChildren (t : Node<'a>) (f : int -> NodeCrate -> unit) : unit = Kind.iteriChildren t.Kind f
@@ -53,19 +68,13 @@ module internal Node =
 
     let isStaleWithRespectToAChild (t : Node<'a>) : bool =
         let mutable isStale = false
+        let parentRecomputedAt = t.RecomputedAt
 
         iteriChildren
             t
             (fun _ child ->
-                { new NodeEval<_> with
-                    member _.Eval child =
-                        if edgeIsStale child t then
-                            isStale <- true
-
-                        FakeUnit.ofUnit ()
-                }
-                |> child.Apply
-                |> FakeUnit.toUnit
+                if changedAtOfCrate child > parentRecomputedAt then
+                    isStale <- true
             )
 
         isStale
@@ -133,13 +142,8 @@ module internal Node =
         iteriChildren
             t
             (fun _ child' ->
-                { new NodeEval<_> with
-                    member _.Eval child' =
-                        has <- has || same child child'
-                        FakeUnit.ofUnit ()
-                }
-                |> child'.Apply
-                |> FakeUnit.toUnit
+                if packedSameAsUnpacked child' child then
+                    has <- true
             )
 
         has
@@ -150,13 +154,8 @@ module internal Node =
         iteriChildren
             t
             (fun _ child ->
-                { new NodeEval<_> with
-                    member _.Eval child =
-                        has <- has || not (NodeHelpers.isValid child)
-                        FakeUnit.ofUnit ()
-                }
-                |> child.Apply
-                |> FakeUnit.toUnit
+                if not (isValidCrate child) then
+                    has <- true
             )
 
         has
@@ -167,13 +166,8 @@ module internal Node =
         iteriParents
             t
             (fun _ parent' ->
-                { new NodeEval<_> with
-                    member _.Eval parent' =
-                        has <- has || same parent parent'
-                        FakeUnit.ofUnit ()
-                }
-                |> parent'.Apply
-                |> FakeUnit.toUnit
+                if packedSameAsUnpacked parent' parent then
+                    has <- true
             )
 
         has
@@ -779,7 +773,7 @@ module internal NodeCrate =
             member _.Eval n = n.NumParents
         }
 
-    let numParents (c : NodeCrate) = c.Apply numParentsEval
+    let numParents (c : NodeCrate) : int = c.Apply numParentsEval
 
     let private recomputedAtEval : NodeEval<StabilizationNum> =
         { new NodeEval<_> with
@@ -852,19 +846,19 @@ module internal NodeCrate =
 
     let heightInRecomputeHeap (n : NodeCrate) : int = n.Apply heightInRecomputeHeapEval
 
-    let private isInRecomputeHeapEval =
-        { new NodeEval<_> with
-            member _.Eval n = Node.isInRecomputeHeap n
-        }
-
-    let isInRecomputeHeap (n : NodeCrate) : bool = n.Apply isInRecomputeHeapEval
-
     let private prevInRecomputeHeapEval =
         { new NodeEval<_> with
             member _.Eval n = n.PrevInRecomputeHeap
         }
 
     let prevInRecomputeHeap (n : NodeCrate) : NodeCrate voption = n.Apply prevInRecomputeHeapEval
+
+    let private isInRecomputeHeapEval =
+        { new NodeEval<_> with
+            member _.Eval n = Node.isInRecomputeHeap n
+        }
+
+    let isInRecomputeHeap (n : NodeCrate) : bool = n.Apply isInRecomputeHeapEval
 
     let private needsToBeComputedEval =
         { new NodeEval<_> with

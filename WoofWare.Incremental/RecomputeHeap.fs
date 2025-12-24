@@ -68,28 +68,50 @@ module RecomputeHeap =
             NodesByHeight = createNodesByHeight maxHeightAllowed
         }
 
+    /// Struct evaluator for setting NextInRecomputeHeap
+    [<Struct>]
+    type private SetNextEval =
+        val Next : NodeCrate voption
+
+        new (next)
+            =
+            {
+                Next = next
+            }
+
+        interface NodeEval<FakeUnit> with
+            member this.Eval node =
+                node.NextInRecomputeHeap <- this.Next
+                FakeUnit.ofUnit ()
+
+    /// Struct evaluator for setting PrevInRecomputeHeap
+    [<Struct>]
+    type private SetPrevEval =
+        val Prev : NodeCrate voption
+
+        new (prev)
+            =
+            {
+                Prev = prev
+            }
+
+        interface NodeEval<FakeUnit> with
+            member this.Eval node =
+                node.PrevInRecomputeHeap <- this.Prev
+                FakeUnit.ofUnit ()
+
     let setNext (prev : NodeCrate voption) (next : NodeCrate voption) : unit =
         match prev with
         | ValueSome prev ->
-            { new NodeEval<_> with
-                member _.Eval node =
-                    node.NextInRecomputeHeap <- next
-                    FakeUnit.ofUnit ()
-            }
-            |> prev.Apply
-            |> FakeUnit.toUnit
+            let eval = SetNextEval next
+            prev.Apply eval |> FakeUnit.toUnit
         | ValueNone -> ()
 
     let setPrev (next : NodeCrate voption) (prev : NodeCrate voption) : unit =
         match next with
         | ValueSome next ->
-            { new NodeEval<_> with
-                member _.Eval node =
-                    node.PrevInRecomputeHeap <- prev
-                    FakeUnit.ofUnit ()
-            }
-            |> next.Apply
-            |> FakeUnit.toUnit
+            let eval = SetPrevEval prev
+            next.Apply eval |> FakeUnit.toUnit
         | ValueNone -> ()
 
     let link<'a> (t : RecomputeHeap) (node : 'a Node) : unit =
