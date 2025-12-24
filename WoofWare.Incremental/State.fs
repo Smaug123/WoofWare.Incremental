@@ -266,7 +266,7 @@ module internal State =
             Stack.push (NodeCrate.make node) t.HandleAfterStabilization
 
     let rec removeChildren<'a> (parent : 'a Node) : unit =
-        Node.iteriChildren
+        Node.iteriChildrenAllocating
             parent
             (fun childIndex child ->
                 { new NodeEval<_> with
@@ -553,7 +553,7 @@ module internal State =
             // - add [node] to the recompute heap, if necessary.
             setHeight node (Scope.height node.CreatedIn + 1)
 
-            Node.iteriChildrenWithVisitor node Unchecked.defaultof<BecameNecessaryVisitor<_>> node
+            Node.iteriChildren node Unchecked.defaultof<BecameNecessaryVisitor<_>> node
 
             // Now that the height is correct, maybe add [node] to the recompute heap.  [node]
             // just became necessary, so it can't have been in the recompute heap.  Since [node]

@@ -162,7 +162,9 @@ module ForAnalyzer =
             packedList
             (fun packedNode ->
                 let children =
-                    mapOfIter (fun f -> NodeCrate.iteriChildren packedNode (fun _ node -> f node)) NodeCrate.nodeId
+                    mapOfIter
+                        (fun f -> NodeCrate.iteriChildrenAllocating packedNode (fun _ node -> f node))
+                        NodeCrate.nodeId
 
                 let bindChildren =
                     mapOfIter (maybeIterOnBindNodesCreatedOnRhs packedNode) NodeCrate.nodeId
