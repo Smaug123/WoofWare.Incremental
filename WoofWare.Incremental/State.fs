@@ -510,74 +510,96 @@ module internal State =
     /// [child], and makes [child] and all its descendants necessary, ensuring their heights
     /// are accurate.  There is no guarantee about the relative heights of [child] and [parent]
     /// though.
-    let rec addParentWithoutAdjustingHeights<'a, 'b> (child : 'a Node) (parent : 'b Node) (childIndex : int) : unit =
-        if Debug.globalFlag then
-            assert (NodeHelpers.isNecessary parent)
+    type private BecameNecessaryLogic =
+        static member addParentWithoutAdjustingHeights<'a, 'b>
+            (child : 'a Node)
+            (parent : 'b Node)
+            (childIndex : int)
+            : unit
+            =
+            if Debug.globalFlag then
+                assert (NodeHelpers.isNecessary parent)
 
-        let t = child.State
-        let wasNecessary = NodeHelpers.isNecessary child
-        Node.addParent child parent childIndex
+            let t = child.State
+            let wasNecessary = NodeHelpers.isNecessary child
+            Node.addParent child parent childIndex
 
-        if not (NodeHelpers.isValid child) then
-            Stack.push (NodeCrate.make parent) t.PropagateInvalidity
+            if not (NodeHelpers.isValid child) then
+                Stack.push (NodeCrate.make parent) t.PropagateInvalidity
 
-        if not wasNecessary then
-            becameNecessary' child
+            if not wasNecessary then
+                BecameNecessaryLogic.becameNecessary' child
 
-        match parent.Kind with
-        | Kind.Expert e -> Expert.runEdgeCallback e childIndex
-        | _ -> ()
+            match parent.Kind with
+            | Kind.Expert e -> Expert.runEdgeCallback e childIndex
+            | _ -> ()
 
-    and becameNecessary'<'a> (node : 'a Node) : unit =
-        // [Scope.is_necessary node.created_in] is true (assuming the scope itself is valid)
-        // because [Node.iter_children] below first visits the lhs-change of bind nodes and
-        // then the rhs.
-        if NodeHelpers.isValid node && not (Scope.isNecessary node.CreatedIn) then
-            failwith "Trying to make a node necessary whose defining bind is not necessary"
+        static member becameNecessary'<'a> (node : 'a Node) : unit =
+            // [Scope.is_necessary node.created_in] is true (assuming the scope itself is valid)
+            // because [Node.iter_children] below first visits the lhs-change of bind nodes and
+            // then the rhs.
+            if NodeHelpers.isValid node && not (Scope.isNecessary node.CreatedIn) then
+                failwith "Trying to make a node necessary whose defining bind is not necessary"
 
-        let t = node.State
-        t.NumNodesBecameNecessary <- t.NumNodesBecameNecessary + 1
+            let t = node.State
+            t.NumNodesBecameNecessary <- t.NumNodesBecameNecessary + 1
 
-        if node.NumOnUpdateHandlers > 0 then
-            handleAfterStabilization node
-        // Since [node] became necessary, to restore the invariant, we need to:
+            if node.NumOnUpdateHandlers > 0 then
+                handleAfterStabilization node
+            // Since [node] became necessary, to restore the invariant, we need to:
 
-        // - add parent pointers to [node] from its children.
-        // - set [node]'s height.
-        // - add [node] to the recompute heap, if necessary.
-        setHeight node (Scope.height node.CreatedIn + 1)
+            // - add parent pointers to [node] from its children.
+            // - set [node]'s height.
+            // - add [node] to the recompute heap, if necessary.
+            setHeight node (Scope.height node.CreatedIn + 1)
 
-        Node.iteriChildren
-            node
-            (fun childIndex child ->
-                { new NodeEval<_> with
-                    member _.Eval child =
-                        addParentWithoutAdjustingHeights child node childIndex
-                        // Now that child is necessary, it should have a valid height.
-                        if Debug.globalFlag then
-                            assert (child.Height >= 0)
+            Node.iteriChildren
+                node
+                (fun childIndex child -> child.Apply (BecameNecessaryChildEval (node, childIndex)) |> FakeUnit.toUnit)
 
-                        if child.Height >= node.Height then
-                            setHeight node (child.Height + 1)
+            // Now that the height is correct, maybe add [node] to the recompute heap.  [node]
+            // just became necessary, so it can't have been in the recompute heap.  Since [node]
+            // is necessary, we should add it to the recompute heap iff it is stale.
+            if Debug.globalFlag then
+                assert (not (Node.isInRecomputeHeap node))
+                assert (NodeHelpers.isNecessary node)
 
-                        FakeUnit.ofUnit ()
-                }
-                |> child.Apply
-                |> FakeUnit.toUnit
-            )
-        // Now that the height is correct, maybe add [node] to the recompute heap.  [node]
-        // just became necessary, so it can't have been in the recompute heap.  Since [node]
-        // is necessary, we should add it to the recompute heap iff it is stale.
-        if Debug.globalFlag then
-            assert (not (Node.isInRecomputeHeap node))
-            assert (NodeHelpers.isNecessary node)
+            if Node.isStale node then
+                RecomputeHeap.add t.RecomputeHeap node
 
-        if Node.isStale node then
-            RecomputeHeap.add t.RecomputeHeap node
+            match node.Kind with
+            | Kind.Expert p -> Expert.observabilityChange p true
+            | _ -> ()
 
-        match node.Kind with
-        | Kind.Expert p -> Expert.observabilityChange p true
-        | _ -> ()
+    /// Struct evaluator for becameNecessary' child iteration. Avoids closure and object expression allocation.
+    and [<Struct>] private BecameNecessaryChildEval<'a> =
+        val Node : Node<'a>
+        val ChildIndex : int
+
+        new (node, childIndex)
+            =
+            {
+                Node = node
+                ChildIndex = childIndex
+            }
+
+        interface NodeEval<FakeUnit> with
+            member this.Eval child =
+                BecameNecessaryLogic.addParentWithoutAdjustingHeights child this.Node this.ChildIndex
+                // Now that child is necessary, it should have a valid height.
+                if Debug.globalFlag then
+                    assert (child.Height >= 0)
+
+                if child.Height >= this.Node.Height then
+                    setHeight this.Node (child.Height + 1)
+
+                FakeUnit.ofUnit ()
+
+    let addParentWithoutAdjustingHeights<'a, 'b> (child : 'a Node) (parent : 'b Node) (childIndex : int) =
+        BecameNecessaryLogic.addParentWithoutAdjustingHeights child parent childIndex
+
+    let becameNecessary'<'a> (node : 'a Node) =
+        BecameNecessaryLogic.becameNecessary' node
 
     let becameNecessary node =
         becameNecessary' node
@@ -653,6 +675,21 @@ module internal State =
             assert (at > Clock.now clock)
 
         TimingWheel.add clock.TimingWheel at alarmValue
+
+    /// Struct evaluator for checking if we can recompute a BindMain parent now.
+    /// Avoids closure allocation by only capturing the node height.
+    [<Struct>]
+    type private CanRecomputeNowBindMainEval<'a> =
+        val NodeHeight : int
+
+        new (nodeHeight)
+            =
+            {
+                NodeHeight = nodeHeight
+            }
+
+        interface BindMainEval<'a, bool> with
+            member this.Eval b = this.NodeHeight > b.LhsChange.Height
 
     /// Struct evaluator for notifying parents at index 1+ that a child changed.
     /// Using a struct avoids heap allocation in the hot path.
@@ -780,11 +817,7 @@ module internal State =
                         | Kind.JoinLhsChange _ -> node.Height > Scope.height parent.CreatedIn
                         | Kind.Map _ -> node.Height > Scope.height parent.CreatedIn
                         | Kind.StepFunction _ -> node.Height > Scope.height parent.CreatedIn
-                        | Kind.BindMain b ->
-                            { new BindMainEval<_, _> with
-                                member _.Eval b = node.Height > b.LhsChange.Height
-                            }
-                            |> b.Apply
+                        | Kind.BindMain b -> b.Apply (CanRecomputeNowBindMainEval<_> node.Height)
                         | Kind.IfThenElse i -> node.Height > i.TestChange.Height
                         | Kind.JoinMain j -> node.Height > j.LhsChange.Height
 
