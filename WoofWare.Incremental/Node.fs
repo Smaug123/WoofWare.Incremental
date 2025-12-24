@@ -10,24 +10,24 @@ module internal Node =
 
     let same (t1 : Node<'a>) (t2 : Node<'b>) = Type.referenceEqual' t1 t2
 
-    let private nodeIdEval : NodeEval<NodeId> =
-        { new NodeEval<_> with
-            member _.Eval n = n.Id
+    let private nodeIdEval : NodeEval<_, NodeId> =
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.Id
         }
 
-    let private changedAtEval : NodeEval<StabilizationNum> =
-        { new NodeEval<_> with
-            member _.Eval n = n.ChangedAt
+    let private changedAtEval : NodeEval<_, StabilizationNum> =
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.ChangedAt
         }
 
-    let private isValidEval : NodeEval<bool> =
-        { new NodeEval<_> with
-            member _.Eval n = NodeHelpers.isValid n
+    let private isValidEval : NodeEval<_, bool> =
+        { new NodeEval<_, _> with
+            member _.Eval () n = NodeHelpers.isValid n
         }
 
-    let private nodeIdOfCrate (t : NodeCrate) = t.Apply nodeIdEval
-    let private changedAtOfCrate (t : NodeCrate) = t.Apply changedAtEval
-    let private isValidCrate (t : NodeCrate) = t.Apply isValidEval
+    let private nodeIdOfCrate (t : NodeCrate) = t.Apply () nodeIdEval
+    let private changedAtOfCrate (t : NodeCrate) = t.Apply () changedAtEval
+    let private isValidCrate (t : NodeCrate) = t.Apply () isValidEval
 
     let packedSame (t1 : NodeCrate) (t2 : NodeCrate) = nodeIdOfCrate t1 = nodeIdOfCrate t2
 
@@ -296,8 +296,8 @@ module internal Node =
             iteriChildren
                 t
                 (fun _ child ->
-                    { new NodeEval<_> with
-                        member _.Eval child =
+                    { new NodeEval<_, _> with
+                        member _.Eval () child =
                             if t.Height <= child.Height then
                                 failwith "invariant failure"
 
@@ -306,7 +306,7 @@ module internal Node =
 
                             FakeUnit.ofUnit ()
                     }
-                    |> child.Apply
+                    |> child.Apply ()
                     |> FakeUnit.toUnit
                 )
 
@@ -316,8 +316,8 @@ module internal Node =
         iteriParents
             t
             (fun _ parent ->
-                { new NodeEval<_> with
-                    member _.Eval parent =
+                { new NodeEval<_, _> with
+                    member _.Eval () parent =
                         if not (hasChild parent t) then
                             failwith "invariant failure"
 
@@ -329,7 +329,7 @@ module internal Node =
 
                         FakeUnit.ofUnit ()
                 }
-                |> parent.Apply
+                |> parent.Apply ()
                 |> FakeUnit.toUnit
             )
 
@@ -410,8 +410,8 @@ module internal Node =
             match t.PrevInRecomputeHeap with
             | ValueNone -> ()
             | ValueSome prev ->
-                { new NodeEval<_> with
-                    member _.Eval prev =
+                { new NodeEval<_, _> with
+                    member _.Eval () prev =
                         if not (packedSame (NodeCrate.make t) prev.NextInRecomputeHeap.Value) then
                             failwith "invariant failure"
 
@@ -420,7 +420,7 @@ module internal Node =
 
                         FakeUnit.ofUnit ()
                 }
-                |> prev.Apply
+                |> prev.Apply ()
                 |> FakeUnit.toUnit
 
         do
@@ -431,8 +431,8 @@ module internal Node =
             match t.NextInRecomputeHeap with
             | ValueNone -> ()
             | ValueSome next ->
-                { new NodeEval<_> with
-                    member _.Eval next =
+                { new NodeEval<_, _> with
+                    member _.Eval () next =
                         if not (packedSame (NodeCrate.make t) next.PrevInRecomputeHeap.Value) then
                             failwith "invariant failure"
 
@@ -441,7 +441,7 @@ module internal Node =
 
                         FakeUnit.ofUnit ()
                 }
-                |> next.Apply
+                |> next.Apply ()
                 |> FakeUnit.toUnit
 
         do
@@ -457,8 +457,8 @@ module internal Node =
                 match t.NextInAdjustHeightsHeap with
                 | ValueNone -> ()
                 | ValueSome next ->
-                    { new NodeEval<_> with
-                        member _.Eval next =
+                    { new NodeEval<_, _> with
+                        member _.Eval () next =
                             if not (isInAdjustHeightsHeap next) then
                                 failwith "invariant failure"
 
@@ -467,7 +467,7 @@ module internal Node =
 
                             FakeUnit.ofUnit ()
                     }
-                    |> next.Apply
+                    |> next.Apply ()
                     |> FakeUnit.toUnit
 
         t.OldValueOpt |> ValueOption.iter invA
@@ -496,8 +496,8 @@ module internal Node =
                 iteriChildren
                     t
                     (fun childIndex child ->
-                        { new NodeEval<_> with
-                            member _.Eval child =
+                        { new NodeEval<_, _> with
+                            member _.Eval () child =
                                 if
                                     not (
                                         packedSame
@@ -509,7 +509,7 @@ module internal Node =
 
                                 FakeUnit.ofUnit ()
                         }
-                        |> child.Apply
+                        |> child.Apply ()
                         |> FakeUnit.toUnit
                     )
 
@@ -525,8 +525,8 @@ module internal Node =
             iteriParents
                 t
                 (fun parentIndex parent ->
-                    { new NodeEval<_> with
-                        member _.Eval parent =
+                    { new NodeEval<_, _> with
+                        member _.Eval () parent =
                             if
                                 not (
                                     packedSame
@@ -538,7 +538,7 @@ module internal Node =
 
                             FakeUnit.ofUnit ()
                     }
-                    |> parent.Apply
+                    |> parent.Apply ()
                     |> FakeUnit.toUnit
                 )
 
@@ -623,12 +623,12 @@ module internal Node =
         let lastParentIndex = child.NumParents - 1
 
         if parentIndex < lastParentIndex then
-            { new NodeEval<_> with
-                member _.Eval parent =
+            { new NodeEval<_, _> with
+                member _.Eval () parent =
                     link child child.MyChildIndexInParentAtIndex.[lastParentIndex] parent parentIndex
                     |> FakeUnit.ofUnit
             }
-            |> child.Parent1AndBeyond.[lastParentIndex - 1].Value.Apply
+            |> child.Parent1AndBeyond.[lastParentIndex - 1].Value.Apply ()
             |> FakeUnit.toUnit
 
         unlink child childIndex parent lastParentIndex
@@ -700,14 +700,14 @@ module internal Node =
 module internal NodeCrate =
     open System.Collections.Generic
 
-    let private invariantEval : NodeEval<FakeUnit> =
-        { new NodeEval<_> with
-            member _.Eval x =
+    let private invariantEval : NodeEval<_, FakeUnit> =
+        { new NodeEval<_, _> with
+            member _.Eval () x =
                 Node.invariant ignore x |> FakeUnit.ofUnit
         }
 
     let invariant (t : NodeCrate) =
-        t.Apply invariantEval |> FakeUnit.toUnit
+        t.Apply () invariantEval |> FakeUnit.toUnit
 
     type AsList =
         {
@@ -739,8 +739,8 @@ module internal NodeCrate =
         let seen = HashSet<NodeId> ()
 
         let rec iterDescendants (nodeCrate : NodeCrate) =
-            { new NodeEval<_> with
-                member _.Eval (t : Node<'a>) =
+            { new NodeEval<_, _> with
+                member _.Eval () (t : Node<'a>) =
                     if not (seen.Contains t.Id) then
                         seen.Add t.Id |> ignore
                         f nodeCrate
@@ -748,7 +748,7 @@ module internal NodeCrate =
 
                     FakeUnit.ofUnit ()
             }
-            |> nodeCrate.Apply
+            |> nodeCrate.Apply ()
             |> FakeUnit.toUnit
 
         List.iter iterDescendants ts
@@ -757,129 +757,129 @@ module internal NodeCrate =
     let iterDescendants (ts : NodeCrate list) (f : NodeCrate -> unit) : unit = iterDescendantsInternal ts f |> ignore
 
     let appendUserInfoGraphviz (nodeCrate : NodeCrate) (label : string list) (attrs : Map<string, string>) : unit =
-        { new NodeEval<_> with
-            member _.Eval (t : Node<'a>) =
+        { new NodeEval<_, _> with
+            member _.Eval () (t : Node<'a>) =
                 Node.appendUserInfoGraphviz t label attrs |> FakeUnit.ofUnit
         }
-        |> nodeCrate.Apply
+        |> nodeCrate.Apply ()
         |> FakeUnit.toUnit
 
-    let private numParentsEval : NodeEval<int> =
-        { new NodeEval<_> with
-            member _.Eval n = n.NumParents
+    let private numParentsEval : NodeEval<_, int> =
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.NumParents
         }
 
-    let numParents (c : NodeCrate) = c.Apply numParentsEval
+    let numParents (c : NodeCrate) : int = c.Apply () numParentsEval
 
-    let private recomputedAtEval : NodeEval<StabilizationNum> =
-        { new NodeEval<_> with
-            member _.Eval n = n.RecomputedAt
+    let private recomputedAtEval : NodeEval<_, StabilizationNum> =
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.RecomputedAt
         }
 
-    let recomputedAt (c : NodeCrate) = c.Apply recomputedAtEval
+    let recomputedAt (c : NodeCrate) = c.Apply () recomputedAtEval
 
-    let private changedAtEval : NodeEval<StabilizationNum> =
-        { new NodeEval<_> with
-            member _.Eval n = n.ChangedAt
+    let private changedAtEval : NodeEval<_, StabilizationNum> =
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.ChangedAt
         }
 
-    let changedAt (c : NodeCrate) = c.Apply changedAtEval
+    let changedAt (c : NodeCrate) = c.Apply () changedAtEval
 
-    let private heightEval : NodeEval<int> =
-        { new NodeEval<_> with
-            member _.Eval n = n.Height
+    let private heightEval : NodeEval<_, int> =
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.Height
         }
 
-    let height (c : NodeCrate) = c.Apply heightEval
+    let height (c : NodeCrate) = c.Apply () heightEval
 
     let iteriChildren (c : NodeCrate) (f : int -> NodeCrate -> unit) : unit =
-        { new NodeEval<_> with
-            member _.Eval node =
+        { new NodeEval<_, _> with
+            member _.Eval () node =
                 Node.iteriChildren node f |> FakeUnit.ofUnit
         }
-        |> c.Apply
+        |> c.Apply ()
         |> FakeUnit.toUnit
 
     let private userInfoEval =
-        { new NodeEval<_> with
-            member _.Eval n = n.UserInfo
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.UserInfo
         }
 
-    let userInfo (c : NodeCrate) : DotUserInfo option = c.Apply userInfoEval
+    let userInfo (c : NodeCrate) : DotUserInfo option = c.Apply () userInfoEval
 
     let private nodeIdEval =
-        { new NodeEval<_> with
-            member _.Eval n = n.Id
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.Id
         }
 
-    let nodeId (c : NodeCrate) : NodeId = c.Apply nodeIdEval
+    let nodeId (c : NodeCrate) : NodeId = c.Apply () nodeIdEval
 
     let private nextInAdjustHeightsHeapEval =
-        { new NodeEval<_> with
-            member _.Eval n = n.NextInAdjustHeightsHeap
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.NextInAdjustHeightsHeap
         }
 
-    let nextInAdjustHeightsHeap (n : NodeCrate) : NodeCrate voption = n.Apply nextInAdjustHeightsHeapEval
+    let nextInAdjustHeightsHeap (n : NodeCrate) : NodeCrate voption = n.Apply () nextInAdjustHeightsHeapEval
 
     let private nextInRecomputeHeapEval =
-        { new NodeEval<_> with
-            member _.Eval n = n.NextInRecomputeHeap
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.NextInRecomputeHeap
         }
 
-    let nextInRecomputeHeap (n : NodeCrate) : NodeCrate voption = n.Apply nextInRecomputeHeapEval
+    let nextInRecomputeHeap (n : NodeCrate) : NodeCrate voption = n.Apply () nextInRecomputeHeapEval
 
     let private heightInAdjustHeightsHeapEval =
-        { new NodeEval<_> with
-            member _.Eval n = n.HeightInAdjustHeightsHeap
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.HeightInAdjustHeightsHeap
         }
 
-    let heightInAdjustHeightsHeap (n : NodeCrate) : int = n.Apply heightInAdjustHeightsHeapEval
+    let heightInAdjustHeightsHeap (n : NodeCrate) : int = n.Apply () heightInAdjustHeightsHeapEval
 
     let private heightInRecomputeHeapEval =
-        { new NodeEval<_> with
-            member _.Eval n = n.HeightInRecomputeHeap
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.HeightInRecomputeHeap
         }
 
-    let heightInRecomputeHeap (n : NodeCrate) : int = n.Apply heightInRecomputeHeapEval
+    let heightInRecomputeHeap (n : NodeCrate) : int = n.Apply () heightInRecomputeHeapEval
 
     let private prevInRecomputeHeapEval =
-        { new NodeEval<_> with
-            member _.Eval n = n.PrevInRecomputeHeap
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.PrevInRecomputeHeap
         }
 
-    let prevInRecomputeHeap (n : NodeCrate) : NodeCrate voption = n.Apply prevInRecomputeHeapEval
+    let prevInRecomputeHeap (n : NodeCrate) : NodeCrate voption = n.Apply () prevInRecomputeHeapEval
 
     let private isInRecomputeHeapEval =
-        { new NodeEval<_> with
-            member _.Eval n = Node.isInRecomputeHeap n
+        { new NodeEval<_, _> with
+            member _.Eval () n = Node.isInRecomputeHeap n
         }
 
-    let isInRecomputeHeap (n : NodeCrate) : bool = n.Apply isInRecomputeHeapEval
+    let isInRecomputeHeap (n : NodeCrate) : bool = n.Apply () isInRecomputeHeapEval
 
     let private needsToBeComputedEval =
-        { new NodeEval<_> with
-            member _.Eval n = Node.needsToBeComputed n
+        { new NodeEval<_, _> with
+            member _.Eval () n = Node.needsToBeComputed n
         }
 
-    let needsToBeComputed (n : NodeCrate) : bool = n.Apply needsToBeComputedEval
+    let needsToBeComputed (n : NodeCrate) : bool = n.Apply () needsToBeComputedEval
 
     let private isNecessaryEval =
-        { new NodeEval<_> with
-            member _.Eval n = NodeHelpers.isNecessary n
+        { new NodeEval<_, _> with
+            member _.Eval () n = NodeHelpers.isNecessary n
         }
 
-    let isNecessary (n : NodeCrate) : bool = n.Apply isNecessaryEval
+    let isNecessary (n : NodeCrate) : bool = n.Apply () isNecessaryEval
 
     let private isValidEval =
-        { new NodeEval<_> with
-            member _.Eval n = NodeHelpers.isValid n
+        { new NodeEval<_, _> with
+            member _.Eval () n = NodeHelpers.isValid n
         }
 
-    let isValid (n : NodeCrate) : bool = n.Apply isValidEval
+    let isValid (n : NodeCrate) : bool = n.Apply () isValidEval
 
     let private nextNodeInSameScopeEval =
-        { new NodeEval<_> with
-            member _.Eval n = n.NextNodeInSameScope
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.NextNodeInSameScope
         }
 
-    let nextNodeInSameScope (n : NodeCrate) : NodeCrate voption = n.Apply nextNodeInSameScopeEval
+    let nextNodeInSameScope (n : NodeCrate) : NodeCrate voption = n.Apply () nextNodeInSameScopeEval

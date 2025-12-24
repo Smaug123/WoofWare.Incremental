@@ -123,14 +123,14 @@ module internal AdjustHeightsHeap =
         let node = t.NodesByHeight.[height].Value
         t.Length <- t.Length - 1
 
-        { new NodeEval<_> with
-            member _.Eval node =
+        { new NodeEval<_, _> with
+            member _.Eval () node =
                 node.HeightInAdjustHeightsHeap <- -1
                 t.NodesByHeight.[height] <- node.NextInAdjustHeightsHeap
                 node.NextInAdjustHeightsHeap <- ValueNone
                 FakeUnit.ofUnit ()
         }
-        |> node.Apply
+        |> node.Apply ()
         |> FakeUnit.toUnit
 
         node
@@ -184,32 +184,32 @@ module internal AdjustHeightsHeap =
         while t.Length > 0 do
             let child = removeMinThrowing t
 
-            { new NodeEval<FakeUnit> with
-                member _.Eval child =
+            { new NodeEval<_, FakeUnit> with
+                member _.Eval () child =
                     if Node.isInRecomputeHeap child then
                         RecomputeHeap.increaseHeight recomputeHeap child
 
                     if child.NumParents > 0 then
                         let parent = child.Parent0.Value
 
-                        { new NodeEval<_> with
-                            member _.Eval parent =
+                        { new NodeEval<_, _> with
+                            member _.Eval () parent =
                                 ensureHeightRequirement t originalChild originalParent child parent
 
                                 for parentIndex = 1 to child.NumParents - 1 do
                                     let parent = child.Parent1AndBeyond.[parentIndex - 1].Value
 
-                                    { new NodeEval<_> with
-                                        member _.Eval parent =
+                                    { new NodeEval<_, _> with
+                                        member _.Eval () parent =
                                             ensureHeightRequirement t originalChild originalParent child parent
                                             |> FakeUnit.ofUnit
                                     }
-                                    |> parent.Apply
+                                    |> parent.Apply ()
                                     |> FakeUnit.toUnit
 
                                 FakeUnit.ofUnit ()
                         }
-                        |> parent.Apply
+                        |> parent.Apply ()
                         |> FakeUnit.toUnit
 
                     match child.Kind with
@@ -221,8 +221,8 @@ module internal AdjustHeightsHeap =
                                 while r.IsSome do
                                     let nodeOnRhs = r.Value
 
-                                    { new NodeEval<_> with
-                                        member _.Eval nodeOnRhs =
+                                    { new NodeEval<_, _> with
+                                        member _.Eval () nodeOnRhs =
                                             r <- nodeOnRhs.NextNodeInSameScope
 
                                             if NodeHelpers.isNecessary nodeOnRhs then
@@ -230,7 +230,7 @@ module internal AdjustHeightsHeap =
 
                                             FakeUnit.ofUnit ()
                                     }
-                                    |> nodeOnRhs.Apply
+                                    |> nodeOnRhs.Apply ()
                                     |> FakeUnit.toUnit
 
                                 FakeUnit.ofUnit ()
@@ -238,7 +238,7 @@ module internal AdjustHeightsHeap =
                         |> bind.Apply
                     | _ -> FakeUnit.ofUnit ()
             }
-            |> child.Apply
+            |> child.Apply ()
             |> FakeUnit.toUnit
 
         if Debug.globalFlag then

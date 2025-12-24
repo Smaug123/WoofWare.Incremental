@@ -145,8 +145,8 @@ module internal State =
             iterObserverDescendants
                 t
                 (fun node ->
-                    { new NodeEval<_> with
-                        member _.Eval node =
+                    { new NodeEval<_, _> with
+                        member _.Eval () node =
                             Node.invariant ignore node
 
                             if not (amStabilizing t) then
@@ -158,7 +158,7 @@ module internal State =
 
                             FakeUnit.ofUnit ()
                     }
-                    |> node.Apply
+                    |> node.Apply ()
                     |> FakeUnit.toUnit
                 )
 
@@ -269,11 +269,11 @@ module internal State =
         Node.iteriChildren
             parent
             (fun childIndex child ->
-                { new NodeEval<_> with
-                    member _.Eval child =
+                { new NodeEval<_, _> with
+                    member _.Eval () child =
                         removeChild child parent childIndex |> FakeUnit.ofUnit
                 }
-                |> child.Apply
+                |> child.Apply ()
                 |> FakeUnit.toUnit
             )
 
@@ -404,14 +404,14 @@ module internal State =
         let mutable r = node
 
         while r.IsSome do
-            { new NodeEval<_> with
-                member _.Eval nodeOnRhs =
+            { new NodeEval<_, _> with
+                member _.Eval () nodeOnRhs =
                     r <- nodeOnRhs.NextNodeInSameScope
                     nodeOnRhs.NextNodeInSameScope <- ValueNone
                     invalidateNode nodeOnRhs
                     FakeUnit.ofUnit ()
             }
-            |> r.Value.Apply
+            |> r.Value.Apply ()
             |> FakeUnit.toUnit
 
     (* When [not t.bind_lhs_change_should_invalidate_rhs] and a bind's lhs changes, we move
@@ -424,15 +424,15 @@ module internal State =
         let mutable r = firstNodeOnRhs
 
         while r.IsSome do
-            { new NodeEval<_> with
-                member _.Eval nodeOnRhs =
+            { new NodeEval<_, _> with
+                member _.Eval () nodeOnRhs =
                     r <- nodeOnRhs.NextNodeInSameScope
                     nodeOnRhs.NextNodeInSameScope <- ValueNone
                     nodeOnRhs.CreatedIn <- newScope
                     Scope.addNode newScope nodeOnRhs
                     FakeUnit.ofUnit ()
             }
-            |> r.Value.Apply
+            |> r.Value.Apply ()
             |> FakeUnit.toUnit
 
     let propagateInvalidity t : unit =
@@ -440,8 +440,8 @@ module internal State =
 
         while (node <- Stack.pop t.PropagateInvalidity
                node.IsSome) do
-            { new NodeEval<_> with
-                member _.Eval node =
+            { new NodeEval<_, _> with
+                member _.Eval () node =
                     if not (NodeHelpers.isValid node) then
                         FakeUnit.ofUnit ()
                     else if Node.shouldBeInvalidated node then
@@ -483,7 +483,7 @@ module internal State =
 
                     FakeUnit.ofUnit ()
             }
-            |> node.Value.Apply
+            |> node.Value.Apply ()
             |> FakeUnit.toUnit
 
     /// [add_parent_without_adjusting_heights t ~child ~parent] adds [parent] as a parent of
@@ -530,8 +530,8 @@ module internal State =
         Node.iteriChildren
             node
             (fun childIndex child ->
-                { new NodeEval<_> with
-                    member _.Eval child =
+                { new NodeEval<_, _> with
+                    member _.Eval () child =
                         addParentWithoutAdjustingHeights child node childIndex
                         // Now that child is necessary, it should have a valid height.
                         if Debug.globalFlag then
@@ -542,7 +542,7 @@ module internal State =
 
                         FakeUnit.ofUnit ()
                 }
-                |> child.Apply
+                |> child.Apply ()
                 |> FakeUnit.toUnit
             )
         // Now that the height is correct, maybe add [node] to the recompute heap.  [node]
@@ -636,8 +636,8 @@ module internal State =
 
     /// Returns true if we need to `recompute` the parent afterwards.
     let eval node oldValueOpt newValue t =
-        { new NodeEval<_> with
-            member _.Eval parent =
+        { new NodeEval<_, _> with
+            member _.Eval () parent =
                 match parent.Kind with
                 | Kind.Expert p ->
                     let childIndex = node.MyChildIndexInParentAtIndex.[0]
@@ -944,8 +944,8 @@ module internal State =
                 for parentIndex = 1 to node.NumParents - 1 do
                     let parent = node.Parent1AndBeyond.[parentIndex - 1].Value
 
-                    { new NodeEval<_> with
-                        member _.Eval parent =
+                    { new NodeEval<_, _> with
+                        member _.Eval () parent =
                             match parent.Kind with
                             | Kind.Expert expert ->
                                 let childIndex = node.MyChildIndexInParentAtIndex.[parentIndex] in
@@ -988,20 +988,20 @@ module internal State =
 
                             FakeUnit.ofUnit ()
                     }
-                    |> parent.Apply
+                    |> parent.Apply ()
                     |> FakeUnit.toUnit
 
-                let mustRecompute = eval node oldValueOpt newValue t |> node.Parent0.Value.Apply
+                let mustRecompute = eval node oldValueOpt newValue t |> node.Parent0.Value.Apply ()
 
                 if mustRecompute then
-                    node.Parent0.Value.Apply recomputeEval |> FakeUnit.toUnit
+                    node.Parent0.Value.Apply () recomputeEval |> FakeUnit.toUnit
 
         if Debug.globalFlag then
             invariant t
 
-    and private recomputeEval : NodeEval<FakeUnit> =
-        { new NodeEval<_> with
-            member _.Eval node =
+    and private recomputeEval : NodeEval<_, FakeUnit> =
+        { new NodeEval<_, _> with
+            member _.Eval () node =
                 if Debug.globalFlag && not (Node.needsToBeComputed node) then
                     failwith "node unexpectedly does not need to be computed"
 
@@ -1011,7 +1011,7 @@ module internal State =
     let recomputeFirstNodeThatIsNecessary (r : RecomputeHeap) : unit =
         let node = RecomputeHeap.removeMin r
 
-        node.Apply recomputeEval |> FakeUnit.toUnit
+        node.Apply () recomputeEval |> FakeUnit.toUnit
 
     let unlinkDisallowedObservers (t : State) : unit =
         while not (Stack.isEmpty t.DisallowedObservers) do
@@ -1257,8 +1257,8 @@ module internal State =
         while not (Stack.isEmpty t.HandleAfterStabilization) do
             let node = t.HandleAfterStabilization |> Stack.pop |> ValueOption.get
 
-            { new NodeEval<_> with
-                member _.Eval node =
+            { new NodeEval<_, _> with
+                member _.Eval () node =
                     node.IsInHandleAfterStabilization <- false
                     let oldValue = node.OldValueOpt in
                     node.OldValueOpt <- ValueNone
@@ -1278,7 +1278,7 @@ module internal State =
                     Stack.push (RunOnUpdateHandlers.make node nodeUpdate) t.RunOnUpdateHandlers
                     FakeUnit.ofUnit ()
             }
-            |> node.Apply
+            |> node.Apply ()
             |> FakeUnit.toUnit
 
         t.Status <- Status.RunningOnUpdateHandlers
@@ -1972,27 +1972,27 @@ module internal State =
         let assertCurrentlyRunningNodeIsChild (state : State) (node : Node<'a>) (name : string) : unit =
             let current = currentlyRunningNodeThrowing state name
 
-            { new NodeEval<_> with
-                member _.Eval current =
+            { new NodeEval<_, _> with
+                member _.Eval () current =
                     if not (Node.hasChild node current) then
                         failwith $"can only call %s{name} on parent nodes"
 
                     FakeUnit.ofUnit ()
             }
-            |> current.Apply
+            |> current.Apply ()
             |> FakeUnit.toUnit
 
         let assertCurrentlyRunningNodeIsParent state node name =
             let current = currentlyRunningNodeThrowing state name
 
-            { new NodeEval<_> with
-                member _.Eval current =
+            { new NodeEval<_, _> with
+                member _.Eval () current =
                     if not (Node.hasParent node current) then
                         failwith $"can only call %s{name} on children nodes"
 
                     FakeUnit.ofUnit ()
             }
-            |> current.Apply
+            |> current.Apply ()
             |> FakeUnit.toUnit
 
         let makeStale (node : 'a Node) : unit =

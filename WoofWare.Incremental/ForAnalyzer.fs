@@ -107,8 +107,8 @@ module ForAnalyzer =
             | WoofWare.Incremental.Kind.Map2 map2Crate -> Kind.Map2
 
     let maybeIterOnBindNodesCreatedOnRhs (node : NodeCrate) f =
-        { new NodeEval<_> with
-            member _.Eval node =
+        { new NodeEval<_, _> with
+            member _.Eval () node =
                 match node.Kind with
                 | WoofWare.Incremental.Kind.BindLhsChange (bind, _) ->
                     { new BindEval<_> with
@@ -119,22 +119,22 @@ module ForAnalyzer =
                     |> bind.Apply
                 | _ -> FakeUnit.ofUnit ()
         }
-        |> node.Apply
+        |> node.Apply ()
         |> FakeUnit.toUnit
 
-    let private kindEval : NodeEval<Kind> =
-        { new NodeEval<_> with
-            member _.Eval n = n.Kind |> Kind.ofKind
+    let private kindEval : NodeEval<_, Kind> =
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.Kind |> Kind.ofKind
         }
 
-    let private kind (n : NodeCrate) = n.Apply kindEval
+    let private kind (n : NodeCrate) = n.Apply () kindEval
 
-    let private cutoffEval : NodeEval<Cutoff> =
-        { new NodeEval<_> with
-            member _.Eval n = n.Cutoff |> Cutoff.ofCutoff
+    let private cutoffEval : NodeEval<_, Cutoff> =
+        { new NodeEval<_, _> with
+            member _.Eval () n = n.Cutoff |> Cutoff.ofCutoff
         }
 
-    let private cutoff (n : NodeCrate) = n.Apply cutoffEval
+    let private cutoff (n : NodeCrate) = n.Apply () cutoffEval
 
     /// Args to the addNode callback:
     /// id, kind, cutoff, children, bindChildren, userInfo, recomputedAt, changedAt, height
