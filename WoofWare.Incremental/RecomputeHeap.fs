@@ -41,18 +41,11 @@ module RecomputeHeap =
                 match node with
                 | ValueNone -> ()
                 | ValueSome node ->
-                    { new NodeEval<_> with
-                        member _.Eval node =
-                            if node.HeightInRecomputeHeap <> height then
-                                failwith "bad height"
+                    if NodeCrate.heightInRecomputeHeap node <> height then
+                        failwith "bad height"
 
-                            if not (Node.needsToBeComputed node) then
-                                failwith "expected node needs to be computed"
-
-                            FakeUnit.ofUnit ()
-                    }
-                    |> node.Apply
-                    |> FakeUnit.toUnit
+                    if not (NodeCrate.needsToBeComputed node) then
+                        failwith "expected node needs to be computed"
             )
 
     let createNodesByHeight maxHeightAllowed : ValueOption<NodeCrate> array = Array.zeroCreate (maxHeightAllowed + 1)
@@ -119,15 +112,8 @@ module RecomputeHeap =
         match t.NodesByHeight.[node.HeightInRecomputeHeap] with
         | ValueNone -> ()
         | ValueSome existing ->
-            { new NodeEval<_> with
-                member _.Eval existing =
-                    if Node.same node existing then
-                        t.NodesByHeight.[node.HeightInRecomputeHeap] <- next
-
-                    FakeUnit.ofUnit ()
-            }
-            |> existing.Apply
-            |> FakeUnit.toUnit
+            if NodeCrate.nodeId existing = node.Id then
+                t.NodesByHeight.[node.HeightInRecomputeHeap] <- next
 
         setPrev next prev
         setNext prev next
@@ -223,15 +209,8 @@ module RecomputeHeap =
         setPrev next ValueNone
 
         if Debug.globalFlag then
-            { new NodeEval<_> with
-                member _.Eval node =
-                    if node.PrevInRecomputeHeap.IsSome then
-                        failwith "expected prev node to be None"
-
-                    FakeUnit.ofUnit ()
-            }
-            |> node.Value.Apply
-            |> FakeUnit.toUnit
+            if (NodeCrate.prevInRecomputeHeap node.Value).IsSome then
+                failwith "expected prev node to be None"
 
         node.Value.Apply clearNextInRecomputeHeap |> FakeUnit.toUnit
 
