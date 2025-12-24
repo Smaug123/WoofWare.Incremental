@@ -72,6 +72,7 @@
           pkgs.shellcheck
           pkgs.xmlstarlet
           pkgs.claude-code
+          pkgs.codex
           pkgs.graph-easy
         ];
       };
