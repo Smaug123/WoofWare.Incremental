@@ -834,8 +834,15 @@ module internal State =
                 let oldAllNodesCreatedOnRhs = bind.AllNodesCreatedOnRhs
                 bind.AllNodesCreatedOnRhs <- ValueNone
 
+                // Inline runWithScope to avoid closure allocation
+                let savedScope = t.CurrentScope
+                t.CurrentScope <- bind.RhsScope
+
                 let rhs =
-                    runWithScope t bind.RhsScope (fun () -> bind.F (Node.valueThrowing bind.Lhs))
+                    try
+                        bind.F (Node.valueThrowing bind.Lhs)
+                    finally
+                        t.CurrentScope <- savedScope
 
                 bind.Rhs <- ValueSome rhs
                 node.ChangedAt <- t.StabilizationNum
