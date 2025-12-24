@@ -296,7 +296,7 @@ WoofWare.Incremental.IVar.Replace [method]: 'a WoofWare.Incremental.Var -> ('a -
 WoofWare.Incremental.IVar.Set [method]: 'a WoofWare.Incremental.Var -> 'a -> unit
 WoofWare.Incremental.IVar.Value [method]: 'a WoofWare.Incremental.Var -> 'a
 WoofWare.Incremental.IVar.Watch [method]: 'a WoofWare.Incremental.Var -> 'a WoofWare.Incremental.Node
-WoofWare.Incremental.Node`1 inherit obj
+WoofWare.Incremental.Node`1 inherit obj, implements WoofWare.Incremental.NodeCrate
 WoofWare.Incremental.NodeCrate - interface with 1 member(s)
 WoofWare.Incremental.NodeCrate.Apply [method]: #('ret WoofWare.Incremental.NodeEval) -> 'ret
 WoofWare.Incremental.NodeEval`1 - interface with 1 member(s)
