@@ -1,7 +1,6 @@
 namespace WoofWare.Incremental.Test
 
 open System
-open System.Diagnostics
 open FsUnitTyped
 open NUnit.Framework
 open WoofWare.Incremental
@@ -31,7 +30,6 @@ module TestNonDebug =
     // Debug-enabled incremental allocates a bunch of words during stabilization,
     // so we only run this test for non-debug incremental.
     [<Test>]
-    [<Explicit "not yet passing; in fact recompute allocates wildly visiting the crates">]
     [<NonParallelizable>]
     let ``Stabilization propagating values through an existing graph should not allocate`` () =
         let oldDebug = Debug.globalFlag

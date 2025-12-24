@@ -634,6 +634,91 @@ module internal State =
 
         TimingWheel.add clock.TimingWheel at alarmValue
 
+    /// Returns true if we need to `recompute` the parent afterwards.
+    let eval node oldValueOpt newValue t =
+        { new NodeEval<_> with
+            member _.Eval parent =
+                match parent.Kind with
+                | Kind.Expert p ->
+                    let childIndex = node.MyChildIndexInParentAtIndex.[0]
+                    Expert.runEdgeCallback p childIndex
+                | Kind.UnorderedArrayFold u ->
+                    { new UnorderedArrayFoldEval<_, _> with
+                        member _.Eval u =
+                            UnorderedArrayFold.childChanged
+                                u
+                                node
+                                node.MyChildIndexInParentAtIndex.[0]
+                                oldValueOpt
+                                newValue
+                            |> FakeUnit.ofUnit
+                    }
+                    |> u.Apply
+                    |> FakeUnit.toUnit
+                | _ -> ()
+
+                if Debug.globalFlag then
+                    assert (Node.needsToBeComputed parent)
+
+                if Node.isInRecomputeHeap parent then
+                    false
+                else
+                    let canRecomputeNow =
+                        match parent.Kind with
+                        | Kind.Uninitialized -> failwith "expected initialised"
+                        | Kind.At _
+                        | Kind.AtIntervals _
+                        | Kind.Const _
+                        | Invalid
+                        | Snapshot _
+                        | Var _ -> failwith "these nodes aren't parents"
+                        // These nodes have more than one child.
+                        | Kind.ArrayFold _
+                        | Kind.Map2 _
+                        | Kind.UnorderedArrayFold _
+                        | Kind.Expert _ -> false
+                        // We can immediately recompute [parent] if no other node needs to be stable
+                        // before computing it.  If [parent] has a single child (i.e. [node]), then
+                        // this amounts to checking that [parent] won't be invalidated, i.e. that
+                        // [parent]'s scope has already stabilized.
+                        | Kind.BindLhsChange _ -> node.Height > Scope.height parent.CreatedIn
+                        | Kind.Freeze _ -> node.Height > Scope.height parent.CreatedIn
+                        | Kind.IfTestChange _ -> node.Height > Scope.height parent.CreatedIn
+                        | Kind.JoinLhsChange _ -> node.Height > Scope.height parent.CreatedIn
+                        | Kind.Map _ -> node.Height > Scope.height parent.CreatedIn
+                        | Kind.StepFunction _ -> node.Height > Scope.height parent.CreatedIn
+                        // For these, we need to check that the "_change" child has already been
+                        // evaluated (if needed).  If so, this also implies:
+                        // node.height > Scope.height parent.created_in
+                        | Kind.BindMain b ->
+                            { new BindMainEval<_, _> with
+                                member _.Eval b = node.Height > b.LhsChange.Height
+                            }
+                            |> b.Apply
+                        | Kind.IfThenElse i -> node.Height > i.TestChange.Height
+                        | Kind.JoinMain j -> node.Height > j.LhsChange.Height
+
+                    if canRecomputeNow then
+                        t.NumNodesRecomputedDirectlyBecauseOneChild <- t.NumNodesRecomputedDirectlyBecauseOneChild + 1
+
+                        true
+                    else if parent.Height <= RecomputeHeap.minHeight t.RecomputeHeap then
+                        // If [parent.height] is [<=] the height of all nodes in the recompute heap
+                        // (possibly because the recompute heap is empty), then we can recompute
+                        // [parent] immediately and save adding it to and then removing it from the
+                        // recompute heap.
+                        t.NumNodesRecomputedDirectlyBecauseMinHeight <- t.NumNodesRecomputedDirectlyBecauseMinHeight + 1
+
+                        true
+                    else
+                        if Debug.globalFlag then
+                            assert (Node.needsToBeComputed parent)
+                            assert (not (Node.isInRecomputeHeap parent))
+
+                        RecomputeHeap.add t.RecomputeHeap parent
+                        false
+        }
+
     let rec recompute<'a> (node : 'a Node) : unit =
         let t = node.State
 
@@ -906,96 +991,15 @@ module internal State =
                     |> parent.Apply
                     |> FakeUnit.toUnit
 
-                { new NodeEval<_> with
-                    member _.Eval parent =
-                        match parent.Kind with
-                        | Kind.Expert p ->
-                            let childIndex = node.MyChildIndexInParentAtIndex.[0]
-                            Expert.runEdgeCallback p childIndex
-                        | Kind.UnorderedArrayFold u ->
-                            { new UnorderedArrayFoldEval<_, _> with
-                                member _.Eval u =
-                                    UnorderedArrayFold.childChanged
-                                        u
-                                        node
-                                        node.MyChildIndexInParentAtIndex.[0]
-                                        oldValueOpt
-                                        newValue
-                                    |> FakeUnit.ofUnit
-                            }
-                            |> u.Apply
-                            |> FakeUnit.toUnit
-                        | _ -> ()
+                let mustRecompute = eval node oldValueOpt newValue t |> node.Parent0.Value.Apply
 
-                        if Debug.globalFlag then
-                            assert (Node.needsToBeComputed parent)
-
-                        if not (Node.isInRecomputeHeap parent) then
-                            let canRecomputeNow =
-                                match parent.Kind with
-                                | Kind.Uninitialized -> failwith "expected initialised"
-                                | Kind.At _
-                                | Kind.AtIntervals _
-                                | Kind.Const _
-                                | Invalid
-                                | Snapshot _
-                                | Var _ -> failwith "these nodes aren't parents"
-                                // These nodes have more than one child.
-                                | Kind.ArrayFold _
-                                | Kind.Map2 _
-                                | Kind.UnorderedArrayFold _
-                                | Kind.Expert _ -> false
-                                // We can immediately recompute [parent] if no other node needs to be stable
-                                // before computing it.  If [parent] has a single child (i.e. [node]), then
-                                // this amounts to checking that [parent] won't be invalidated, i.e. that
-                                // [parent]'s scope has already stabilized.
-                                | Kind.BindLhsChange _ -> node.Height > Scope.height parent.CreatedIn
-                                | Kind.Freeze _ -> node.Height > Scope.height parent.CreatedIn
-                                | Kind.IfTestChange _ -> node.Height > Scope.height parent.CreatedIn
-                                | Kind.JoinLhsChange _ -> node.Height > Scope.height parent.CreatedIn
-                                | Kind.Map _ -> node.Height > Scope.height parent.CreatedIn
-                                | Kind.StepFunction _ -> node.Height > Scope.height parent.CreatedIn
-                                // For these, we need to check that the "_change" child has already been
-                                // evaluated (if needed).  If so, this also implies:
-                                // node.height > Scope.height parent.created_in
-                                | Kind.BindMain b ->
-                                    { new BindMainEval<_, _> with
-                                        member _.Eval b = node.Height > b.LhsChange.Height
-                                    }
-                                    |> b.Apply
-                                | Kind.IfThenElse i -> node.Height > i.TestChange.Height
-                                | Kind.JoinMain j -> node.Height > j.LhsChange.Height
-
-                            if canRecomputeNow then
-                                t.NumNodesRecomputedDirectlyBecauseOneChild <-
-                                    t.NumNodesRecomputedDirectlyBecauseOneChild + 1
-
-                                recompute parent
-                            else if parent.Height <= RecomputeHeap.minHeight t.RecomputeHeap then
-                                // If [parent.height] is [<=] the height of all nodes in the recompute heap
-                                // (possibly because the recompute heap is empty), then we can recompute
-                                // [parent] immediately and save adding it to and then removing it from the
-                                // recompute heap.
-                                t.NumNodesRecomputedDirectlyBecauseMinHeight <-
-                                    t.NumNodesRecomputedDirectlyBecauseMinHeight + 1
-
-                                recompute parent
-                            else
-                                if Debug.globalFlag then
-                                    assert (Node.needsToBeComputed parent)
-                                    assert (not (Node.isInRecomputeHeap parent))
-
-                                RecomputeHeap.add t.RecomputeHeap parent
-
-                        FakeUnit.ofUnit ()
-                }
-                |> node.Parent0.Value.Apply
-                |> FakeUnit.toUnit
+                if mustRecompute then
+                    node.Parent0.Value.Apply recomputeEval |> FakeUnit.toUnit
 
         if Debug.globalFlag then
             invariant t
 
-    let private recomputeEval =
+    and private recomputeEval : NodeEval<FakeUnit> =
         { new NodeEval<_> with
             member _.Eval node =
                 if Debug.globalFlag && not (Node.needsToBeComputed node) then
