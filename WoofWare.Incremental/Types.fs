@@ -336,6 +336,9 @@ and Node<'a> =
             mutable CreationBacktrace : string option
         }
 
+    interface NodeCrate with
+        member this.Apply (e : 'TEval) : 'ret = e.Eval this
+
 and NodeEval<'ret> =
     abstract Eval<'a> : 'a Node -> 'ret
 
@@ -540,10 +543,8 @@ module internal BindCrate =
 module CrateExtensions =
     type NodeCrate with
         /// Construct a NodeCrate from a Node, i.e. hiding its type parameter.
-        static member make (node : Node<'a>) : NodeCrate =
-            { new NodeCrate with
-                member _.Apply e = e.Eval node
-            }
+        /// This is a simple upcast since Node<'a> implements NodeCrate directly.
+        static member inline make (node : Node<'a>) : NodeCrate = node :> NodeCrate
 
     type InternalObserverCrate with
         static member internal make (i : InternalObserver<'a>) : InternalObserverCrate =
