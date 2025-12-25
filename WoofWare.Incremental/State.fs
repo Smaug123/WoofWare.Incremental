@@ -265,52 +265,79 @@ module internal State =
             node.IsInHandleAfterStabilization <- true
             Stack.push (NodeCrate.make node) t.HandleAfterStabilization
 
-    let rec removeChildren<'a> (parent : 'a Node) : unit =
-        Node.iteriChildrenAllocating
-            parent
-            (fun childIndex child ->
-                { new NodeEval<_> with
-                    member _.Eval child =
-                        removeChild child parent childIndex |> FakeUnit.ofUnit
+    type private RemoveChildrenLogic =
+        static member removeChildren<'a> (parent : 'a Node) : unit =
+            Node.iteriChildren parent Unchecked.defaultof<RemoveChildrenVisitor<_>> parent
+
+        static member removeChild<'a, 'b> (child : 'b Node) (parent : 'a Node) (childIndex : int) : unit =
+            Node.removeParent child parent childIndex
+            RemoveChildrenLogic.checkIfUnnecessary child
+
+        static member checkIfUnnecessary<'a> (node : 'a Node) : unit =
+            if not (NodeHelpers.isNecessary node) then
+                RemoveChildrenLogic.becameUnnecessary node
+
+        static member becameUnnecessary<'a> (node : 'a Node) : unit =
+            let t = node.State
+            t.NumNodesBecameUnnecessary <- t.NumNodesBecameUnnecessary + 1
+
+            if node.NumOnUpdateHandlers > 0 then
+                handleAfterStabilization node
+
+            node.Height <- -1
+            RemoveChildrenLogic.removeChildren node
+
+            match node.Kind with
+            | Kind.UnorderedArrayFold u ->
+                { new UnorderedArrayFoldEval<_, _> with
+                    member _.Eval u =
+                        UnorderedArrayFold.forceFullCompute u |> FakeUnit.ofUnit
                 }
-                |> child.Apply
+                |> u.Apply
                 |> FakeUnit.toUnit
-            )
+            | Kind.Expert p -> Expert.observabilityChange p false
+            | _ -> ()
 
-    and removeChild<'a, 'b> (child : 'b Node) (parent : 'a Node) (childIndex : int) : unit =
-        Node.removeParent child parent childIndex
-        checkIfUnnecessary child
+            if Debug.globalFlag then
+                assert (not (Node.needsToBeComputed node))
 
-    and checkIfUnnecessary<'a> (node : 'a Node) : unit =
-        if not (NodeHelpers.isNecessary node) then
-            becameUnnecessary node
+            if Node.isInRecomputeHeap node then
+                RecomputeHeap.remove t.RecomputeHeap node
 
-    and becameUnnecessary<'a> (node : 'a Node) : unit =
-        let t = node.State
-        t.NumNodesBecameUnnecessary <- t.NumNodesBecameUnnecessary + 1
+    /// Struct evaluator for removeChildren child iteration. Avoids closure allocation.
+    and [<Struct>] private RemoveChildEval<'a> =
+        val Parent : Node<'a>
+        val ChildIndex : int
 
-        if node.NumOnUpdateHandlers > 0 then
-            handleAfterStabilization node
-
-        node.Height <- -1
-        removeChildren node
-
-        match node.Kind with
-        | Kind.UnorderedArrayFold u ->
-            { new UnorderedArrayFoldEval<_, _> with
-                member _.Eval u =
-                    UnorderedArrayFold.forceFullCompute u |> FakeUnit.ofUnit
+        new (parent, childIndex)
+            =
+            {
+                Parent = parent
+                ChildIndex = childIndex
             }
-            |> u.Apply
-            |> FakeUnit.toUnit
-        | Kind.Expert p -> Expert.observabilityChange p false
-        | _ -> ()
 
-        if Debug.globalFlag then
-            assert (not (Node.needsToBeComputed node))
+        interface NodeEval<FakeUnit> with
+            member this.Eval child =
+                RemoveChildrenLogic.removeChild child this.Parent this.ChildIndex
+                |> FakeUnit.ofUnit
 
-        if Node.isInRecomputeHeap node then
-            RecomputeHeap.remove t.RecomputeHeap node
+    /// Struct visitor for removeChildren child iteration. Avoids outer lambda allocation.
+    and [<Struct>] private RemoveChildrenVisitor<'a> =
+        interface IChildVisitor<Node<'a>> with
+            member _.Visit (childIndex, child, parent) =
+                child.Apply (RemoveChildEval (parent, childIndex)) |> FakeUnit.toUnit
+
+    let removeChildren<'a> (parent : 'a Node) : unit =
+        RemoveChildrenLogic.removeChildren parent
+
+    let removeChild<'a, 'b> (child : 'b Node) (parent : 'a Node) (childIndex : int) : unit =
+        RemoveChildrenLogic.removeChild child parent childIndex
+
+    let checkIfUnnecessary<'a> (node : 'a Node) : unit =
+        RemoveChildrenLogic.checkIfUnnecessary node
+
+    let becameUnnecessary<'a> (node : 'a Node) : unit =
+        RemoveChildrenLogic.becameUnnecessary node
 
     let removeAlarm (clock : Clock) (alarm : TimingWheel.Alarm) : unit =
         if TimingWheel.mem clock.TimingWheel alarm then
