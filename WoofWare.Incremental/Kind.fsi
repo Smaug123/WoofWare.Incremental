@@ -16,6 +16,13 @@ module internal Kind =
     val freezeChildIndex : int
     val ifBranchChildIndex : int
     val joinRhsChildIndex : int
-    val iteriChildren<'a> : Kind<'a> -> f : (int -> NodeCrate -> unit) -> unit
+
+    /// Allocation-free version of iteriChildren using a struct visitor.
+    val inline iteriChildren<'a, 'TVisitor, 'TState when 'TVisitor : struct and 'TVisitor :> IChildVisitor<'TState>> :
+        Kind<'a> -> visitor : 'TVisitor -> state : 'TState -> unit
+
+    /// Iterates over children, calling the given function for each.
+    /// This version allocates if the function captures variables.
+    val iteriChildrenAllocating<'a> : Kind<'a> -> f : (int -> NodeCrate -> unit) -> unit
 
     val invariant<'a> : ('a -> unit) -> Kind<'a> -> unit

@@ -38,7 +38,20 @@ module internal Node =
         Type.referenceEqual' (nodeAsObj packed) (unpacked :> obj)
 
     let initialNumChildren (n : Node<_>) : int = Kind.initialNumChildren n.Kind
-    let iteriChildren (t : Node<'a>) (f : int -> NodeCrate -> unit) : unit = Kind.iteriChildren t.Kind f
+
+    /// Allocation-free version using a struct visitor.
+    let inline iteriChildren<'a, 'TVisitor, 'TState when 'TVisitor : struct and 'TVisitor :> IChildVisitor<'TState>>
+        (t : Node<'a>)
+        (visitor : 'TVisitor)
+        (state : 'TState)
+        : unit
+        =
+        Kind.iteriChildren t.Kind visitor state
+
+    /// Iterates over children, calling the given function for each.
+    /// This version allocates if the function captures variables.
+    let iteriChildrenAllocating (t : Node<'a>) (f : int -> NodeCrate -> unit) : unit =
+        Kind.iteriChildrenAllocating t.Kind f
 
     let userInfo (t : Node<'a>) : string option =
         match t.UserInfo with
@@ -70,7 +83,7 @@ module internal Node =
         let mutable isStale = false
         let parentRecomputedAt = t.RecomputedAt
 
-        iteriChildren
+        iteriChildrenAllocating
             t
             (fun _ child ->
                 if changedAtOfCrate child > parentRecomputedAt then
@@ -139,7 +152,7 @@ module internal Node =
     let hasChild (t : Node<'a>) (child : Node<'b>) : bool =
         let mutable has = false
 
-        iteriChildren
+        iteriChildrenAllocating
             t
             (fun _ child' ->
                 if packedSameAsUnpacked child' child then
@@ -151,7 +164,7 @@ module internal Node =
     let hasInvalidChild (t : Node<'a>) : bool =
         let mutable has = false
 
-        iteriChildren
+        iteriChildrenAllocating
             t
             (fun _ child ->
                 if not (isValidCrate child) then
@@ -297,7 +310,7 @@ module internal Node =
             if t.Height <= Scope.height t.CreatedIn then
                 failwith "invariant failure"
 
-            iteriChildren
+            iteriChildrenAllocating
                 t
                 (fun _ child ->
                     { new NodeEval<_> with
@@ -497,7 +510,7 @@ module internal Node =
                     failwith "invariant failure"
 
             if NodeHelpers.isNecessary t then
-                iteriChildren
+                iteriChildrenAllocating
                     t
                     (fun childIndex child ->
                         { new NodeEval<_> with
@@ -748,7 +761,7 @@ module internal NodeCrate =
                     if not (seen.Contains t.Id) then
                         seen.Add t.Id |> ignore
                         f nodeCrate
-                        Node.iteriChildren t (fun _ childCrate -> iterDescendants childCrate)
+                        Node.iteriChildrenAllocating t (fun _ childCrate -> iterDescendants childCrate)
 
                     FakeUnit.ofUnit ()
             }
@@ -796,10 +809,10 @@ module internal NodeCrate =
 
     let height (c : NodeCrate) = c.Apply heightEval
 
-    let iteriChildren (c : NodeCrate) (f : int -> NodeCrate -> unit) : unit =
+    let iteriChildrenAllocating (c : NodeCrate) (f : int -> NodeCrate -> unit) : unit =
         { new NodeEval<_> with
             member _.Eval node =
-                Node.iteriChildren node f |> FakeUnit.ofUnit
+                Node.iteriChildrenAllocating node f |> FakeUnit.ofUnit
         }
         |> c.Apply
         |> FakeUnit.toUnit

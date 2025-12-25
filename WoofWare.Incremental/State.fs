@@ -266,7 +266,7 @@ module internal State =
             Stack.push (NodeCrate.make node) t.HandleAfterStabilization
 
     let rec removeChildren<'a> (parent : 'a Node) : unit =
-        Node.iteriChildren
+        Node.iteriChildrenAllocating
             parent
             (fun childIndex child ->
                 { new NodeEval<_> with
@@ -553,9 +553,7 @@ module internal State =
             // - add [node] to the recompute heap, if necessary.
             setHeight node (Scope.height node.CreatedIn + 1)
 
-            Node.iteriChildren
-                node
-                (fun childIndex child -> child.Apply (BecameNecessaryChildEval (node, childIndex)) |> FakeUnit.toUnit)
+            Node.iteriChildren node Unchecked.defaultof<BecameNecessaryVisitor<_>> node
 
             // Now that the height is correct, maybe add [node] to the recompute heap.  [node]
             // just became necessary, so it can't have been in the recompute heap.  Since [node]
@@ -594,6 +592,12 @@ module internal State =
                     setHeight this.Node (child.Height + 1)
 
                 FakeUnit.ofUnit ()
+
+    /// Struct visitor for becameNecessary' child iteration. Avoids outer lambda allocation.
+    and [<Struct>] private BecameNecessaryVisitor<'a> =
+        interface IChildVisitor<Node<'a>> with
+            member _.Visit (childIndex, child, node) =
+                child.Apply (BecameNecessaryChildEval (node, childIndex)) |> FakeUnit.toUnit
 
     let addParentWithoutAdjustingHeights<'a, 'b> (child : 'a Node) (parent : 'b Node) (childIndex : int) =
         BecameNecessaryLogic.addParentWithoutAdjustingHeights child parent childIndex

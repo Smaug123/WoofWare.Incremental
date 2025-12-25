@@ -68,13 +68,21 @@ module internal Kind =
     /// inefficient.  Instead, we only want them to be recomputed at the "right" time,
     /// i.e. when time passes some threshold relevant to them.  We do this via scheduling
     /// alarms at those thresholds.
-    let iteriChildren<'a> (t : Kind<'a>) (f : int -> NodeCrate -> unit) : unit =
+    ///
+    /// This is the allocation-free version using a struct visitor.
+    /// The visitor's Visit method is called for each child with the provided state.
+    let inline iteriChildren<'a, 'TVisitor, 'TState when 'TVisitor : struct and 'TVisitor :> IChildVisitor<'TState>>
+        (t : Kind<'a>)
+        (visitor : 'TVisitor)
+        (state : 'TState)
+        : unit
+        =
         match t with
         | Kind.ArrayFold cr ->
             { new ArrayFoldEval<_, _> with
                 member _.Eval fold =
                     for i = 0 to Array.length fold.Children - 1 do
-                        fold.Children.[i] |> NodeCrate.make |> f i
+                        visitor.Visit (i, NodeCrate.make fold.Children.[i], state)
 
                     FakeUnit.ofUnit ()
             }
@@ -85,19 +93,18 @@ module internal Kind =
         | Kind.BindLhsChange (bind, _) ->
             { new BindEval<_> with
                 member _.Eval bind =
-                    bind.Lhs |> NodeCrate.make |> f 0 |> FakeUnit.ofUnit
+                    visitor.Visit (0, NodeCrate.make bind.Lhs, state) |> FakeUnit.ofUnit
             }
             |> bind.Apply
             |> FakeUnit.toUnit
         | Kind.BindMain cr ->
             { new BindMainEval<_, _> with
                 member _.Eval bind =
-                    // Various code, e.g. [state.became_necessary], relies on processing [lhs_change] before [rhs].
-                    bind.LhsChange |> NodeCrate.make |> f 0
+                    visitor.Visit (0, NodeCrate.make bind.LhsChange, state)
 
                     match bind.Rhs with
                     | ValueNone -> ()
-                    | ValueSome b -> b |> NodeCrate.make |> f 1
+                    | ValueSome b -> visitor.Visit (1, NodeCrate.make b, state)
 
                     FakeUnit.ofUnit ()
             }
@@ -108,49 +115,49 @@ module internal Kind =
             for i = 0 to expert.NumChildren - 1 do
                 { new ExpertEdgeEval<_> with
                     member _.Eval edge =
-                        edge.Child |> NodeCrate.make |> f i |> FakeUnit.ofUnit
+                        visitor.Visit (i, NodeCrate.make edge.Child, state) |> FakeUnit.ofUnit
                 }
                 |> expert.Children.[i].Value.Apply
                 |> FakeUnit.toUnit
-        | Kind.Freeze freeze -> freeze.Child |> NodeCrate.make |> f 0
+        | Kind.Freeze freeze -> visitor.Visit (0, NodeCrate.make freeze.Child, state)
         | Kind.IfTestChange (iTC, _) ->
             { new IfThenElseEval<_> with
                 member _.Eval iTE =
-                    iTE.Test |> NodeCrate.make |> f 0 |> FakeUnit.ofUnit
+                    visitor.Visit (0, NodeCrate.make iTE.Test, state) |> FakeUnit.ofUnit
             }
             |> iTC.Apply
             |> FakeUnit.toUnit
         | Kind.IfThenElse iTE ->
-            f 0 (NodeCrate.make iTE.TestChange)
+            visitor.Visit (0, NodeCrate.make iTE.TestChange, state)
 
             match iTE.CurrentBranch with
             | ValueNone -> ()
-            | ValueSome b -> f 1 (NodeCrate.make b)
+            | ValueSome b -> visitor.Visit (1, NodeCrate.make b, state)
         | Kind.Invalid -> ()
         | Kind.JoinLhsChange (cr, _) ->
             { new JoinEval<_> with
                 member _.Eval e =
-                    e.Lhs |> NodeCrate.make |> f 0 |> FakeUnit.ofUnit
+                    visitor.Visit (0, NodeCrate.make e.Lhs, state) |> FakeUnit.ofUnit
             }
             |> cr.Apply
             |> FakeUnit.toUnit
         | Kind.JoinMain join ->
-            join.LhsChange |> NodeCrate.make |> f 0
+            visitor.Visit (0, NodeCrate.make join.LhsChange, state)
 
             match join.Rhs with
             | ValueNone -> ()
-            | ValueSome rhs -> rhs |> NodeCrate.make |> f 1
+            | ValueSome rhs -> visitor.Visit (1, NodeCrate.make rhs, state)
         | Kind.Snapshot _ -> ()
         | Kind.StepFunction stepFunc ->
             match stepFunc.Child with
             | ValueNone -> ()
-            | ValueSome child -> NodeCrate.make child |> f 0
+            | ValueSome child -> visitor.Visit (0, NodeCrate.make child, state)
         | Kind.Uninitialized -> ()
         | Kind.UnorderedArrayFold cr ->
             { new UnorderedArrayFoldEval<_, _> with
                 member _.Eval e =
                     for i = 0 to Array.length e.Children - 1 do
-                        f i (NodeCrate.make e.Children.[i])
+                        visitor.Visit (i, NodeCrate.make e.Children.[i], state)
 
                     FakeUnit.ofUnit ()
             }
@@ -160,23 +167,35 @@ module internal Kind =
         | Kind.Map cr ->
             { new MapEval<_, _> with
                 member _.Eval (_, node) =
-                    f 0 (NodeCrate.make node) |> FakeUnit.ofUnit
+                    visitor.Visit (0, NodeCrate.make node, state) |> FakeUnit.ofUnit
             }
             |> cr.Apply
             |> FakeUnit.toUnit
         | Kind.Map2 cr ->
             { new Map2Eval<_, _> with
                 member _.Eval (_, node0, node1) =
-                    f 0 (NodeCrate.make node0)
-                    f 1 (NodeCrate.make node1)
+                    visitor.Visit (0, NodeCrate.make node0, state)
+                    visitor.Visit (1, NodeCrate.make node1, state)
                     FakeUnit.ofUnit ()
             }
             |> cr.Apply
             |> FakeUnit.toUnit
 
+    /// Struct visitor for iteriChildrenAllocating, passing function as state.
+    [<Struct>]
+    type private FunctionVisitor =
+        interface IChildVisitor<int -> NodeCrate -> unit> with
+            member _.Visit (i, child, f) = f i child
+
+    /// Iterates over children, calling the given function for each.
+    /// This version allocates if the function captures variables.
+    /// For allocation-free iteration, use iteriChildren with a struct visitor.
+    let iteriChildrenAllocating<'a> (t : Kind<'a>) (f : int -> NodeCrate -> unit) : unit =
+        iteriChildren t Unchecked.defaultof<FunctionVisitor> f
+
     exception private StopIteration of NodeCrate
 
-    /// Only used by Node.invariant, so we don't mind using withReturn and iteriChildren.
+    /// Only used by Node.invariant, so we don't mind using iteriChildrenAllocating.
     /// If we ever need a fast [get_child], we coded it in rev 48dbfd03c9c5.
     /// (patricks note: that rev does not appear to be public.)
     let slowGetChild<'a> (t : Kind<'a>) index : NodeCrate =
@@ -198,7 +217,7 @@ module internal Kind =
             |> e.Children.[index].Value.Apply
         | _ ->
             try
-                iteriChildren
+                iteriChildrenAllocating
                     t
                     (fun i child ->
                         if i = index then
