@@ -66,6 +66,7 @@
       devShell = pkgs.mkShell {
         buildInputs = [dotnet-sdk];
         DOTNET_CLI_TELEMETRY_OPTOUT = "1";
+        DOTNET_EnableDiagnostics = "0";
         packages = [
           pkgs.alejandra
           pkgs.nodePackages.markdown-link-check
