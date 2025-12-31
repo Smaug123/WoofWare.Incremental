@@ -32,7 +32,7 @@
     <Compile Include="TestIncrementalFailures.fs"/>
     <None Include="TestExpert.fs"/>
     <Compile Include="TestDot.fs"/>
-    <None Include="TestSyntax.fs"/>
+    <Compile Include="TestSyntax.fs"/>
     <Compile Include="TestNonDebug.fs"/>
     <Compile Include="TestSkeleton.fs"/>
     <Compile Include="TestFreeze.fs" />
