@@ -286,6 +286,15 @@ WoofWare.Incremental.Incremental.Var [property]: [read-only] WoofWare.Incrementa
 WoofWare.Incremental.Incremental.VoptUnorderedArrayFold [method]: 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'acc Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.VoptUnorderedArrayFold' [method]: int -> 'acc -> ('acc -> 'a -> 'acc) -> ('acc -> 'a -> 'acc) -> 'a Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node [] -> 'acc Microsoft.FSharp.Core.FSharpValueOption WoofWare.Incremental.Node
 WoofWare.Incremental.Incremental.WithinScope [method]: WoofWare.Incremental.Scope -> (unit -> 'a) -> 'a
+WoofWare.Incremental.IncrementalBuilder inherit obj
+WoofWare.Incremental.IncrementalBuilder..ctor [constructor]: WoofWare.Incremental.Incremental
+WoofWare.Incremental.IncrementalBuilder.Bind [method]: ('a WoofWare.Incremental.Node, 'a -> 'b WoofWare.Incremental.Node) -> 'b WoofWare.Incremental.Node
+WoofWare.Incremental.IncrementalBuilder.BindReturn [method]: ('a WoofWare.Incremental.Node, 'a -> 'b) -> 'b WoofWare.Incremental.Node
+WoofWare.Incremental.IncrementalBuilder.MergeSources [method]: ('a WoofWare.Incremental.Node, 'b WoofWare.Incremental.Node) -> ('a * 'b) WoofWare.Incremental.Node
+WoofWare.Incremental.IncrementalBuilder.Return [method]: 'a -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.IncrementalBuilder.ReturnFrom [method]: 'a WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.IncrementalBuilderModule inherit obj
+WoofWare.Incremental.IncrementalBuilderModule.create [static method]: WoofWare.Incremental.Incremental -> WoofWare.Incremental.IncrementalBuilder
 WoofWare.Incremental.IncrementalModule inherit obj
 WoofWare.Incremental.IncrementalModule.make [static method]: unit -> WoofWare.Incremental.Incremental
 WoofWare.Incremental.IVar - interface with 7 member(s)

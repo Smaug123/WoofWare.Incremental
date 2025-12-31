@@ -2,82 +2,187 @@ namespace WoofWare.Incremental.Test
 
 open WoofWare.Incremental
 open NUnit.Framework
-
-(*
+open FsUnitTyped
 
 [<TestFixture>]
 module TestSyntax =
-    open! Core
-open! Import
-module I = Incremental.Make ()
-open I
 
-let%expect_test "simple examples of [let%map] and [let%bind]" =
-  let open I.Let_syntax in
-  let xi = Var.create 13 in
-  let i1 =
-    let%map_open a = watch xi
-    and b = watch xi in
-    a + b
-  in
-  let xb = Var.create true in
-  let i2 =
-    let%bind_open b = watch xb in
-    if b then return 17 else return 19
-  in
-  let o1 = observe i1 in
-  let o2 = observe i2 in
-  I.stabilize ();
-  print_s
-    [%message
-      "" (Observer.value o1 : int Or_error.t) (Observer.value o2 : int Or_error.t)];
-  [%expect
-    {|
-    (("Observer.value o1" (Ok 26))
-     ("Observer.value o2" (Ok 17)))
-    |}]
-;;
+    [<Test>]
+    let ``simple examples of let! and and! (map and bind)`` () =
+        let I = Incremental.make ()
+        let incr = IncrementalBuilder.create I
 
-let%expect_test "simple example of using map3 via [let%mapn]" =
-  let open I.Let_syntax in
-  let x = Var.create 13 in
-  let y = Var.create 42 in
-  let z = Var.create 12 in
-  let xyz =
-    let%mapn x = Var.watch x
-    and y = Var.watch y
-    and z = Var.watch z in
-    x, y, z
-  in
-  let o = observe xyz in
-  I.stabilize ();
-  print_s [%message (Observer.value o : (int * int * int) Or_error.t)];
-  [%expect {| ("Observer.value o" (Ok (13 42 12))) |}];
-  Var.set x 100;
-  I.stabilize ();
-  print_s [%message (Observer.value o : (int * int * int) Or_error.t)];
-  [%expect {| ("Observer.value o" (Ok (100 42 12))) |}]
-;;
+        let xi = I.Var.Create 13
 
-let%expect_test "simple example of using bind3 via [let%bindn]" =
-  let open I.Let_syntax in
-  let x = Var.create 13 in
-  let y = Var.create 42 in
-  let z = Var.create 12 in
-  let xyz =
-    let%bindn x = Var.watch x
-    and y = Var.watch y
-    and z = Var.watch z in
-    return (x, y, z)
-  in
-  let o = observe xyz in
-  I.stabilize ();
-  print_s [%message (Observer.value o : (int * int * int) Or_error.t)];
-  [%expect {| ("Observer.value o" (Ok (13 42 12))) |}];
-  Var.set x 100;
-  I.stabilize ();
-  print_s [%message (Observer.value o : (int * int * int) Or_error.t)];
-  [%expect {| ("Observer.value o" (Ok (100 42 12))) |}]
-;;
+        // Using and! for applicative combination (more efficient, uses Map2)
+        let i1 =
+            incr {
+                let! a = I.Var.Watch xi
+                and! b = I.Var.Watch xi
+                return a + b
+            }
 
-*)
+        let xb = I.Var.Create true
+
+        // Using let! for monadic bind
+        let i2 =
+            incr {
+                let! b = I.Var.Watch xb
+
+                return! if b then I.Return 17 else I.Return 19
+            }
+
+        let o1 = I.Observe i1
+        let o2 = I.Observe i2
+        I.Stabilize ()
+
+        Observer.value o1 |> shouldEqual 26
+        Observer.value o2 |> shouldEqual 17
+
+    [<Test>]
+    let ``simple example of using map3 via and!`` () =
+        let I = Incremental.make ()
+        let incr = IncrementalBuilder.create I
+
+        let x = I.Var.Create 13
+        let y = I.Var.Create 42
+        let z = I.Var.Create 12
+
+        // With 3 and! clauses, MergeSources is chained creating nested tuples: ((a, b), c)
+        let xyz =
+            incr {
+                let! x = I.Var.Watch x
+                and! y = I.Var.Watch y
+                and! z = I.Var.Watch z
+                return (x, y, z)
+            }
+
+        let o = I.Observe xyz
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual (13, 42, 12)
+
+        I.Var.Set x 100
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual (100, 42, 12)
+
+    [<Test>]
+    let ``simple example of using bind3 via and! followed by return!`` () =
+        let I = Incremental.make ()
+        let incr = IncrementalBuilder.create I
+
+        let x = I.Var.Create 13
+        let y = I.Var.Create 42
+        let z = I.Var.Create 12
+
+        let xyz =
+            incr {
+                let! x = I.Var.Watch x
+                and! y = I.Var.Watch y
+                and! z = I.Var.Watch z
+                return! I.Return (x, y, z)
+            }
+
+        let o = I.Observe xyz
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual (13, 42, 12)
+
+        I.Var.Set x 100
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual (100, 42, 12)
+
+    [<Test>]
+    let ``simple example of using bind3 via let! followed by return!`` () =
+        let I = Incremental.make ()
+        let incr = IncrementalBuilder.create I
+
+        let x = I.Var.Create 13
+        let y = I.Var.Create 42
+        let z = I.Var.Create 12
+
+        let xyz =
+            incr {
+                let! x = I.Var.Watch x
+                let! y = I.Var.Watch y
+                let! z = I.Var.Watch z
+                return! I.Return (x, y, z)
+            }
+
+        let o = I.Observe xyz
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual (13, 42, 12)
+
+        I.Var.Set x 100
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual (100, 42, 12)
+
+    [<Test>]
+    let ``BindReturn optimization with single let!`` () =
+        let I = Incremental.make ()
+        let incr = IncrementalBuilder.create I
+
+        let x = I.Var.Create 10
+
+        // This should use BindReturn (i.e., Map) rather than Bind + Return
+        let doubled =
+            incr {
+                let! v = I.Var.Watch x
+                return v * 2
+            }
+
+        doubled.Kind.IsMap |> shouldEqual true
+
+        let o = I.Observe doubled
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual 20
+
+        I.Var.Set x 25
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual 50
+
+    [<Test>]
+    let ``MergeSources plus BindReturn with two let! and!`` () =
+        let I = Incremental.make ()
+        let incr = IncrementalBuilder.create I
+
+        let x = I.Var.Create 3
+        let y = I.Var.Create 7
+
+        // This uses MergeSources (Both) then BindReturn (Map)
+        let product =
+            incr {
+                let! a = I.Var.Watch x
+                and! b = I.Var.Watch y
+                return a * b
+            }
+
+        match product.Kind with
+        | Kind.Map cr ->
+            { new MapEval<_, _> with
+                member _.Eval (_, inner) = inner.Kind.IsMap2
+            }
+            |> cr.Apply
+            |> shouldEqual true
+        | _ -> failwith "bad kind"
+
+        let o = I.Observe product
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual 21
+
+        I.Var.Set x 5
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual 35
+
+        I.Var.Set y 10
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual 50

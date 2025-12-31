@@ -91,6 +91,8 @@
     <Compile Include="ReduceBalanced.fs"/>
     <Compile Include="Incremental.fsi"/>
     <Compile Include="Incremental.fs"/>
+    <Compile Include="IncrementalBuilder.fsi"/>
+    <Compile Include="IncrementalBuilder.fs"/>
     <Compile Include="Skeleton\RenderRelation.fs"/>
     <Compile Include="Skeleton\Node.fs"/>
     <Compile Include="Skeleton\Skeleton.fsi"/>
