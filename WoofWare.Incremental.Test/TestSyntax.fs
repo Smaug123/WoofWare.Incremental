@@ -95,6 +95,33 @@ module TestSyntax =
         Observer.value o |> shouldEqual (100, 42, 12)
 
     [<Test>]
+    let ``simple example of using bind3 via let! followed by return!`` () =
+        let I = Incremental.make ()
+        let incr = IncrementalBuilder.create I
+
+        let x = I.Var.Create 13
+        let y = I.Var.Create 42
+        let z = I.Var.Create 12
+
+        let xyz =
+            incr {
+                let! x = I.Var.Watch x
+                let! y = I.Var.Watch y
+                let! z = I.Var.Watch z
+                return! I.Return (x, y, z)
+            }
+
+        let o = I.Observe xyz
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual (13, 42, 12)
+
+        I.Var.Set x 100
+        I.Stabilize ()
+
+        Observer.value o |> shouldEqual (100, 42, 12)
+
+    [<Test>]
     let ``BindReturn optimization with single let!`` () =
         let I = Incremental.make ()
         let incr = IncrementalBuilder.create I
@@ -107,6 +134,8 @@ module TestSyntax =
                 let! v = I.Var.Watch x
                 return v * 2
             }
+
+        doubled.Kind.IsMap |> shouldEqual true
 
         let o = I.Observe doubled
         I.Stabilize ()
@@ -133,6 +162,15 @@ module TestSyntax =
                 and! b = I.Var.Watch y
                 return a * b
             }
+
+        match product.Kind with
+        | Kind.Map cr ->
+            { new MapEval<_, _> with
+                member _.Eval (_, inner) = inner.Kind.IsMap2
+            }
+            |> cr.Apply
+            |> shouldEqual true
+        | _ -> failwith "bad kind"
 
         let o = I.Observe product
         I.Stabilize ()
