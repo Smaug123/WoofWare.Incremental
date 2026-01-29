@@ -217,7 +217,7 @@ WoofWare.Incremental.ForAnalyzer+KindModule inherit obj
 WoofWare.Incremental.ForAnalyzer+KindModule.toString [static method]: WoofWare.Incremental.ForAnalyzer+Kind -> string
 WoofWare.Incremental.ForAnalyzer.directlyObserved [static method]: WoofWare.Incremental.State -> WoofWare.Incremental.NodeCrate list
 WoofWare.Incremental.ForAnalyzer.traverse [static method]: WoofWare.Incremental.NodeCrate list -> (WoofWare.Incremental.NodeId -> WoofWare.Incremental.ForAnalyzer+Kind -> WoofWare.Incremental.ForAnalyzer+Cutoff -> WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList -> WoofWare.Incremental.NodeId System.Collections.Generic.IReadOnlyList -> WoofWare.Incremental.DotUserInfo option -> int -> int -> int -> unit) -> unit
-WoofWare.Incremental.IClock - interface with 14 member(s)
+WoofWare.Incremental.IClock - interface with 15 member(s)
 WoofWare.Incremental.IClock.AdvanceClock [method]: WoofWare.Incremental.Clock -> System.Int64 -> unit
 WoofWare.Incremental.IClock.AdvanceClockBy [method]: WoofWare.Incremental.Clock -> System.Int64 -> unit
 WoofWare.Incremental.IClock.After [method]: WoofWare.Incremental.Clock -> System.Int64 -> WoofWare.Incremental.BeforeOrAfter WoofWare.Incremental.Node
@@ -229,6 +229,7 @@ WoofWare.Incremental.IClock.Create' [method]: WoofWare.TimingWheel.TimingWheelCo
 WoofWare.Incremental.IClock.DefaultTimingWheelConfig [property]: [read-only] WoofWare.TimingWheel.TimingWheelConfig
 WoofWare.Incremental.IClock.get_DefaultTimingWheelConfig [method]: unit -> WoofWare.TimingWheel.TimingWheelConfig
 WoofWare.Incremental.IClock.IncrementalStepFunction [method]: WoofWare.Incremental.Clock -> 'a WoofWare.Incremental.StepFunction WoofWare.Incremental.Node -> 'a WoofWare.Incremental.Node
+WoofWare.Incremental.IClock.NextAlarmFiresAt [method]: WoofWare.Incremental.Clock -> System.Int64 Microsoft.FSharp.Core.FSharpValueOption
 WoofWare.Incremental.IClock.Snapshot [method]: WoofWare.Incremental.Clock -> 'a WoofWare.Incremental.Node -> System.Int64 -> 'a -> Microsoft.FSharp.Core.FSharpResult<'a WoofWare.Incremental.Node, string>
 WoofWare.Incremental.IClock.StepFunction [method]: WoofWare.Incremental.Clock -> 'a -> (System.Int64 * 'a) list -> 'a WoofWare.Incremental.Node
 WoofWare.Incremental.IClock.WatchNow [method]: WoofWare.Incremental.Clock -> System.Int64 WoofWare.Incremental.Node

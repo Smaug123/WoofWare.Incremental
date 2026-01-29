@@ -43,6 +43,7 @@ type IClock =
     abstract Snapshot<'a> : Clock -> Node<'a> -> at : TimeNs -> before : 'a -> Result<Node<'a>, string>
     abstract WatchNow : Clock -> Node<TimeNs>
     abstract AlarmPrecision : Clock -> TimeNs.Span
+    abstract NextAlarmFiresAt : Clock -> TimeNs voption
     abstract StepFunction : Clock -> init : 'a -> (TimeNs * 'a) list -> Node<'a>
 
     abstract IncrementalStepFunction<'a> : Clock -> StepFunction<'a> Node -> 'a Node
