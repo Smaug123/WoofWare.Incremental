@@ -108,7 +108,7 @@
   <ItemGroup>
     <PackageReference Include="TypeEquality" Version="0.4.2"/>
     <PackageReference Include="WoofWare.BalancedReducer" Version="1.0.5" />
-    <PackageReference Include="WoofWare.TimingWheel" Version="0.6.4" />
+    <PackageReference Include="WoofWare.TimingWheel" Version="0.7.1" />
     <PackageReference Include="WoofWare.WeakHashTable" Version="1.2.2" />
     <PackageReference Update="FSharp.Core" Version="5.0.0"/>
   </ItemGroup>
