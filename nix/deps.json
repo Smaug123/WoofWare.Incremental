@@ -321,8 +321,8 @@
   },
   {
     "pname": "WoofWare.TimingWheel",
-    "version": "0.6.4",
-    "hash": "sha256-IOz5Vr35O46XZl+eOc9SwYsZE9IQBdeA1wmGVHvExFo="
+    "version": "0.7.1",
+    "hash": "sha256-2QDCVj9n1tGZSAWNf4YX8H7z8JlJzFBcmKiNsjs/mEI="
   },
   {
     "pname": "WoofWare.WeakHashTable",
