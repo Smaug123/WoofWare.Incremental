@@ -115,7 +115,7 @@ jobs:
       - name: Enable Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@b8276522d77f21bf19d3574e5bc99186a6c7aa6c
       - name: Run link checker
-        run: nix develop --command markdown-link-check README.md
+        run: nix develop --command lychee README.md
 
   nuget-pack:
     runs-on: ubuntu-latest

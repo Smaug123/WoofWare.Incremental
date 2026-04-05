@@ -69,7 +69,7 @@
         DOTNET_EnableDiagnostics = "0";
         packages = [
           pkgs.alejandra
-          pkgs.nodePackages.markdown-link-check
+          pkgs.lychee
           pkgs.shellcheck
           pkgs.xmlstarlet
           pkgs.claude-code
