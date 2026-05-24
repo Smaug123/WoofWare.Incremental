@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       with:
         fetch-depth: 0 # so that NerdBank.GitVersioning has access to history
     - name: Install Nix
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ab0a9732c6464e5bb81efb82a2103c7d98f0946f
       - name: Enable Nix cache
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ab0a9732c6464e5bb81efb82a2103c7d98f0946f
       - name: Enable Nix cache
@@ -66,7 +66,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0 # so that NerdBank.GitVersioning has access to history
       - name: Install Nix
@@ -85,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ab0a9732c6464e5bb81efb82a2103c7d98f0946f
       - name: Enable Nix cache
@@ -97,7 +97,7 @@ jobs:
     name: Check flake
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@61b9e3751b92087fd0b06925ba6dd6314e06f089 # master
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ab0a9732c6464e5bb81efb82a2103c7d98f0946f
       - name: Enable Nix cache
@@ -109,7 +109,7 @@ jobs:
     name: Check links
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@61b9e3751b92087fd0b06925ba6dd6314e06f089 # master
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ab0a9732c6464e5bb81efb82a2103c7d98f0946f
       - name: Enable Nix cache
@@ -120,7 +120,7 @@ jobs:
   nuget-pack:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       with:
         fetch-depth: 0 # so that NerdBank.GitVersioning has access to history
     - name: Install Nix
@@ -134,7 +134,7 @@ jobs:
     - name: Pack
       run: nix develop --command dotnet pack --configuration Release
     - name: Upload NuGet artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
         name: nuget-package
         path: WoofWare.Incremental/bin/Release/WoofWare.Incremental.*.nupkg
@@ -144,7 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download NuGet artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: nuget-package
           path: packed
@@ -156,9 +156,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [nuget-pack]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Download NuGet artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: nuget-package
       - name: Compute package path
@@ -198,13 +198,13 @@ jobs:
       attestations: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@ab0a9732c6464e5bb81efb82a2103c7d98f0946f
       - name: Enable Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@b8276522d77f21bf19d3574e5bc99186a6c7aa6c
       - name: Download NuGet artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: nuget-package
           path: packed
@@ -233,9 +233,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Download NuGet artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: nuget-package
       - name: Compute package path
