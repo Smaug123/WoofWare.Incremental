@@ -1,7 +1,7 @@
 # WoofWare.Incremental
 
 [![NuGet version](https://img.shields.io/nuget/v/WoofWare.Incremental.svg?style=flat-square)](https://www.nuget.org/packages/WoofWare.Incremental)
-[![GitHub Actions status](https://github.com/Smaug123/WoofWare.Incremental/actions/workflows/dotnet.yaml/badge.svg)](https://github.com/Smaug123/WoofWare.Incremental/actions?query=branch%3Amain)
+[![GitHub Actions status](https://github.com/Smaug123/WoofWare.Incremental/actions/workflows/ci.yaml/badge.svg)](https://github.com/Smaug123/WoofWare.Incremental/actions?query=branch%3Amain)
 [![License file](https://img.shields.io/github/license/Smaug123/WoofWare.Incremental)](./LICENCE.md)
 
 This is [`incremental`](https://github.com/janestreet/incremental), but in F#.
