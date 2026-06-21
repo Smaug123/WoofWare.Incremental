@@ -3,8 +3,10 @@ namespace WoofWare.Incremental.Test
 open System
 open System.Collections.Generic
 open NUnit.Framework
+open FsUnitTyped
 open WoofWare.Incremental
 open WoofWare.Expect
+open WoofWare.TimingWheel
 
 type NodePrint =
     {
@@ -362,3 +364,26 @@ module TestForAnalyzer =
 
             return printNodes (ForAnalyzer.directlyObserved Incr.State) id (fun n -> n.ToString ())
         }
+
+[<TestFixture>]
+module TestForAnalyzerKind =
+    [<Test>]
+    let ``At renders its payload`` () =
+        ForAnalyzer.Kind.toString (ForAnalyzer.Kind.At 3L<timeNs>) |> shouldEqual "At(3)"
+
+    [<Test>]
+    let ``Snapshot renders its payload`` () =
+        // The OCaml renders the Snapshot's `at`, and the adjacent At/AtIntervals cases include their payloads.
+        ForAnalyzer.Kind.toString (ForAnalyzer.Kind.Snapshot 7L<timeNs>)
+        |> shouldEqual "Snapshot(7)"
+
+    [<Test>]
+    let ``AtIntervals is well-formed and includes both payloads`` () =
+        let s =
+            ForAnalyzer.Kind.toString (ForAnalyzer.Kind.AtIntervals (5L<timeNs>, TimeNs.Span.ofSec 1.0))
+
+        s.StartsWith ("AtIntervals(5, ", StringComparison.Ordinal) |> shouldEqual true
+        s.EndsWith (")", StringComparison.Ordinal) |> shouldEqual true
+        // parentheses must be balanced
+        (s |> Seq.filter (fun c -> c = '(') |> Seq.length)
+        |> shouldEqual (s |> Seq.filter (fun c -> c = ')') |> Seq.length)
