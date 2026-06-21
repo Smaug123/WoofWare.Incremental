@@ -47,6 +47,7 @@
     <Compile Include="TestArrayFold.fs" />
     <Compile Include="TestReduceBalanced.fs" />
     <Compile Include="TestOnUpdate.fs" />
+    <Compile Include="TestRecomputeHeap.fs" />
   </ItemGroup>
 
   <ItemGroup>
