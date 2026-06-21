@@ -66,7 +66,7 @@ module internal InternalObserverInvariant =
                 match t.State with
                 | InternalObserverState.Created
                 | InternalObserverState.Unlinked ->
-                    if t.PrevInObserving.IsSome then
+                    if t.NextInObserving.IsSome then
                         failwith "invariant failed"
                 | _ -> ()
 

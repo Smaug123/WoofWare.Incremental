@@ -783,3 +783,52 @@ module TestObserver =
         fix.Stabilize ()
         fix.Stabilize ()
         Observer.disallowFutureUse o
+
+    /// Build an observer left in [state] (i.e. Created/Unlinked, so not registered on its node) whose
+    /// [NextInObserving] dangles to a second observer. The back-link is kept consistent so that the *only*
+    /// invariant that can fire is "a Created/Unlinked observer must have no NextInObserving" -- exactly the
+    /// dangling-pointer corruption a buggy unlinkFromObserving would leave behind.
+    let private observerWithDanglingNextInObserving (state : InternalObserverState) : unit -> unit =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let node = I.Const 0
+        // Stabilize against a real observer so [node] is a fully consistent node and Node.invariant is happy.
+        let warm = I.Observe node
+        fix.Stabilize ()
+        ignore<Observer<int>> warm
+
+        let t = (State.createObserver (Some false) node).Value
+        let next = (State.createObserver (Some false) node).Value
+        t.NextInObserving <- ValueSome next
+        next.PrevInObserving <- ValueSome t
+        t.State <- state
+
+        fun () -> InternalObserver.invariant ignore t
+
+    [<Test>]
+    let ``created observer with dangling NextInObserving violates the invariant`` () =
+        expect {
+            snapshotThrows @"System.Exception: invariant failed"
+            return! observerWithDanglingNextInObserving InternalObserverState.Created
+        }
+
+    [<Test>]
+    let ``unlinked observer with dangling NextInObserving violates the invariant`` () =
+        expect {
+            snapshotThrows @"System.Exception: invariant failed"
+            return! observerWithDanglingNextInObserving InternalObserverState.Unlinked
+        }
+
+    [<Test>]
+    let ``freshly created observer with no observing links satisfies the invariant`` () =
+        // Positive control: confirms the node setup above is otherwise invariant-clean, so the failing
+        // tests fail because of the dangling link and nothing else.
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let node = I.Const 0
+        let warm = I.Observe node
+        fix.Stabilize ()
+        ignore<Observer<int>> warm
+
+        let t = (State.createObserver (Some false) node).Value
+        InternalObserver.invariant ignore t
