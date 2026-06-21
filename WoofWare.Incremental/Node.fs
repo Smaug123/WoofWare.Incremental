@@ -53,12 +53,6 @@ module internal Node =
     let iteriChildrenAllocating (t : Node<'a>) (f : int -> NodeCrate -> unit) : unit =
         Kind.iteriChildrenAllocating t.Kind f
 
-    let userInfo (t : Node<'a>) : string option =
-        match t.UserInfo with
-        | None -> None
-        | Some (DotUserInfo.Info i) -> Some i
-        | Some other -> Some (failwith "TODO: this was Info.create_s (Dot_user_info.sexp_of_t other)")
-
     let setUserInfo (t : Node<'a>) (info : string option) : unit =
         let desired =
             match info with
