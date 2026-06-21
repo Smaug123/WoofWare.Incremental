@@ -369,7 +369,8 @@ module TestForAnalyzer =
 module TestForAnalyzerKind =
     [<Test>]
     let ``At renders its payload`` () =
-        ForAnalyzer.Kind.toString (ForAnalyzer.Kind.At 3L<timeNs>) |> shouldEqual "At(3)"
+        ForAnalyzer.Kind.toString (ForAnalyzer.Kind.At 3L<timeNs>)
+        |> shouldEqual "At(3)"
 
     [<Test>]
     let ``Snapshot renders its payload`` () =
