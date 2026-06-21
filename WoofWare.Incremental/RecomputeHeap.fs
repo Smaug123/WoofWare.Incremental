@@ -18,7 +18,17 @@ module RecomputeHeap =
             let mutable actualLength = 0
 
             t.NodesByHeight
-            |> Array.iter (fun node -> actualLength <- actualLength + NodeCrate.AsList.length asList node)
+            |> Array.iter (fun node ->
+                NodeCrate.AsList.iter
+                    asList
+                    node
+                    (fun node ->
+                        actualLength <- actualLength + 1
+
+                        if not (NodeCrate.isInRecomputeHeap node) then
+                            failwith "expected node to be in recompute heap"
+                    )
+            )
 
             if t.Length <> actualLength then
                 failwith "incorrect length"
@@ -38,14 +48,16 @@ module RecomputeHeap =
         do
             t.NodesByHeight
             |> Array.iteri (fun height node ->
-                match node with
-                | ValueNone -> ()
-                | ValueSome node ->
-                    if NodeCrate.heightInRecomputeHeap node <> height then
-                        failwith "bad height"
+                NodeCrate.AsList.iter
+                    asList
+                    node
+                    (fun node ->
+                        if NodeCrate.heightInRecomputeHeap node <> height then
+                            failwith "bad height"
 
-                    if not (NodeCrate.needsToBeComputed node) then
-                        failwith "expected node needs to be computed"
+                        if not (NodeCrate.needsToBeComputed node) then
+                            failwith "expected node needs to be computed"
+                    )
             )
 
     let createNodesByHeight maxHeightAllowed : ValueOption<NodeCrate> array = Array.zeroCreate (maxHeightAllowed + 1)
