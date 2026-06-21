@@ -22,7 +22,15 @@ type Observer<'a> =
             | InternalObserverState.InUse ->
                 match this.Value.Observing.ValueOpt with
                 | ValueNone -> "<invalid>"
-                | ValueSome v -> v.ToString ()
+                | ValueSome v ->
+                    // The observed value may legitimately be null (e.g. a `Var.Create (null : string)`);
+                    // mirror OCaml's `sexp_of_t`, which never raises, rather than throwing NullReferenceException.
+                    // Only reference types can be null; for value types we skip the null check entirely so we
+                    // don't box (`v.ToString ()` on a value type is a constrained call that allocates nothing).
+                    if not (typeof<'a>.IsValueType) && isNull (box v) then
+                        "null"
+                    else
+                        v.ToString ()
 
 [<RequireQualifiedAccess>]
 module Observer =

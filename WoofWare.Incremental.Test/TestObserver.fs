@@ -36,6 +36,19 @@ module TestObserver =
         }
 
     [<Test>]
+    let ``toString of a legitimately null value does not throw`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+        let t = I.Observe (I.Var.Watch (I.Var.Create (null : string)))
+
+        fix.Stabilize ()
+
+        expect {
+            snapshot "null"
+            return Observer.toString t
+        }
+
+    [<Test>]
     let ``observe and watch`` () =
         let fix = IncrementalFixture.Make ()
         let I = fix.I
