@@ -394,9 +394,21 @@ and [<CustomEquality ; NoComparison>] Scope =
                         |> other.Apply
                 }
                 |> this.Apply
-        | _ -> failwith "bad equality comparison"
+        // The .NET equality contract requires Equals(null) and Equals(non-Scope) to return false,
+        // not throw.
+        | _ -> false
 
-    override this.GetHashCode () = failwith "Scope is not hashable"
+    override this.GetHashCode () =
+        // Equality is reference equality of the underlying Bind, so hash on its identity to keep
+        // equal scopes hashing equally. All Tops are equal, so they share a constant hash.
+        match this with
+        | Scope.Top -> 0
+        | Scope.Bind bind ->
+            { new BindEval<_> with
+                member _.Eval bind =
+                    System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode bind
+            }
+            |> bind.Apply
 
 and internal Snapshot<'a> =
     {

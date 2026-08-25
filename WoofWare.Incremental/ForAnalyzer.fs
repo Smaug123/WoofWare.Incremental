@@ -63,7 +63,7 @@ module ForAnalyzer =
             match k with
             | Kind.ArrayFold -> "ArrayFold"
             | Kind.At int64 -> $"At(%i{int64})"
-            | Kind.AtIntervals (base', interval) -> $"AtIntervals(%i{base'}, %i{interval}"
+            | Kind.AtIntervals (base', interval) -> $"AtIntervals(%i{base'}, %i{interval})"
             | Kind.BindLhsChange -> "BindLhsChange"
             | Kind.BindMain -> "BindMain"
             | Kind.Const -> "Const"
@@ -75,7 +75,7 @@ module ForAnalyzer =
             | Kind.JoinLhsChange -> "JoinLhsChange"
             | Kind.JoinMain -> "JoinMain"
             | Kind.Map -> "Map"
-            | Kind.Snapshot at -> "Snapshot"
+            | Kind.Snapshot at -> $"Snapshot(%i{at})"
             | Kind.StepFunction -> "StepFunction"
             | Kind.Uninitialized -> "Uninitialized"
             | Kind.UnorderedArrayFold -> "UnorderedArrayFold"

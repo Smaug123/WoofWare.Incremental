@@ -145,8 +145,9 @@ type Incremental =
     /// <summary>Sets the maximum allowed height of nodes.</summary>
     /// <exception cref="Exception">Raises if called during stabilization, or if the input height is less than the max height we've already seen.</exception>
     abstract SetMaxHeightAllowed : int -> unit
-    /// The maximum height of any node in this graph.
-    /// This is a constant-time-access counter that is automatically updated during execution anyway.
+    /// The maximum height a node is allowed to have, as configured by `SetMaxHeightAllowed` (default 128).
+    /// This is the limit, not the tallest node currently in the graph; attempting to give a node a greater
+    /// height is an error.
     abstract MaxHeightAllowed : int
 
     /// Like `Lazy.Create`, except that the nodes created within the function will be created in the scope in which
