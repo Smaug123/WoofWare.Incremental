@@ -1,5 +1,11 @@
 # WoofWare.Incremental
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="logos/dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="logos/light.svg">
+  <img alt="Project logo: minimalistic face of a cartoon Shiba Inu, drawn in outline, with a small dependency graph for a face: two circular nodes for eyes, each with an arrow pointing down to the nose, and an edge from the nose down to a fourth node at the chin." src="logos/light.svg" width="300">
+</picture>
+
 [![NuGet version](https://img.shields.io/nuget/v/WoofWare.Incremental.svg?style=flat-square)](https://www.nuget.org/packages/WoofWare.Incremental)
 [![GitHub Actions status](https://github.com/Smaug123/WoofWare.Incremental/actions/workflows/ci.yaml/badge.svg)](https://github.com/Smaug123/WoofWare.Incremental/actions?query=branch%3Amain)
 [![License file](https://img.shields.io/github/license/Smaug123/WoofWare.Incremental)](./LICENCE.md)
