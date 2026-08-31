@@ -4,6 +4,8 @@ open System.Threading
 open FsUnitTyped
 open NUnit.Framework
 open WoofWare.Incremental
+open FsCheck
+open FsCheck.FSharp
 
 [<TestFixture>]
 module TestSum =
@@ -132,3 +134,84 @@ module TestSum =
         let o = I.Observe (I.Sum None 0.0 (+) (-) [||])
         fix.Stabilize ()
         Observer.value o |> shouldEqual 0.0
+
+    [<Test>]
+    let ``sum' does a periodic full recompute to bound float drift`` () =
+        let fix = IncrementalFixture.Make ()
+        let I = fix.I
+
+        // Choose values that make incremental add/sub drift: 1.0 is lost when added to 1e16
+        // (the ULP of 1e16 is 2), so (a + b) - b = 0.0 <> 1.0 = a.
+        let a = I.Var.Create 1.0
+        let b = I.Var.Create 1e16
+
+        let o = State.sumFloat I.State [| I.Var.Watch a ; I.Var.Watch b |] |> I.Observe
+
+        fix.Stabilize ()
+        // Initial full compute: (0 + 1.0) + 1e16 = 1e16.
+        Observer.value o |> shouldEqual 1e16
+
+        // Change #1 is always incremental: (1e16 - 1e16) + 0.0 = 0.0. The true sum is now 1.0.
+        I.Var.Set b 0.0
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 0.0
+
+        // Change #2 is the nodes.Length-th change. With fullComputeEveryNChanges = nodes.Length
+        // it forces a full recompute, giving the exact answer (0 + 2.0 + 0.0 = 2.0). Without it,
+        // the incremental update gives (0.0 - 1.0) + 2.0 = 1.0, i.e. accumulated drift of 1.0.
+        I.Var.Set a 2.0
+        fix.Stabilize ()
+        Observer.value o |> shouldEqual 2.0
+
+    [<Test>]
+    let ``sum' agrees with an explicit full_compute_every_n_changes of nodes.Length`` () =
+        // A finite, varied-magnitude float so that incremental drift actually appears.
+        let genValue =
+            gen {
+                let! sign = Gen.elements [ 1.0 ; -1.0 ]
+                let! mant = Gen.choose (0, 1000)
+                let! scale = Gen.elements [ 1.0 ; 1e8 ; 1e16 ]
+                return sign * float mant * scale
+            }
+
+        let genScenario =
+            gen {
+                let! n = Gen.choose (2, 5)
+                let! initial = Gen.listOfLength n genValue
+
+                let! updates =
+                    gen {
+                        let! i = Gen.choose (0, n - 1)
+                        let! v = genValue
+                        return (i, v)
+                    }
+                    |> Gen.listOf
+
+                return (initial, updates)
+            }
+
+        let property (initial : float list, updates : (int * float) list) =
+            let fix = IncrementalFixture.Make ()
+            let I = fix.I
+            let n = List.length initial
+            let vars = initial |> List.map I.Var.Create
+            let watches = vars |> List.map I.Var.Watch |> Array.ofList
+
+            // sum' must behave exactly like Sum with full_compute_every_n_changes = nodes.Length.
+            let oPrime = State.sumFloat I.State watches |> I.Observe
+            let oExplicit = I.Sum (Some n) 0.0 (+) (-) watches |> I.Observe
+
+            fix.Stabilize ()
+            let mutable ok = Observer.value oPrime = Observer.value oExplicit
+
+            for i, v in updates do
+                I.Var.Set (List.item i vars) v
+                fix.Stabilize ()
+                ok <- ok && (Observer.value oPrime = Observer.value oExplicit)
+
+            Observer.disallowFutureUse oPrime
+            Observer.disallowFutureUse oExplicit
+            ok
+
+        let config = Config.QuickThrowOnFailure.WithQuietOnSuccess true
+        Check.One (config, Prop.forAll (Arb.fromGen genScenario) property)

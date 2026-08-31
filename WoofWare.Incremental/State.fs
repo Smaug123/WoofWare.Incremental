@@ -1825,7 +1825,14 @@ module internal State =
         (nodes : Node<'T> array)
         : Node<'T>
         =
-        sum t None nodes LanguagePrimitives.GenericZero (+) (-)
+        // Periodically recompute from scratch to bound floating-point drift in the incremental
+        // add/sub, matching OCaml's [sum_float]. Harmless for exact types such as [int].
+        sum t (Some nodes.Length) nodes LanguagePrimitives.GenericZero (+) (-)
+
+    /// Concrete instantiation of [sum'] at [float]. An [inline] SRTP function such as [sum']
+    /// cannot be invoked across the InternalsVisibleTo boundary (FS1113), so this seam lets the
+    /// tests exercise [sum'] directly.
+    let internal sumFloat (t : State) (nodes : Node<float> array) : Node<float> = sum' t nodes
 
     let setFreeze (node : 'a Node) (child : Node<'a>) (onlyFreezeWhen : 'a -> bool) : unit =
         if Debug.globalFlag then
